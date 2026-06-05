@@ -1,0 +1,10 @@
+{
+  "name": "batchExport",
+  "version": "1.0.0",
+  "description": "批量导出选手数据为Excel云函数",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest",
+    "xlsx": "^0.18.5"
+  }
+}

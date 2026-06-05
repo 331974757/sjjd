@@ -1,0 +1,83 @@
+<!--pages/dota2-add/dota2-add.wxml-->
+<view class="add-page">
+  <view class="form-section">
+    <!-- 微信群昵称 -->
+    <view class="form-group">
+      <text class="form-label">微信群昵称 <text class="required">*</text></text>
+      <input class="form-input" placeholder="请输入微信群昵称" value="{{wxNickname}}" bindinput="onInput" data-field="wxNickname" />
+    </view>
+
+    <!-- Steam ID -->
+    <view class="form-group">
+      <text class="form-label">Steam ID</text>
+      <input class="form-input" placeholder="请输入 Steam ID" value="{{steamId}}" bindinput="onInput" data-field="steamId" />
+    </view>
+
+    <!-- Dota2 游戏 ID -->
+    <view class="form-group">
+      <text class="form-label">Dota2 游戏 ID <text class="required">*</text></text>
+      <input class="form-input" placeholder="请输入 Dota2 游戏 ID" value="{{gameId}}" bindinput="onInput" data-field="gameId" />
+    </view>
+
+    <!-- 历史最高分 -->
+    <view class="form-group">
+      <text class="form-label">Dota2 历史最高分</text>
+      <input class="form-input" type="digit" placeholder="请输入历史最高分" value="{{highestMmr}}" bindinput="onInput" data-field="highestMmr" />
+    </view>
+
+    <!-- 当前分数 -->
+    <view class="form-group">
+      <text class="form-label">Dota2 当前分数 <text class="required">*</text></text>
+      <input class="form-input" type="digit" placeholder="请输入当前分数" value="{{currentMmr}}" bindinput="onInput" data-field="currentMmr" />
+    </view>
+
+    <!-- 自我认定分数 -->
+    <view class="form-group">
+      <text class="form-label">自我认定分数</text>
+      <input class="form-input" type="digit" placeholder="请输入自我认定分数" value="{{selfMmr}}" bindinput="onInput" data-field="selfMmr" />
+    </view>
+
+    <!-- 擅长游戏位置（多选） -->
+    <view class="form-group">
+      <text class="form-label">擅长游戏位置</text>
+      <view class="pos-selector">
+        <view class="pos-card {{selectedPos[1] ? 'pos-selected' : ''}}" bindtap="togglePos" data-pos="1">
+          <view class="pos-icon pos-icon-1">1</view>
+          <text class="pos-label">一号位</text>
+        </view>
+        <view class="pos-card {{selectedPos[2] ? 'pos-selected' : ''}}" bindtap="togglePos" data-pos="2">
+          <view class="pos-icon pos-icon-2">2</view>
+          <text class="pos-label">二号位</text>
+        </view>
+        <view class="pos-card {{selectedPos[3] ? 'pos-selected' : ''}}" bindtap="togglePos" data-pos="3">
+          <view class="pos-icon pos-icon-3">3</view>
+          <text class="pos-label">三号位</text>
+        </view>
+        <view class="pos-card {{selectedPos[4] ? 'pos-selected' : ''}}" bindtap="togglePos" data-pos="4">
+          <view class="pos-icon pos-icon-4">4</view>
+          <text class="pos-label">四号位</text>
+        </view>
+        <view class="pos-card {{selectedPos[5] ? 'pos-selected' : ''}}" bindtap="togglePos" data-pos="5">
+          <view class="pos-icon pos-icon-5">5</view>
+          <text class="pos-label">五号位</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 比赛报名位置（picker单选） -->
+    <view class="form-group">
+      <text class="form-label">比赛报名位置</text>
+      <picker mode="selector" range="{{signupOptions}}" value="{{signupIndex}}" bindchange="onSignupPick">
+        <view class="picker-display">
+          <text class="picker-text">{{signupOptions[signupIndex]}}</text>
+          <text class="picker-arrow">▾</text>
+        </view>
+      </picker>
+    </view>
+
+    <!-- 提交按钮 -->
+    <view class="submit-btn {{submitting ? 'btn-disabled' : ''}}" bindtap="onSubmit">
+      <text class="submit-text">{{submitting ? '提交中...' : '确认添加'}}</text>
+    </view>
+  </view>
+</view>

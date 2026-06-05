@@ -1,0 +1,18 @@
+{
+  "pages": [
+    "pages/dota2/dota2",
+    "pages/dota2-detail/dota2-detail",
+    "pages/dota2-add/dota2-add",
+    "pages/dota2-import/dota2-import"
+  ],
+  "window": {
+    "backgroundTextStyle": "dark",
+    "navigationBarBackgroundColor": "#1B6B4A",
+    "navigationBarTitleText": "Dota2选手管理",
+    "navigationBarTextStyle": "white"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents",
+  "cloud": true
+}

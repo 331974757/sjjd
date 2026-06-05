@@ -1,0 +1,102 @@
+<!--pages/dota2/dota2.wxml-->
+<view class="page">
+  <!-- 顶部栏 -->
+  <view class="top-bar">
+    <view class="top-left">
+      <text class="title">微雨杯</text>
+      <text class="count">{{filteredCount}} 名选手</text>
+    </view>
+    <view class="top-right">
+      <view class="menu-btn" bindtap="showMenu">
+        <text class="menu-icon">⋯</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 搜索 + 筛选 -->
+  <view class="filter-bar">
+    <input class="search-input" placeholder="搜索昵称 / Dota2 ID" value="{{keyword}}" bindinput="onKeywordInput" bindconfirm="onKeywordInput" />
+    <view class="filter-row">
+      <!-- 擅长位置筛选 -->
+      <view class="filter-group">
+        <text class="filter-label">擅长位置</text>
+        <scroll-view class="pos-scroll" scroll-x="true">
+          <view class="pos-filter-tag {{positionFilter === 'all' ? 'pos-active' : ''}}" bindtap="onPosFilter" data-pos="all">全部位置</view>
+          <view class="pos-filter-tag {{positionFilter === '1' ? 'pos-active' : ''}}" bindtap="onPosFilter" data-pos="1">1号位</view>
+          <view class="pos-filter-tag {{positionFilter === '2' ? 'pos-active' : ''}}" bindtap="onPosFilter" data-pos="2">2号位</view>
+          <view class="pos-filter-tag {{positionFilter === '3' ? 'pos-active' : ''}}" bindtap="onPosFilter" data-pos="3">3号位</view>
+          <view class="pos-filter-tag {{positionFilter === '4' ? 'pos-active' : ''}}" bindtap="onPosFilter" data-pos="4">4号位</view>
+          <view class="pos-filter-tag {{positionFilter === '5' ? 'pos-active' : ''}}" bindtap="onPosFilter" data-pos="5">5号位</view>
+        </scroll-view>
+      </view>
+      <!-- 排序 -->
+      <view class="filter-group">
+        <text class="filter-label">排序</text>
+        <view class="sort-tags">
+          <view class="sort-tag {{sortFilter === 'currentMmr-desc' ? 'sort-active' : ''}}" bindtap="onSortFilter" data-sort="currentMmr-desc">当前分 ↓</view>
+          <view class="sort-tag {{sortFilter === 'currentMmr-asc' ? 'sort-active' : ''}}" bindtap="onSortFilter" data-sort="currentMmr-asc">当前分 ↑</view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 选手卡片列表 -->
+  <view class="player-list" wx:if="{{filteredPlayers.length > 0}}">
+    <view class="player-card" wx:for="{{filteredPlayers}}" wx:key="_id" bindtap="goDetail" data-id="{{item._id}}">
+      <view class="card-top">
+        <view class="card-name-row">
+          <text class="card-name">{{item.wxNickname}}</text>
+          <view class="pos-tags" wx:if="{{item.goodAtPositions.length > 0}}">
+            <view class="pos-tag pos-{{pos}}" wx:for="{{item.goodAtPositions}}" wx:for-item="pos" wx:key="*this">{{pos}}</view>
+          </view>
+        </view>
+        <view class="card-signup" wx:if="{{item.signupPosition}}">
+          <text class="signup-text">报名{{item.signupPosition}}号位</text>
+        </view>
+      </view>
+      <view class="card-score-row">
+        <view class="score-main">
+          <text class="score-val">{{item.currentMmr}}</text>
+          <text class="score-label">当前分数</text>
+        </view>
+        <view class="score-sub">
+          <view class="score-sub-item">
+            <text class="sub-val">{{item.highestMmr || 0}}</text>
+            <text class="sub-label">历史最高</text>
+          </view>
+          <view class="score-sub-item">
+            <text class="sub-val">{{item.selfMmr || 0}}</text>
+            <text class="sub-label">自认</text>
+          </view>
+        </view>
+      </view>
+      <view class="card-id-row" wx:if="{{item.gameId}}">
+        <text class="id-text">ID: {{item.gameId}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-state" wx:if="{{filteredPlayers.length === 0 && loaded}}">
+    <text class="empty-icon">🎮</text>
+    <text class="empty-text">暂无符合条件的选手</text>
+  </view>
+
+  <!-- 加载中 -->
+  <view class="loading-state" wx:if="{{!loaded}}">
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <!-- 底部加载更多 -->
+  <view class="load-more" wx:if="{{loaded && hasMore && filteredPlayers.length > 0}}">
+    <text class="load-more-text">上拉加载更多</text>
+  </view>
+  <view class="load-more" wx:if="{{loaded && !hasMore && filteredPlayers.length > 0}}">
+    <text class="load-more-text">已加载全部</text>
+  </view>
+
+  <!-- FAB 添加按钮 -->
+  <view class="fab-btn" bindtap="goAdd">
+    <text class="fab-text">+</text>
+  </view>
+</view>

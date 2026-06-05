@@ -1,0 +1,108 @@
+<!--pages/dota2-detail/dota2-detail.wxml-->
+<view class="detail-page">
+  <view class="detail-card" wx:if="{{player}}">
+    <!-- 微信群昵称 -->
+    <view class="field-row">
+      <view class="field-info">
+        <text class="field-label">微信群昵称</text>
+        <text class="field-val">{{player.wxNickname || '-'}}</text>
+      </view>
+      <view class="field-edit" bindtap="editField" data-field="wxNickname" data-type="text">
+        <text class="edit-icon">✎</text>
+      </view>
+    </view>
+
+    <!-- Steam ID -->
+    <view class="field-row">
+      <view class="field-info">
+        <text class="field-label">Steam ID</text>
+        <text class="field-val">{{player.steamId || '-'}}</text>
+      </view>
+      <view class="field-edit" bindtap="editField" data-field="steamId" data-type="text">
+        <text class="edit-icon">✎</text>
+      </view>
+    </view>
+
+    <!-- Dota2 游戏 ID -->
+    <view class="field-row">
+      <view class="field-info">
+        <text class="field-label">Dota2 游戏 ID</text>
+        <text class="field-val">{{player.gameId || '-'}}</text>
+      </view>
+      <view class="field-edit" bindtap="editField" data-field="gameId" data-type="text">
+        <text class="edit-icon">✎</text>
+      </view>
+    </view>
+
+    <!-- 历史最高分 -->
+    <view class="field-row">
+      <view class="field-info">
+        <text class="field-label">历史最高分</text>
+        <text class="field-val score-val">{{player.highestMmr || 0}}</text>
+      </view>
+      <view class="field-edit" bindtap="editField" data-field="highestMmr" data-type="number">
+        <text class="edit-icon">✎</text>
+      </view>
+    </view>
+
+    <!-- 当前分数 -->
+    <view class="field-row">
+      <view class="field-info">
+        <text class="field-label">当前分数</text>
+        <text class="field-val score-val current-score">{{player.currentMmr || 0}}</text>
+      </view>
+      <view class="field-edit" bindtap="editField" data-field="currentMmr" data-type="number">
+        <text class="edit-icon">✎</text>
+      </view>
+    </view>
+
+    <!-- 自我认定分数 -->
+    <view class="field-row">
+      <view class="field-info">
+        <text class="field-label">自我认定分数</text>
+        <text class="field-val score-val">{{player.selfMmr || 0}}</text>
+      </view>
+      <view class="field-edit" bindtap="editField" data-field="selfMmr" data-type="number">
+        <text class="edit-icon">✎</text>
+      </view>
+    </view>
+
+    <!-- 擅长游戏位置 -->
+    <view class="field-row">
+      <view class="field-info">
+        <text class="field-label">擅长游戏位置</text>
+        <view class="pos-display" wx:if="{{player.goodAtPositions.length > 0}}">
+          <view class="pos-tag pos-{{pos}}" wx:for="{{player.goodAtPositions}}" wx:for-item="pos" wx:key="*this">{{pos}}号位</view>
+        </view>
+        <text class="field-val" wx:else>-</text>
+      </view>
+      <view class="field-edit" bindtap="editPositions">
+        <text class="edit-icon">✎</text>
+      </view>
+    </view>
+
+    <!-- 比赛报名位置 -->
+    <view class="field-row">
+      <view class="field-info">
+        <text class="field-label">比赛报名位置</text>
+        <text class="field-val" wx:if="{{player.signupPosition}}">{{player.signupPosition}}号位</text>
+        <text class="field-val" wx:else>未定</text>
+      </view>
+      <view class="field-edit" bindtap="editSignupPosition">
+        <text class="edit-icon">✎</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 加载中 -->
+  <view class="loading-state" wx:if="{{!player}}">
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <!-- 删除按钮 -->
+  <view class="delete-section" wx:if="{{player}}">
+    <view class="delete-btn" bindtap="deletePlayer">
+      <text class="delete-text">删除选手</text>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,84 @@
+<!--pages/dota2-import/dota2-import.wxml-->
+<view class="import-page">
+  <!-- 说明 -->
+  <view class="header-section">
+    <view class="header-icon">📁</view>
+    <text class="header-title">批量导入选手数据</text>
+    <text class="header-desc">支持 .xlsx .xls .csv .json 格式</text>
+  </view>
+
+  <!-- CSV 列格式说明 -->
+  <view class="template-section">
+    <text class="section-title">文件列格式</text>
+    <view class="column-list">
+      <view class="column-item" wx:for="{{columns}}" wx:key="field">
+        <text class="column-idx">{{index + 1}}</text>
+        <view class="column-info">
+          <text class="column-name">{{item.name}}</text>
+          <text class="column-field">{{item.field}}</text>
+        </view>
+        <text class="column-required" wx:if="{{item.required}}">必填</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 选择文件 -->
+  <view class="action-section">
+    <view class="pick-btn" bindtap="pickFile">
+      <text class="pick-btn-text">选择文件</text>
+    </view>
+    <text class="action-hint">从微信聊天中选择文件</text>
+    <text class="file-name" wx:if="{{fileName}}">已选: {{fileName}}</text>
+  </view>
+
+  <!-- CSV/JSON 客户端解析预览 -->
+  <view class="preview-section" wx:if="{{parsedData.length > 0}}">
+    <view class="preview-header">
+      <text class="preview-title">预览 ({{parsedData.length}} 条)</text>
+      <text class="preview-warn" wx:if="{{errorRows.length > 0}}">{{errorRows.length}} 条有误</text>
+    </view>
+
+    <view class="error-list" wx:if="{{errorRows.length > 0}}">
+      <view class="error-item" wx:for="{{errorRows}}" wx:key="index">
+        <text class="error-text">第{{item.row}}行: {{item.msg}}</text>
+      </view>
+    </view>
+
+    <scroll-view class="preview-table" scroll-x="true">
+      <view class="table-row table-header">
+        <text class="table-cell">昵称</text>
+        <text class="table-cell">Dota2 ID</text>
+        <text class="table-cell">当前分</text>
+        <text class="table-cell">历史最高</text>
+        <text class="table-cell">自认</text>
+        <text class="table-cell">擅长位置</text>
+        <text class="table-cell">报名位置</text>
+      </view>
+      <view class="table-row" wx:for="{{parsedData}}" wx:key="index">
+        <text class="table-cell">{{item.wxNickname || '-'}}</text>
+        <text class="table-cell">{{item.gameId || '-'}}</text>
+        <text class="table-cell">{{item.currentMmr || '-'}}</text>
+        <text class="table-cell">{{item.highestMmr || '-'}}</text>
+        <text class="table-cell">{{item.selfMmr || '-'}}</text>
+        <text class="table-cell">{{item.positionsText || '-'}}</text>
+        <text class="table-cell">{{item.signupPosition || '-'}}</text>
+      </view>
+    </scroll-view>
+
+    <view class="import-btn {{importing ? 'btn-disabled' : ''}}" bindtap="doImportParsed">
+      <text class="import-btn-text">{{importing ? '导入中...' : '确认导入 ' + parsedData.length + ' 条'}}</text>
+    </view>
+  </view>
+
+  <!-- XLSX/XLS 直接上传到云函数 -->
+  <view class="xlsx-section" wx:if="{{isXlsx && !parsedData.length}}">
+    <view class="import-btn {{importing ? 'btn-disabled' : ''}}" bindtap="doImportXlsx">
+      <text class="import-btn-text">{{importing ? '导入中...' : '上传并导入'}}</text>
+    </view>
+  </view>
+
+  <!-- 导入结果 -->
+  <view class="result-section" wx:if="{{importDone}}">
+    <text class="result-text">导入完成！成功 {{importedCount}} 条{{replacedCount > 0 ? '，覆盖重复 ' + replacedCount + ' 条' : ''}}{{failCount > 0 ? '，失败 ' + failCount + ' 条' : ''}}</text>
+  </view>
+</view>
