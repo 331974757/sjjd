@@ -1,8 +1,1 @@
-{
-  "navigationBarTitleText": "微雨杯",
-  "navigationBarBackgroundColor": "#0d1b2a",
-  "navigationBarTextStyle": "white",
-  "enablePullDownRefresh": true,
-  "backgroundColor": "#0d1b2a",
-  "backgroundTextStyle": "dark"
-}
+{"navigationStyle": "custom", "enablePullDownRefresh": true, "onReachBottomDistance": 100, "backgroundColor": "#0d1117", "backgroundTextStyle": "dark"}

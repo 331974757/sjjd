@@ -1,5 +1,11 @@
 <!--pages/dota2-detail/dota2-detail.wxml-->
 <view class="detail-page">
+  <!-- 头像区 -->
+  <view class="avatar-section" wx:if="{{player}}">
+    <image class="detail-avatar" src="{{player.avatarUrl || '/assets/default-avatar.png'}}" mode="aspectFill" bindtap="changeAvatar" />
+    <text class="avatar-tip" wx:if="{{canEditAll || canEditOwn}}">点击更换头像</text>
+  </view>
+
   <view class="detail-card" wx:if="{{player}}">
     <!-- 微信群昵称 -->
     <view class="field-row">
@@ -7,7 +13,7 @@
         <text class="field-label">微信群昵称</text>
         <text class="field-val">{{player.wxNickname || '-'}}</text>
       </view>
-      <view class="field-edit" bindtap="editField" data-field="wxNickname" data-type="text">
+      <view class="field-edit" wx:if="{{canEditAll}}" bindtap="editField" data-field="wxNickname">
         <text class="edit-icon">✎</text>
       </view>
     </view>
@@ -18,51 +24,29 @@
         <text class="field-label">Steam ID</text>
         <text class="field-val">{{player.steamId || '-'}}</text>
       </view>
-      <view class="field-edit" bindtap="editField" data-field="steamId" data-type="text">
+      <view class="field-edit" wx:if="{{canEditAll || canEditOwn}}" bindtap="editField" data-field="steamId">
         <text class="edit-icon">✎</text>
       </view>
     </view>
 
-    <!-- Dota2 游戏 ID -->
+    <!-- Dota2 游戏昵称 -->
     <view class="field-row">
       <view class="field-info">
-        <text class="field-label">Dota2 游戏 ID</text>
+        <text class="field-label">Dota2 游戏昵称</text>
         <text class="field-val">{{player.gameId || '-'}}</text>
       </view>
-      <view class="field-edit" bindtap="editField" data-field="gameId" data-type="text">
+      <view class="field-edit" wx:if="{{canEditAll || canEditOwn}}" bindtap="editField" data-field="gameId">
         <text class="edit-icon">✎</text>
       </view>
     </view>
 
-    <!-- 历史最高分 -->
+    <!-- 核准段位（金色） -->
     <view class="field-row">
       <view class="field-info">
-        <text class="field-label">历史最高分</text>
-        <text class="field-val score-val">{{player.highestMmr || 0}}</text>
+        <text class="field-label">核准段位</text>
+        <text class="field-val rank-gold">{{player.calibrateRankLabel || player.calibrateRankName || '核准中'}}{{!player.calibrateRankLabel && player.calibrateRankStar > 0 ? ' ' + player.calibrateRankStar + '★' : ''}}</text>
       </view>
-      <view class="field-edit" bindtap="editField" data-field="highestMmr" data-type="number">
-        <text class="edit-icon">✎</text>
-      </view>
-    </view>
-
-    <!-- 当前分数 -->
-    <view class="field-row">
-      <view class="field-info">
-        <text class="field-label">当前分数</text>
-        <text class="field-val score-val current-score">{{player.currentMmr || 0}}</text>
-      </view>
-      <view class="field-edit" bindtap="editField" data-field="currentMmr" data-type="number">
-        <text class="edit-icon">✎</text>
-      </view>
-    </view>
-
-    <!-- 自我认定分数 -->
-    <view class="field-row">
-      <view class="field-info">
-        <text class="field-label">自我认定分数</text>
-        <text class="field-val score-val">{{player.selfMmr || 0}}</text>
-      </view>
-      <view class="field-edit" bindtap="editField" data-field="selfMmr" data-type="number">
+      <view class="field-edit" wx:if="{{canEditAll}}" bindtap="editRankTitle">
         <text class="edit-icon">✎</text>
       </view>
     </view>
@@ -71,12 +55,12 @@
     <view class="field-row">
       <view class="field-info">
         <text class="field-label">擅长游戏位置</text>
-        <view class="pos-display" wx:if="{{player.goodAtPositions.length > 0}}">
+        <view class="pos-display" wx:if="{{player.goodAtPositions && player.goodAtPositions.length > 0}}">
           <view class="pos-tag pos-{{pos}}" wx:for="{{player.goodAtPositions}}" wx:for-item="pos" wx:key="*this">{{pos}}号位</view>
         </view>
-        <text class="field-val" wx:else>-</text>
+        <text class="field-val dim" wx:else>未选择</text>
       </view>
-      <view class="field-edit" bindtap="editPositions">
+      <view class="field-edit" wx:if="{{canEditAll || canEditOwn}}" bindtap="editPositions">
         <text class="edit-icon">✎</text>
       </view>
     </view>
@@ -85,12 +69,20 @@
     <view class="field-row">
       <view class="field-info">
         <text class="field-label">比赛报名位置</text>
-        <text class="field-val" wx:if="{{player.signupPosition}}">{{player.signupPosition}}号位</text>
-        <text class="field-val" wx:else>未定</text>
+        <view class="pos-display" wx:if="{{player.signupPosition && player.signupPosition.length > 0}}">
+          <view class="pos-tag pos-{{pos}}" wx:for="{{player.signupPosition}}" wx:for-item="pos" wx:key="*this">{{pos}}号位</view>
+        </view>
+        <text class="field-val dim" wx:else>未报名</text>
       </view>
-      <view class="field-edit" bindtap="editSignupPosition">
+      <view class="field-edit" wx:if="{{canEditAll || canEditOwn}}" bindtap="editSignupPosition">
         <text class="edit-icon">✎</text>
       </view>
+    </view>
+
+    <!-- 无编辑权限提示 -->
+    <view class="no-edit-tip" wx:if="{{!canEditAll && !canEditOwn}}">
+      <text>仅选手本人或管理员可编辑此信息</text>
+      <text class="tip-sub">昵称与选手微信群昵称一致</text>
     </view>
   </view>
 
@@ -99,8 +91,104 @@
     <text class="loading-text">加载中...</text>
   </view>
 
-  <!-- 删除按钮 -->
-  <view class="delete-section" wx:if="{{player}}">
+  <!-- 位置选择弹窗 -->
+  <view class="pos-modal-mask" wx:if="{{showPosModal}}" bindtap="closePosModal">
+    <view class="pos-modal" catchtap="preventMove">
+      <view class="pos-modal-header">
+        <text class="pos-modal-title">{{posModalTitle}}</text>
+        <text class="pos-modal-close" bindtap="closePosModal">×</text>
+      </view>
+      <view class="pos-modal-body">
+        <view class="pm-circle {{posModalSelected[1] ? 'pm-sel-1' : 'pm-def'}}" bindtap="toggleModalPos" data-pos="1">
+          <text class="pm-num">1</text>
+        </view>
+        <view class="pm-circle {{posModalSelected[2] ? 'pm-sel-2' : 'pm-def'}}" bindtap="toggleModalPos" data-pos="2">
+          <text class="pm-num">2</text>
+        </view>
+        <view class="pm-circle {{posModalSelected[3] ? 'pm-sel-3' : 'pm-def'}}" bindtap="toggleModalPos" data-pos="3">
+          <text class="pm-num">3</text>
+        </view>
+        <view class="pm-circle {{posModalSelected[4] ? 'pm-sel-4' : 'pm-def'}}" bindtap="toggleModalPos" data-pos="4">
+          <text class="pm-num">4</text>
+        </view>
+        <view class="pm-circle {{posModalSelected[5] ? 'pm-sel-5' : 'pm-def'}}" bindtap="toggleModalPos" data-pos="5">
+          <text class="pm-num">5</text>
+        </view>
+      </view>
+      <view class="pos-modal-confirm" bindtap="confirmPosModal">
+        <text class="pos-modal-confirm-text">确认</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 段位选择弹窗 -->
+  <view class="pos-modal-mask" wx:if="{{showRankModal}}" bindtap="closeRankModal">
+    <view class="pos-modal" catchtap="preventMove">
+      <view class="pos-modal-header">
+        <text class="pos-modal-title">选择核准段位</text>
+        <text class="pos-modal-close" bindtap="closeRankModal">×</text>
+      </view>
+      <view class="rank-grid">
+        <view class="rank-cell {{rankPickedIndex === 0 ? 'rank-cell-active' : ''}}" catchtap="pickRank" data-index="0">
+          <text class="rank-cell-text">先锋</text>
+        </view>
+        <view class="rank-cell {{rankPickedIndex === 1 ? 'rank-cell-active' : ''}}" catchtap="pickRank" data-index="1">
+          <text class="rank-cell-text">卫士</text>
+        </view>
+        <view class="rank-cell {{rankPickedIndex === 2 ? 'rank-cell-active' : ''}}" catchtap="pickRank" data-index="2">
+          <text class="rank-cell-text">中军</text>
+        </view>
+        <view class="rank-cell {{rankPickedIndex === 3 ? 'rank-cell-active' : ''}}" catchtap="pickRank" data-index="3">
+          <text class="rank-cell-text">统帅</text>
+        </view>
+        <view class="rank-cell {{rankPickedIndex === 4 ? 'rank-cell-active' : ''}}" catchtap="pickRank" data-index="4">
+          <text class="rank-cell-text">传奇</text>
+        </view>
+        <view class="rank-cell {{rankPickedIndex === 5 ? 'rank-cell-active' : ''}}" catchtap="pickRank" data-index="5">
+          <text class="rank-cell-text">万古流芳</text>
+        </view>
+        <view class="rank-cell {{rankPickedIndex === 6 ? 'rank-cell-active' : ''}}" catchtap="pickRank" data-index="6">
+          <text class="rank-cell-text">超凡入圣</text>
+        </view>
+        <view class="rank-cell {{rankPickedIndex === 7 ? 'rank-cell-active' : ''}}" catchtap="pickRank" data-index="7">
+          <text class="rank-cell-text">冠绝一世</text>
+        </view>
+      </view>
+
+      <!-- 星级选择（选中非冠绝段位后显示） -->
+      <view class="star-section" wx:if="{{rankPickedIndex >= 0 && rankPickedIndex < 7}}">
+        <text class="star-label">选择星数</text>
+        <view class="star-row">
+          <view class="pm-circle {{starPickedIndex === 0 ? 'pm-sel-1' : 'pm-def'}}" catchtap="pickStar" data-index="0">
+            <text class="pm-num">1</text>
+          </view>
+          <view class="pm-circle {{starPickedIndex === 1 ? 'pm-sel-2' : 'pm-def'}}" catchtap="pickStar" data-index="1">
+            <text class="pm-num">2</text>
+          </view>
+          <view class="pm-circle {{starPickedIndex === 2 ? 'pm-sel-3' : 'pm-def'}}" catchtap="pickStar" data-index="2">
+            <text class="pm-num">3</text>
+          </view>
+          <view class="pm-circle {{starPickedIndex === 3 ? 'pm-sel-4' : 'pm-def'}}" catchtap="pickStar" data-index="3">
+            <text class="pm-num">4</text>
+          </view>
+          <view class="pm-circle {{starPickedIndex === 4 ? 'pm-sel-5' : 'pm-def'}}" catchtap="pickStar" data-index="4">
+            <text class="pm-num">5</text>
+          </view>
+        </view>
+        <view class="pos-modal-confirm" catchtap="confirmRankStar">
+          <text class="pos-modal-confirm-text">确认</text>
+        </view>
+      </view>
+
+      <!-- 冠绝一世确认按钮 -->
+      <view class="pos-modal-confirm" wx:if="{{rankPickedIndex === 7}}" catchtap="confirmRankStar">
+        <text class="pos-modal-confirm-text">确认</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 删除按钮（仅管理员/超管可见） -->
+  <view class="delete-section" wx:if="{{player && canDelete}}">
     <view class="delete-btn" bindtap="deletePlayer">
       <text class="delete-text">删除选手</text>
     </view>

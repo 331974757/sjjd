@@ -3,11 +3,12 @@
     "pages/dota2/dota2",
     "pages/dota2-detail/dota2-detail",
     "pages/dota2-add/dota2-add",
-    "pages/dota2-import/dota2-import"
+    "pages/dota2-import/dota2-import",
+    "pages/admin/admin"
   ],
   "window": {
     "backgroundTextStyle": "dark",
-    "navigationBarBackgroundColor": "#1B6B4A",
+    "navigationBarBackgroundColor": "#0d1117",
     "navigationBarTitleText": "Dota2选手管理",
     "navigationBarTextStyle": "white"
   },

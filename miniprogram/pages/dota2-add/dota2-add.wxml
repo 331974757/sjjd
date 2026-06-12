@@ -1,5 +1,27 @@
 <!--pages/dota2-add/dota2-add.wxml-->
 <view class="add-page">
+  <!-- 权限检查中 -->
+  <view class="loading-state" wx:if="{{!accessChecked}}">
+    <text class="loading-text">验证权限中...</text>
+  </view>
+
+  <!-- 无权限 -->
+  <view class="empty-state" wx:elif="{{accessDenied}}">
+    <text class="empty-text">仅管理员可添加选手</text>
+  </view>
+
+  <block wx:else>
+  <!-- 头像上传 -->
+  <view class="avatar-section">
+    <view class="avatar-upload" bindtap="chooseAvatar">
+      <image class="avatar-img" src="{{avatarUrl}}" wx:if="{{avatarUrl}}" mode="aspectFill" />
+      <view class="avatar-placeholder" wx:else>
+        <text class="avatar-plus">+</text>
+        <text class="avatar-hint">点击上传头像</text>
+      </view>
+    </view>
+  </view>
+
   <view class="form-section">
     <!-- 微信群昵称 -->
     <view class="form-group">
@@ -13,71 +35,135 @@
       <input class="form-input" placeholder="请输入 Steam ID" value="{{steamId}}" bindinput="onInput" data-field="steamId" />
     </view>
 
-    <!-- Dota2 游戏 ID -->
+    <!-- Dota2 游戏昵称 -->
     <view class="form-group">
-      <text class="form-label">Dota2 游戏 ID <text class="required">*</text></text>
-      <input class="form-input" placeholder="请输入 Dota2 游戏 ID" value="{{gameId}}" bindinput="onInput" data-field="gameId" />
+      <text class="form-label">Dota2 游戏昵称 <text class="required">*</text></text>
+      <input class="form-input" placeholder="请输入 Dota2 游戏昵称" value="{{gameId}}" bindinput="onInput" data-field="gameId" />
     </view>
 
-    <!-- 历史最高分 -->
+    <!-- 核准段位 + 星数 -->
     <view class="form-group">
-      <text class="form-label">Dota2 历史最高分</text>
-      <input class="form-input" type="digit" placeholder="请输入历史最高分" value="{{highestMmr}}" bindinput="onInput" data-field="highestMmr" />
+      <text class="form-label">核准段位 <text class="required">*</text></text>
+      <view class="picker-display" bindtap="openRankModal">
+        <text class="picker-text">{{rankDisplay}}</text>
+        <text class="picker-arrow">▸</text>
+      </view>
     </view>
 
-    <!-- 当前分数 -->
-    <view class="form-group">
-      <text class="form-label">Dota2 当前分数 <text class="required">*</text></text>
-      <input class="form-input" type="digit" placeholder="请输入当前分数" value="{{currentMmr}}" bindinput="onInput" data-field="currentMmr" />
-    </view>
-
-    <!-- 自我认定分数 -->
-    <view class="form-group">
-      <text class="form-label">自我认定分数</text>
-      <input class="form-input" type="digit" placeholder="请输入自我认定分数" value="{{selfMmr}}" bindinput="onInput" data-field="selfMmr" />
-    </view>
-
-    <!-- 擅长游戏位置（多选） -->
+    <!-- 擅长游戏位置（多选圆形按钮） -->
     <view class="form-group">
       <text class="form-label">擅长游戏位置</text>
-      <view class="pos-selector">
-        <view class="pos-card {{selectedPos[1] ? 'pos-selected' : ''}}" bindtap="togglePos" data-pos="1">
-          <view class="pos-icon pos-icon-1">1</view>
-          <text class="pos-label">一号位</text>
+      <view class="pos-row">
+        <view class="pos-circle {{selectedPos[1] ? 'pos-sel-1' : ''}} {{!selectedPos[1] ? 'pos-def' : ''}}" bindtap="togglePos" data-pos="1">
+          <text class="pos-num">1</text>
         </view>
-        <view class="pos-card {{selectedPos[2] ? 'pos-selected' : ''}}" bindtap="togglePos" data-pos="2">
-          <view class="pos-icon pos-icon-2">2</view>
-          <text class="pos-label">二号位</text>
+        <view class="pos-circle {{selectedPos[2] ? 'pos-sel-2' : ''}} {{!selectedPos[2] ? 'pos-def' : ''}}" bindtap="togglePos" data-pos="2">
+          <text class="pos-num">2</text>
         </view>
-        <view class="pos-card {{selectedPos[3] ? 'pos-selected' : ''}}" bindtap="togglePos" data-pos="3">
-          <view class="pos-icon pos-icon-3">3</view>
-          <text class="pos-label">三号位</text>
+        <view class="pos-circle {{selectedPos[3] ? 'pos-sel-3' : ''}} {{!selectedPos[3] ? 'pos-def' : ''}}" bindtap="togglePos" data-pos="3">
+          <text class="pos-num">3</text>
         </view>
-        <view class="pos-card {{selectedPos[4] ? 'pos-selected' : ''}}" bindtap="togglePos" data-pos="4">
-          <view class="pos-icon pos-icon-4">4</view>
-          <text class="pos-label">四号位</text>
+        <view class="pos-circle {{selectedPos[4] ? 'pos-sel-4' : ''}} {{!selectedPos[4] ? 'pos-def' : ''}}" bindtap="togglePos" data-pos="4">
+          <text class="pos-num">4</text>
         </view>
-        <view class="pos-card {{selectedPos[5] ? 'pos-selected' : ''}}" bindtap="togglePos" data-pos="5">
-          <view class="pos-icon pos-icon-5">5</view>
-          <text class="pos-label">五号位</text>
+        <view class="pos-circle {{selectedPos[5] ? 'pos-sel-5' : ''}} {{!selectedPos[5] ? 'pos-def' : ''}}" bindtap="togglePos" data-pos="5">
+          <text class="pos-num">5</text>
         </view>
       </view>
     </view>
 
-    <!-- 比赛报名位置（picker单选） -->
+    <!-- 比赛报名位置（多选圆形按钮） -->
     <view class="form-group">
       <text class="form-label">比赛报名位置</text>
-      <picker mode="selector" range="{{signupOptions}}" value="{{signupIndex}}" bindchange="onSignupPick">
-        <view class="picker-display">
-          <text class="picker-text">{{signupOptions[signupIndex]}}</text>
-          <text class="picker-arrow">▾</text>
+      <view class="pos-row">
+        <view class="pos-circle {{signupPos[1] ? 'pos-sel-1' : ''}} {{!signupPos[1] ? 'pos-def' : ''}}" bindtap="toggleSignup" data-pos="1">
+          <text class="pos-num">1</text>
         </view>
-      </picker>
+        <view class="pos-circle {{signupPos[2] ? 'pos-sel-2' : ''}} {{!signupPos[2] ? 'pos-def' : ''}}" bindtap="toggleSignup" data-pos="2">
+          <text class="pos-num">2</text>
+        </view>
+        <view class="pos-circle {{signupPos[3] ? 'pos-sel-3' : ''}} {{!signupPos[3] ? 'pos-def' : ''}}" bindtap="toggleSignup" data-pos="3">
+          <text class="pos-num">3</text>
+        </view>
+        <view class="pos-circle {{signupPos[4] ? 'pos-sel-4' : ''}} {{!signupPos[4] ? 'pos-def' : ''}}" bindtap="toggleSignup" data-pos="4">
+          <text class="pos-num">4</text>
+        </view>
+        <view class="pos-circle {{signupPos[5] ? 'pos-sel-5' : ''}} {{!signupPos[5] ? 'pos-def' : ''}}" bindtap="toggleSignup" data-pos="5">
+          <text class="pos-num">5</text>
+        </view>
+      </view>
     </view>
 
     <!-- 提交按钮 -->
     <view class="submit-btn {{submitting ? 'btn-disabled' : ''}}" bindtap="onSubmit">
       <text class="submit-text">{{submitting ? '提交中...' : '确认添加'}}</text>
+    </view>
+  </view>
+  </block>
+
+  <!-- 段位选择弹窗 -->
+  <view class="pos-modal-mask" wx:if="{{showRankModal}}" bindtap="closeRankModal">
+    <view class="pos-modal" catchtap="preventMove">
+      <view class="pos-modal-header">
+        <text class="pos-modal-title">选择核准段位</text>
+        <text class="pos-modal-close" bindtap="closeRankModal">×</text>
+      </view>
+      <view class="rank-grid">
+        <view class="rank-cell {{rankPickedIndex === 0 ? 'rank-cell-active' : ''}}" catchtap="pickRank" data-index="0">
+          <text class="rank-cell-text">先锋</text>
+        </view>
+        <view class="rank-cell {{rankPickedIndex === 1 ? 'rank-cell-active' : ''}}" catchtap="pickRank" data-index="1">
+          <text class="rank-cell-text">卫士</text>
+        </view>
+        <view class="rank-cell {{rankPickedIndex === 2 ? 'rank-cell-active' : ''}}" catchtap="pickRank" data-index="2">
+          <text class="rank-cell-text">中军</text>
+        </view>
+        <view class="rank-cell {{rankPickedIndex === 3 ? 'rank-cell-active' : ''}}" catchtap="pickRank" data-index="3">
+          <text class="rank-cell-text">统帅</text>
+        </view>
+        <view class="rank-cell {{rankPickedIndex === 4 ? 'rank-cell-active' : ''}}" catchtap="pickRank" data-index="4">
+          <text class="rank-cell-text">传奇</text>
+        </view>
+        <view class="rank-cell {{rankPickedIndex === 5 ? 'rank-cell-active' : ''}}" catchtap="pickRank" data-index="5">
+          <text class="rank-cell-text">万古流芳</text>
+        </view>
+        <view class="rank-cell {{rankPickedIndex === 6 ? 'rank-cell-active' : ''}}" catchtap="pickRank" data-index="6">
+          <text class="rank-cell-text">超凡入圣</text>
+        </view>
+        <view class="rank-cell {{rankPickedIndex === 7 ? 'rank-cell-active' : ''}}" catchtap="pickRank" data-index="7">
+          <text class="rank-cell-text">冠绝一世</text>
+        </view>
+      </view>
+
+      <!-- 星级选择（选中非冠绝段位后显示） -->
+      <view class="star-section" wx:if="{{rankPickedIndex >= 0 && rankPickedIndex < 7}}">
+        <text class="star-label">选择星数</text>
+        <view class="star-row">
+          <view class="pm-circle {{starPickedIndex === 0 ? 'pm-sel-1' : 'pm-def'}}" catchtap="pickStar" data-index="0">
+            <text class="pm-num">1</text>
+          </view>
+          <view class="pm-circle {{starPickedIndex === 1 ? 'pm-sel-2' : 'pm-def'}}" catchtap="pickStar" data-index="1">
+            <text class="pm-num">2</text>
+          </view>
+          <view class="pm-circle {{starPickedIndex === 2 ? 'pm-sel-3' : 'pm-def'}}" catchtap="pickStar" data-index="2">
+            <text class="pm-num">3</text>
+          </view>
+          <view class="pm-circle {{starPickedIndex === 3 ? 'pm-sel-4' : 'pm-def'}}" catchtap="pickStar" data-index="3">
+            <text class="pm-num">4</text>
+          </view>
+          <view class="pm-circle {{starPickedIndex === 4 ? 'pm-sel-5' : 'pm-def'}}" catchtap="pickStar" data-index="4">
+            <text class="pm-num">5</text>
+          </view>
+        </view>
+        <view class="pos-modal-confirm" catchtap="confirmRankStar">
+          <text class="pos-modal-confirm-text">确认</text>
+        </view>
+      </view>
+
+      <!-- 冠绝一世确认按钮 -->
+      <view class="pos-modal-confirm" wx:if="{{rankPickedIndex === 7}}" catchtap="confirmRankStar">
+        <text class="pos-modal-confirm-text">确认</text>
+      </view>
     </view>
   </view>
 </view>

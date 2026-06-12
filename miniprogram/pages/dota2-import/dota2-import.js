@@ -1,16 +1,34 @@
 // pages/dota2-import/dota2-import.js
-var COLUMN_MAP = [
-  { name: '微信群昵称', field: 'wxNickname', required: true },
-  { name: 'Steam ID', field: 'steamId', required: false },
-  { name: 'Dota2游戏ID', field: 'gameId', required: true },
-  { name: '历史最高分', field: 'highestMmr', required: false, type: 'number' },
-  { name: '当前分数', field: 'currentMmr', required: true, type: 'number' },
-  { name: '自我认定分数', field: 'selfMmr', required: false, type: 'number' },
-  { name: '擅长游戏位置', field: 'goodAtPositions', required: false, type: 'positions' },
-  { name: '比赛报名位置', field: 'signupPosition', required: false }
+const perm = require('../../utils/permission.js')
+const COLUMN_MAP = [
+  { name: '微信群昵称', field: 'wxNickname', required: true, hint: '' },
+  { name: 'Steam ID', field: 'steamId', required: false, hint: '选填' },
+  { name: 'Dota2游戏昵称', field: 'gameId', required: true, hint: '' },
+  { name: '核准段位', field: 'calibrateRankName', required: false, hint: '' },
+  { name: '核准星数', field: 'calibrateRankStar', required: false, hint: '填写数字' },
+  { name: '擅长游戏位置', field: 'goodAtPositions', required: false, hint: '填1~5数字，逗号分隔' },
+  { name: '比赛报名位置', field: 'signupPosition', required: false, hint: '填1~5数字，逗号分隔' }
 ]
 
+const TEMPLATE_HEADER = '微信群昵称\tSteam ID\tDota2游戏昵称\t核准段位\t核准星数\t擅长游戏位置\t比赛报名位置'
+const TEMPLATE_ROW = '示例选手\t123456789\tDota2示例昵称\t统帅\t3\t1,2,3\t1'
+
 Page({
+  async onLoad() {
+    const isAdmin = await perm.isAdmin()
+    if (!isAdmin) {
+      this.setData({ accessChecked: true, accessDenied: true })
+      wx.showModal({
+        title: '仅管理员可导入',
+        content: '请联系管理员操作',
+        showCancel: false,
+        success: () => { wx.navigateBack() }
+      })
+    } else {
+      this.setData({ accessChecked: true, accessDenied: false })
+    }
+  },
+
   data: {
     columns: COLUMN_MAP,
     parsedData: [],
@@ -22,21 +40,33 @@ Page({
     importDone: false,
     fileName: '',
     filePath: '',
-    isXlsx: false
+    isXlsx: false,
+    accessChecked: false,
+    accessDenied: false
+  },
+
+  // 获取导入模板（复制到剪贴板）
+  downloadTemplate() {
+    const content = TEMPLATE_HEADER + '\n' + TEMPLATE_ROW
+    wx.setClipboardData({
+      data: content,
+      success: () => {
+        wx.showToast({ title: '已复制到剪贴板', icon: 'success' })
+      }
+    })
   },
 
   pickFile() {
-    var that = this
     wx.chooseMessageFile({
       count: 1,
       type: 'file',
-      extension: ['csv', 'xlsx', 'xls', 'json'],
-      success: function(res) {
-        var file = res.tempFiles[0]
-        var name = file.name.toLowerCase()
-        var isXlsx = name.endsWith('.xlsx') || name.endsWith('.xls')
+      extension: ['csv', 'xlsx', 'json'],
+      success: (res) => {
+        const file = res.tempFiles[0]
+        const name = file.name.toLowerCase()
+        const isXlsx = name.endsWith('.xlsx')
 
-        that.setData({
+        this.setData({
           fileName: file.name,
           filePath: file.path,
           isXlsx: isXlsx,
@@ -48,11 +78,9 @@ Page({
         })
 
         if (isXlsx) {
-          // xlsx 文件需要上传到云函数解析
           wx.showToast({ title: '请点击"上传并导入"', icon: 'none' })
         } else {
-          // csv / json 客户端解析
-          that.readAndParse(file.path, name)
+          this.readAndParse(file.path, name)
         }
       }
     })
@@ -60,9 +88,9 @@ Page({
 
   // 客户端解析 CSV / JSON
   readAndParse(filePath, fileName) {
-    var fs = wx.getFileSystemManager()
+    const fs = wx.getFileSystemManager()
     try {
-      var content = fs.readFileSync(filePath, 'utf-8')
+      const content = fs.readFileSync(filePath, 'utf-8')
       if (fileName.endsWith('.json')) {
         this.parseJSON(content)
       } else {
@@ -74,19 +102,17 @@ Page({
     }
   },
 
-  // 解析 JSON
   parseJSON(content) {
     try {
-      var data = JSON.parse(content)
+      const data = JSON.parse(content)
       if (!Array.isArray(data)) {
         wx.showToast({ title: 'JSON需为数组格式', icon: 'none' })
         return
       }
-      var parsedData = []
-      var errorRows = []
-      for (var i = 0; i < data.length; i++) {
-        var row = data[i]
-        var result = validateAndFormat(row, i + 1)
+      const parsedData = []
+      const errorRows = []
+      for (let i = 0; i < data.length; i++) {
+        const result = validateAndFormat(data[i], i + 1)
         if (result.error) {
           errorRows.push(result.error)
         } else {
@@ -99,22 +125,19 @@ Page({
     }
   },
 
-  // 解析 CSV
   parseCSV(content) {
-    var lines = content.split(/\r?\n/).filter(function(l) { return l.trim() !== '' })
+    const lines = content.split(/\r?\n/).filter(l => { return l.trim() !== '' })
     if (lines.length < 2) {
       wx.showToast({ title: 'CSV文件无数据行', icon: 'none' })
       return
     }
 
-    var headers = splitCSVLine(lines[0])
-
-    // 建立列映射
-    var colMapping = []
-    for (var c = 0; c < headers.length; c++) {
-      var h = headers[c].trim().toLowerCase()
-      var found = null
-      for (var m = 0; m < COLUMN_MAP.length; m++) {
+    const headers = splitCSVLine(lines[0])
+    const colMapping = []
+    for (let c = 0; c < headers.length; c++) {
+      const h = headers[c].trim().toLowerCase()
+      let found = null
+      for (let m = 0; m < COLUMN_MAP.length; m++) {
         if (h === COLUMN_MAP[m].name.toLowerCase() || h === COLUMN_MAP[m].field.toLowerCase()) {
           found = COLUMN_MAP[m]
           break
@@ -123,17 +146,17 @@ Page({
       colMapping.push(found)
     }
 
-    var parsedData = []
-    var errorRows = []
+    const parsedData = []
+    const errorRows = []
 
-    for (var i = 1; i < lines.length; i++) {
-      var cols = splitCSVLine(lines[i])
-      var row = {}
-      for (var ci = 0; ci < colMapping.length; ci++) {
+    for (let i = 1; i < lines.length; i++) {
+      const cols = splitCSVLine(lines[i])
+      const row = {}
+      for (let ci = 0; ci < colMapping.length; ci++) {
         if (!colMapping[ci]) continue
         row[colMapping[ci].field] = (cols[ci] || '').trim()
       }
-      var result = validateAndFormat(row, i + 1)
+      const result = validateAndFormat(row, i + 1)
       if (result.error) {
         errorRows.push(result.error)
       } else {
@@ -144,28 +167,39 @@ Page({
     this.setData({ parsedData: parsedData, errorRows: errorRows })
   },
 
-  // 客户端解析数据 → 调用云函数批量导入
   async doImportParsed() {
     if (this.data.importing) return
-    var data = this.data.parsedData
+    const data = this.data.parsedData
     if (data.length === 0) return
 
-    this.setData({ importing: true })
+    // 去掉预览用字段，只传数据字段给云函数
+    const cleanData = data.map(row => {
+      return {
+        wxNickname: row.wxNickname,
+        steamId: row.steamId,
+        gameId: row.gameId,
+        calibrateRankName: row.calibrateRankName,
+        calibrateRankStar: row.calibrateRankStar,
+        goodAtPositions: row.goodAtPositions,
+        signupPosition: row.signupPosition
+      }
+    })
 
+    this.setData({ importing: true })
     wx.showLoading({ title: '导入中...' })
     try {
-      var res = await wx.cloud.callFunction({
+      const res = await wx.cloud.callFunction({
         name: 'batchImport',
-        data: { players: data }
+        data: { players: cleanData }
       })
       wx.hideLoading()
 
-      var result = res.result
+      const result = res.result
       this.setData({
         importing: false,
         importDone: true,
         importedCount: result.imported || 0,
-        replacedCount: result.replaced || 0,
+        replacedCount: result.updated || 0,
         failCount: result.failed || 0
       })
 
@@ -173,10 +207,8 @@ Page({
         this.setData({ errorRows: result.errors })
       }
 
-      var tip = '导入完成！'
-      if (result.replaced > 0) {
-        tip = '导入完成，覆盖' + result.replaced + '条重复记录'
-      }
+      let tip = '导入完成！'
+      if (result.updated > 0) tip = '导入完成，更新' + result.updated + '条已有记录'
       wx.showToast({ title: tip, icon: 'success' })
     } catch (err) {
       wx.hideLoading()
@@ -186,34 +218,28 @@ Page({
     }
   },
 
-  // XLSX 文件上传到云函数解析
   async doImportXlsx() {
     if (this.data.importing || !this.data.filePath) return
-
     this.setData({ importing: true })
 
-    // 读取文件为 base64
-    var fs = wx.getFileSystemManager()
+    const fs = wx.getFileSystemManager()
     try {
-      var fileBuf = fs.readFileSync(this.data.filePath)
-      var base64 = wx.arrayBufferToBase64(fileBuf)
+      const fileBuf = fs.readFileSync(this.data.filePath)
+      const base64 = wx.arrayBufferToBase64(fileBuf)
 
       wx.showLoading({ title: '上传解析中...' })
-      var res = await wx.cloud.callFunction({
+      const res = await wx.cloud.callFunction({
         name: 'batchImport',
-        data: {
-          fileType: 'xlsx',
-          fileContent: base64
-        }
+        data: { fileType: 'xlsx', fileContent: base64 }
       })
       wx.hideLoading()
 
-      var result = res.result
+      const result = res.result
       this.setData({
         importing: false,
         importDone: true,
         importedCount: result.imported || 0,
-        replacedCount: result.replaced || 0,
+        replacedCount: result.updated || 0,
         failCount: result.failed || 0
       })
 
@@ -221,10 +247,8 @@ Page({
         this.setData({ errorRows: result.errors })
       }
 
-      var tip = '导入完成！'
-      if (result.replaced > 0) {
-        tip = '导入完成，覆盖' + result.replaced + '条重复记录'
-      }
+      let tip = '导入完成！'
+      if (result.updated > 0) tip = '导入完成，更新' + result.updated + '条已有记录'
       wx.showToast({ title: tip, icon: 'success' })
     } catch (err) {
       wx.hideLoading()
@@ -236,43 +260,40 @@ Page({
 })
 
 // 校验并格式化一行数据
-function validateAndFormat(row, rowNum) {
-  var wxNickname = (row.wxNickname || '').trim()
-  var gameId = (row.gameId || '').trim()
-  var currentMmr = row.currentMmr
+const validateAndFormat = (row, rowNum) => {
+  const wxNickname = (row.wxNickname || '').trim()
+  const gameId = (row.gameId || '').trim()
 
   if (!wxNickname) return { error: { row: rowNum, msg: '微信群昵称缺失' } }
-  if (!gameId) return { error: { row: rowNum, msg: 'Dota2游戏ID缺失' } }
-  if (currentMmr === undefined || currentMmr === null || currentMmr === '') {
-    return { error: { row: rowNum, msg: '当前分数缺失' } }
-  }
+  if (!gameId) return { error: { row: rowNum, msg: 'Dota2游戏昵称缺失' } }
 
-  var positions = parsePositions(row.goodAtPositions)
-  var positionsText = positions.length > 0 ? positions.map(function(p) { return p + '号位' }).join(' ') : '-'
-  var signupPosition = String(row.signupPosition || '').trim()
+  const positions = parsePositions(row.goodAtPositions)
+  const positionsText = positions.length > 0 ? positions.join(',') : ''
+  const signupPos = parsePositions(row.signupPosition)
+  const signupText = signupPos.length > 0 ? signupPos.join(',') : ''
 
   return {
     data: {
       wxNickname: wxNickname,
       steamId: String(row.steamId || '').trim(),
       gameId: gameId,
-      highestMmr: Number(row.highestMmr) || 0,
-      currentMmr: Number(currentMmr) || 0,
-      selfMmr: Number(row.selfMmr) || 0,
+      calibrateRankName: String(row.calibrateRankName || '').trim(),
+      calibrateRankStar: Number(row.calibrateRankStar) || 0,
       goodAtPositions: positions,
-      signupPosition: signupPosition,
-      positionsText: positionsText
+      signupPosition: signupPos,
+      positionsText: positionsText,
+      signupText: signupText
     }
   }
 }
 
-function parsePositions(val) {
-  if (Array.isArray(val)) return val.filter(function(n) { return n >= 1 && n <= 5 })
+const parsePositions = (val) => {
+  if (Array.isArray(val)) return val.filter(n => { return n >= 1 && n <= 5 })
   if (typeof val === 'string') {
-    var parts = val.split(/[,，\/、\s]+/)
-    var nums = []
-    for (var i = 0; i < parts.length; i++) {
-      var n = parseInt(parts[i])
+    const parts = val.split(/[,，\/、\s]+/)
+    const nums = []
+    for (let i = 0; i < parts.length; i++) {
+      const n = parseInt(parts[i])
       if (n >= 1 && n <= 5) nums.push(n)
     }
     return nums
@@ -281,12 +302,12 @@ function parsePositions(val) {
   return []
 }
 
-function splitCSVLine(line) {
-  var result = []
-  var current = ''
-  var inQuotes = false
-  for (var i = 0; i < line.length; i++) {
-    var ch = line[i]
+const splitCSVLine = (line) => {
+  const result = []
+  let current = ''
+  let inQuotes = false
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
     if (ch === '"') {
       inQuotes = !inQuotes
     } else if (ch === ',' && !inQuotes) {

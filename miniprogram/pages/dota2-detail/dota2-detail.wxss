@@ -1,15 +1,40 @@
 /* pages/dota2-detail/dota2-detail.wxss */
 .detail-page {
   min-height: 100vh;
-  background-color: #0d1b2a;
-  padding: 24rpx 32rpx;
+  background-color: #0d1117;
+  padding: 0 32rpx 60rpx;
   box-sizing: border-box;
 }
 
+/* ===== 头像区 ===== */
+.avatar-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40rpx 0 32rpx;
+}
+
+.detail-avatar {
+  width: 180rpx;
+  height: 180rpx;
+  border-radius: 50%;
+  border: 3rpx solid rgba(212, 160, 58, 0.3);
+  background-color: #161b22;
+  box-shadow: 0 8rpx 32rpx rgba(0, 0, 0, 0.4);
+}
+
+.avatar-tip {
+  font-size: 22rpx;
+  color: #484f58;
+  margin-top: 16rpx;
+}
+
+/* ===== 卡片 ===== */
 .detail-card {
-  background-color: #1b263b;
+  background-color: #161b22;
   border-radius: 20rpx;
   overflow: hidden;
+  border: 1rpx solid rgba(255, 255, 255, 0.05);
 }
 
 .field-row {
@@ -17,118 +42,147 @@
   flex-direction: row;
   justify-content: space-between;
   align-items: center;
-  padding: 28rpx 24rpx;
-  border-bottom: 1rpx solid rgba(255, 255, 255, 0.05);
+  padding: 24rpx 28rpx;
+  border-bottom: 1rpx solid rgba(255, 255, 255, 0.04);
 }
 
-.field-row:last-child {
-  border-bottom: none;
-}
+.field-row:last-child { border-bottom: none; }
 
 .field-info {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 8rpx;
   overflow: hidden;
 }
 
 .field-label {
   font-size: 24rpx;
-  color: #778da9;
+  color: #8b949e;
+  margin-bottom: 6rpx;
 }
 
 .field-val {
   font-size: 30rpx;
-  color: #e0e1dd;
+  color: #e6edf3;
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.score-val {
-  font-size: 36rpx;
-  font-weight: 700;
-  color: #f39c12;
+.field-val.dim {
+  color: #484f58;
 }
 
-.current-score {
-  color: #3498db;
-  font-size: 44rpx;
+/* 段位金色 */
+.rank-gold {
+  color: #d4a03a !important;
+  font-size: 34rpx !important;
+  font-weight: 700 !important;
 }
 
+/* 编辑图标 */
 .field-edit {
-  width: 64rpx;
-  height: 64rpx;
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  background-color: rgba(255, 255, 255, 0.04);
+  margin-left: 16rpx;
+}
+.field-edit:active {
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 .edit-icon {
-  font-size: 32rpx;
-  color: #415a77;
+  font-size: 26rpx;
+  color: #58a6ff;
 }
 
 /* 位置标签 */
 .pos-display {
   display: flex;
   flex-direction: row;
-  gap: 8rpx;
   flex-wrap: wrap;
 }
 
 .pos-tag {
   padding: 6rpx 16rpx;
   border-radius: 8rpx;
-  font-size: 24rpx;
+  font-size: 22rpx;
   font-weight: 600;
-  color: #FFFFFF;
+  color: #ffffff;
+  margin-right: 10rpx;
+  margin-bottom: 6rpx;
 }
 
-.pos-tag.pos-1 { background-color: #e74c3c; }
-.pos-tag.pos-2 { background-color: #f39c12; }
-.pos-tag.pos-3 { background-color: #27ae60; }
-.pos-tag.pos-4 { background-color: #3498db; }
-.pos-tag.pos-5 { background-color: #9b59b6; }
+.pos-tag.pos-1 { background-color: rgba(231, 76, 60, 0.85); }
+.pos-tag.pos-2 { background-color: rgba(243, 156, 18, 0.85); }
+.pos-tag.pos-3 { background-color: rgba(39, 174, 96, 0.85); }
+.pos-tag.pos-4 { background-color: rgba(52, 152, 219, 0.85); }
+.pos-tag.pos-5 { background-color: rgba(155, 89, 182, 0.85); }
 
-/* 加载中 */
+/* ===== 加载中 ===== */
 .loading-state {
   display: flex;
   justify-content: center;
-  padding: 120rpx 0;
+  padding: 160rpx 0;
 }
 
 .loading-text {
   font-size: 28rpx;
-  color: #778da9;
+  color: #484f58;
 }
 
-/* 删除 */
+/* ===== 删除按钮 ===== */
 .delete-section {
   margin-top: 48rpx;
-  padding-bottom: 60rpx;
+  padding-bottom: 20rpx;
 }
 
 .delete-btn {
   width: 100%;
   height: 88rpx;
   border-radius: 16rpx;
-  background-color: rgba(231, 76, 60, 0.15);
-  border: 1rpx solid rgba(231, 76, 60, 0.3);
+  background-color: rgba(218, 54, 51, 0.08);
+  border: 1rpx solid rgba(218, 54, 51, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .delete-btn:active {
-  background-color: rgba(231, 76, 60, 0.3);
+  opacity: 0.75;
+  background-color: rgba(218, 54, 51, 0.16);
 }
 
 .delete-text {
   font-size: 30rpx;
-  color: #e74c3c;
+  color: #f85149;
   font-weight: 600;
 }
+
+/* ===== 无权限提示 ===== */
+.no-edit-tip {
+  margin-top: 32rpx;
+  padding: 24rpx;
+  border-radius: 12rpx;
+  background-color: rgba(31, 111, 235, 0.06);
+  border: 1rpx solid rgba(31, 111, 235, 0.12);
+  text-align: center;
+  font-size: 24rpx;
+  color: #58a6ff;
+  line-height: 1.6;
+}
+
+.tip-sub {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: rgba(88, 166, 255, 0.6);
+}
+
+/* 弹窗/段位/星数 → 见 app.wxss 公共样式 */

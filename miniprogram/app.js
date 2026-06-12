@@ -1,6 +1,6 @@
 // app.js
 App({
-  onLaunch: function () {
+  onLaunch() {
     if (!wx.cloud) {
       console.error('请使用 2.2.3 或以上的基础库以使用云能力')
     } else {
@@ -11,9 +11,8 @@ App({
     }
 
     // 延迟获取 openid，避免阻塞启动
-    var that = this
-    setTimeout(function() {
-      that.getOpenId()
+    setTimeout(() => {
+      this.getOpenId()
     }, 500)
   },
 
@@ -21,17 +20,17 @@ App({
     if (this.globalData.openid) return Promise.resolve(this.globalData.openid)
     if (this.globalData._openIdPromise) return this.globalData._openIdPromise
 
-    var promise = wx.cloud.callFunction({
+    const promise = wx.cloud.callFunction({
       name: 'getOpenId'
-    }).then(function(res) {
+    }).then((res) => {
       this.globalData.openid = res.result.openid
       this.globalData._openIdPromise = null
       return res.result.openid
-    }.bind(this)).catch(function(err) {
+    }).catch((err) => {
       console.error('获取 openid 失败', err)
       this.globalData._openIdPromise = null
       return null
-    }.bind(this))
+    })
 
     this.globalData._openIdPromise = promise
     return promise

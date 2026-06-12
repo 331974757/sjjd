@@ -1,0 +1,30 @@
+// utils/constants.js - 全局常量
+
+// 分页
+const PAGE_SIZE = 20
+const MORE_PAGE_SIZE = 10
+const BATCH_LOAD_SIZE = 100
+
+// 昵称
+const NICK_CHANGE_LIMIT = 3
+
+// 云函数 - 批量操作批次大小
+const CLOUD_BATCH_DELETE_SIZE = 20
+const CLOUD_BATCH_IMPORT_SIZE = 20
+const CLOUD_BATCH_EXPORT_SIZE = 100
+
+// 位置范围
+const POSITION_MIN = 1
+const POSITION_MAX = 5
+
+module.exports = {
+  PAGE_SIZE,
+  MORE_PAGE_SIZE,
+  BATCH_LOAD_SIZE,
+  NICK_CHANGE_LIMIT,
+  CLOUD_BATCH_DELETE_SIZE,
+  CLOUD_BATCH_IMPORT_SIZE,
+  CLOUD_BATCH_EXPORT_SIZE,
+  POSITION_MIN,
+  POSITION_MAX
+}
