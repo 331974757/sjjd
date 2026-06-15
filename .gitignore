@@ -12,3 +12,7 @@ $RECYCLE.BIN/
 
 # Node.js
 node_modules/
+
+# 环境变量（含数据库密码、微信密钥等敏感信息）
+.env
+server/.env

@@ -30,15 +30,14 @@ function calcRankSort(rankName, star) {
 // 根据段位名称返回段位层级 key
 function getRankTier(title) {
   if (!title) return ''
-  const t = title.toLowerCase()
-  if (t.indexOf('冠绝一世') !== -1 || t.indexOf('immortal') !== -1) return 'immortal'
-  if (t.indexOf('超凡入圣') !== -1 || t.indexOf('divine') !== -1) return 'divine'
-  if (t.indexOf('万古流芳') !== -1 || t.indexOf('ancient') !== -1) return 'ancient'
-  if (t.indexOf('传奇') !== -1 || t.indexOf('legend') !== -1) return 'legend'
-  if (t.indexOf('统帅') !== -1 || t.indexOf('archon') !== -1) return 'archon'
-  if (t.indexOf('中军') !== -1 || t.indexOf('crusader') !== -1) return 'crusader'
-  if (t.indexOf('卫士') !== -1 || t.indexOf('guardian') !== -1) return 'guardian'
-  if (t.indexOf('先锋') !== -1 || t.indexOf('herald') !== -1) return 'herald'
+  if (title.indexOf('冠绝一世') !== -1) return 'immortal'
+  if (title.indexOf('超凡入圣') !== -1) return 'divine'
+  if (title.indexOf('万古流芳') !== -1) return 'ancient'
+  if (title.indexOf('传奇') !== -1) return 'legend'
+  if (title.indexOf('统帅') !== -1) return 'archon'
+  if (title.indexOf('中军') !== -1) return 'crusader'
+  if (title.indexOf('卫士') !== -1) return 'guardian'
+  if (title.indexOf('先锋') !== -1) return 'herald'
   return ''
 }
 

@@ -14,7 +14,6 @@
     </view>
 
     <text class="subtitle" wx:if="{{isSuperAdmin}}">点击用户即可调整权限（管理员/超级管理员）</text>
-    <text class="subtitle" wx:if="{{!isSuperAdmin}}">查看注册用户列表（仅超级管理员可调整权限）</text>
 
     <view class="loading-state" wx:if="{{loading}}">
       <text>加载中...</text>
@@ -35,7 +34,7 @@
         </view>
         <view class="user-actions">
           <view
-            wx:if="{{isSuperAdmin && item.nickName && item.nickChangeCount > 0 && item.role !== 'admin' && item.role !== 'super_admin'}}"
+            wx:if="{{isSuperAdmin && item.nickName && item.role !== 'admin' && item.role !== 'super_admin'}}"
             class="reset-btn"
             bindtap="resetNickCount"
             data-openid="{{item.openid}}"
@@ -59,7 +58,7 @@
 
       <view class="empty-state" wx:if="{{users.length === 0 && !loading}}">
         <text class="empty-text">暂无注册用户</text>
-        <text class="empty-hint">请先部署 manageUser 云函数，然后重新进入此页面</text>
+        <text class="empty-hint">暂无注册用户，用户打开小程序后将自动注册</text>
       </view>
 
       <view class="load-more" wx:if="{{hasMore}}">

@@ -1,6 +1,7 @@
 // pages/dota2-detail/dota2-detail.js
 const perm = require('../../utils/permission.js')
 const R = require('../../utils/rank-utils.js')
+const api = require('../../utils/api.js')
 const RANK_OPTIONS = R.RANK_OPTIONS
 
 Page({
@@ -11,7 +12,6 @@ Page({
     canEditAll: false,      // 管理员/超管 → 可编辑所有字段
     canEditOwn: false,      // 普通用户匹配到自己的选手 → 可编辑部分字段
     canDelete: false,       // 管理员/超管 → 可删除
-    userRole: '',
     // 位置选择弹窗
     showPosModal: false,
     posModalTitle: '',
@@ -36,16 +36,10 @@ Page({
 
   async loadPlayer() {
     try {
-      const res = await wx.cloud.database().collection('dota2_players').doc(this.data.playerId).get()
+      const res = await api.get('/players/' + this.data.playerId)
       const player = res.data
       if (!player.goodAtPositions) player.goodAtPositions = []
-      if (!player.signupPosition || typeof player.signupPosition === 'string') {
-        if (player.signupPosition && player.signupPosition !== '') {
-          player.signupPosition = player.signupPosition.split(',').map(s => { return parseInt(s.trim()) }).filter(Boolean)
-        } else {
-          player.signupPosition = []
-        }
-      }
+      if (!player.signupPosition || !Array.isArray(player.signupPosition)) player.signupPosition = []
       this.setData({ player: player })
     } catch (err) {
       console.error('加载失败', err)
@@ -66,8 +60,7 @@ Page({
       this.setData({
         canEditAll: isManager,
         canEditOwn: isOwnPlayer && !isManager,  // 自己匹配到的选手（非管理员）
-        canDelete: isManager,
-        userRole: role
+        canDelete: isManager
       })
     } catch (err) {
       console.error('权限检查失败', err)
@@ -84,15 +77,28 @@ Page({
       success: (res) => {
         const tempPath = res.tempFiles[0].tempFilePath
         wx.showLoading({ title: '上传中...' })
-        const cloudPath = 'avatars/' + Date.now() + '-' + Math.random().toString(36).substr(2, 6) + '.jpg'
-        wx.cloud.uploadFile({
-          cloudPath: cloudPath,
+        const app = getApp()
+        const openid = app.globalData.openid || ''
+        const uploadUrl = api.API_BASE + '/upload' + (openid ? '?openid=' + openid : '')
+        wx.uploadFile({
+          url: uploadUrl,
           filePath: tempPath,
+          name: 'file',
           success: (uploadRes) => {
-            this.updateField('avatarUrl', uploadRes.fileID)
+            try {
+              const data = JSON.parse(uploadRes.data)
+              if (data.success && data.data) {
+                const fullUrl = api.API_BASE.replace('/api', '') + data.data.url
+                this.updateField('avatarUrl', fullUrl)
+              } else {
+                wx.showToast({ title: '上传失败', icon: 'none' })
+              }
+            } catch (e) {
+              wx.showToast({ title: '上传失败', icon: 'none' })
+            }
           },
           fail: () => {
-            this.updateField('avatarUrl', tempPath)
+            wx.showToast({ title: '上传失败', icon: 'none' })
           },
           complete: () => { wx.hideLoading() }
         })
@@ -251,30 +257,25 @@ Page({
 
   preventMove() {},
 
-  // 云函数更新字段
+  // API 更新字段
   async updateField(field, value) {
     const updateData = {}
     updateData[field] = value
 
     wx.showLoading({ title: '保存中...' })
     try {
-      const res = await wx.cloud.callFunction({
-        name: 'managePlayer',
-        data: {
-          action: 'update',
-          playerId: this.data.playerId,
-          data: updateData
-        }
-      })
+      const res = await api.put('/players/' + this.data.playerId, updateData)
       wx.hideLoading()
 
-      if (res.result.success) {
+      if (res.success) {
+        // 通知首页刷新（段位/昵称等变更后首页卡片需更新）
+        this._notifyHomeRefresh()
         wx.showToast({ title: '已更新', icon: 'success' })
         const player = this.data.player
         player[field] = value
         this.setData({ player: player })
       } else {
-        wx.showToast({ title: res.result.message || '更新失败', icon: 'none' })
+        wx.showToast({ title: res.message || '更新失败', icon: 'none' })
       }
     } catch (err) {
       wx.hideLoading()
@@ -287,12 +288,11 @@ Page({
   async updateFields(data) {
     wx.showLoading({ title: '保存中...' })
     try {
-      const res = await wx.cloud.callFunction({
-        name: 'managePlayer',
-        data: { action: 'update', playerId: this.data.playerId, data: data }
-      })
+      const res = await api.put('/players/' + this.data.playerId, data)
       wx.hideLoading()
-      if (res.result.success) {
+      if (res.success) {
+        // 通知首页刷新
+        this._notifyHomeRefresh()
         wx.showToast({ title: '已更新', icon: 'success' })
         const player = this.data.player
         for (const key in data) {
@@ -300,7 +300,7 @@ Page({
         }
         this.setData({ player: player })
       } else {
-        wx.showToast({ title: res.result.message || '更新失败', icon: 'none' })
+        wx.showToast({ title: res.message || '更新失败', icon: 'none' })
       }
     } catch (err) {
       wx.hideLoading()
@@ -324,16 +324,15 @@ Page({
   async doDelete() {
     wx.showLoading({ title: '删除中...' })
     try {
-      const res = await wx.cloud.callFunction({
-        name: 'managePlayer',
-        data: { action: 'delete', playerId: this.data.playerId }
-      })
+      const res = await api.del('/players/' + this.data.playerId)
       wx.hideLoading()
-      if (res.result.success) {
+      if (res.success) {
+        // 通知首页强制刷新
+        this._notifyHomeRefresh()
         wx.showToast({ title: '已删除', icon: 'success' })
         setTimeout(() => { wx.navigateBack() }, 800)
       } else {
-        wx.showToast({ title: res.result.message || '删除失败', icon: 'none' })
+        wx.showToast({ title: res.message || '删除失败', icon: 'none' })
       }
     } catch (err) {
       wx.hideLoading()
@@ -342,18 +341,27 @@ Page({
     }
   },
 
+  // 通知首页下次 onShow 时刷新数据
+  _notifyHomeRefresh() {
+    const pages = getCurrentPages()
+    const homePage = pages[pages.length - 2]
+    if (homePage && homePage.loadAllPlayers) {
+      homePage._needsReload = true
+    }
+  },
+
   // 分享
   onShareAppMessage() {
     const player = this.data.player
     if (player) {
       return {
-        title: player.wxNickname + ' - ' + (player.calibrateRankName || '未定段位') + ' | 蜀军战力排行',
+        title: player.wxNickname + ' - ' + (player.calibrateRankName || '未定段位') + ' | 蜀国争霸系统',
         path: '/pages/dota2-detail/dota2-detail?id=' + this.data.playerId,
         imageUrl: player.avatarUrl || ''
       }
     }
     return {
-      title: '蜀军战力排行 - Dota2',
+      title: '蜀国争霸系统 - Dota2',
       path: '/pages/dota2/dota2'
     }
   }

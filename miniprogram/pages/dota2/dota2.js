@@ -2,6 +2,7 @@
 const perm = require('../../utils/permission.js')
 const R = require('../../utils/rank-utils.js')
 const C = require('../../utils/constants.js')
+const api = require('../../utils/api.js')
 
 const RANK_ORDER = R.RANK_ORDER
 const RANK_ICONS = R.RANK_ICONS
@@ -11,23 +12,27 @@ const RANK_COLORS = R.RANK_COLORS
 Page({
   data: {
     currentGame: 'dota2',
+    subTab: 'profile',        // profile=选手档案, rules=赛事章程, history=历史赛事
     allPlayers: [],
     filteredPlayers: [],
     displayPlayers: [],
     positionFilter: 'all',
     rankFilter: 'all',
     sortFilter: 'rank-desc',
+    filteredCount: 0,
     loaded: false,
     userInfo: { avatarUrl: '' },
     nickName: '',
     nickChangeCount: 0,
     nickChangeLimit: C.NICK_CHANGE_LIMIT,
+    remainingCount: C.NICK_CHANGE_LIMIT,
     unlimitedNick: false,
     userRole: '',
     isAdmin: false,
     showNickModal: false,
     showAdminModal: false,
     nickInputValue: '',
+    userOpenid: '',
     pageSize: C.PAGE_SIZE,
     morePageSize: C.MORE_PAGE_SIZE,
     hasMore: false,
@@ -57,10 +62,13 @@ Page({
     // 从其他页面返回时仅刷新昵称，不重新拉取数据（除非标记为脏）
     if (this._needsReload) {
       this._needsReload = false
-      this.loadAllPlayers()
+      // 延迟刷新，避免页面转场动画期间 setData 打断 input 的内部状态
+      if (this._reloadTimer) clearTimeout(this._reloadTimer)
+      this._reloadTimer = setTimeout(() => { this.loadAllPlayers() }, 500)
     }
-    // 始终检查昵称变更（可能在管理员页面被重置）
-    if (this.data.loaded) {
+    // 仅当昵称可能被管理员修改时才拉取最新昵称信息
+    if (this._nickMayBeChanged) {
+      this._nickMayBeChanged = false
       this.fetchNicknameInfo()
     }
   },
@@ -77,12 +85,9 @@ Page({
   // 加载管理员信息（公开接口，供用户联系）
   async loadSuperAdminInfo() {
     try {
-      const res = await wx.cloud.callFunction({
-        name: 'manageUser',
-        data: { action: 'getSuperAdminInfo' }
-      })
-      if (res.result.success && res.result.data) {
-        const list = res.result.data
+      const res = await api.get('/users/admins/list')
+      if (res.success && res.data) {
+        const list = res.data
         const superAdmins = []
         const admins = []
         list.forEach(u => {
@@ -99,12 +104,10 @@ Page({
           _superAdminOnly: superAdmins,
           _adminOnly: admins
         })
-        return allNames
       }
     } catch (err) {
       console.error('加载超管信息失败', err)
     }
-    return []
   },
 
   // 点击管理栏弹出说明
@@ -125,20 +128,26 @@ Page({
     const nick = perm.getNickName() || ''
     this.setData({ nickName: nick })
     // 异步从服务端拉取最新 nickName + nickChangeCount
-    this.fetchNicknameInfo()
+    this.fetchNicknameInfo().then(() => {
+      // 仅 onLoad 首次加载时自动弹窗，且只弹一次
+      if (!this.data.nickName && !this._nickModalAutoShown) {
+        this._nickModalAutoShown = true
+        this.setData({
+          showNickModal: true,
+          nickInputValue: ''
+        })
+      }
+    })
   },
 
   async fetchNicknameInfo() {
     try {
-      const res = await wx.cloud.callFunction({
-        name: 'manageUser',
-        data: { action: 'checkRole' }
-      })
-      if (res.result.success) {
-        const serverNick = res.result.nickName || ''
-        const count = res.result.nickChangeCount || 0
-        const role = res.result.role || 'user'
-        // 注入 perm 缓存，后续页面切换不再重复调云函数
+      const res = await api.get('/users/me')
+      if (res.success) {
+        const serverNick = res.nickName || ''
+        const count = res.nickChangeCount || 0
+        const role = res.role || 'user'
+        // 注入 perm 缓存，后续页面切换不再重复调API
         perm.setCache(role)
         // 服务端有昵称而本地没有，说明其他设备设置过，同步到本地
         if (serverNick && serverNick !== this.data.nickName) {
@@ -148,42 +157,77 @@ Page({
         this.setData({
           nickName: serverNick || this.data.nickName,
           nickChangeCount: count,
+          remainingCount: Math.max(0, this.data.nickChangeLimit - count),
           userRole: role,
           isAdmin: isManager,
           unlimitedNick: isManager
         })
-
-        // 未设置昵称 → 自动弹出昵称设置弹窗
-        if (!serverNick) {
-          this.setData({
-            nickName: '',
-            showNickModal: true,
-            nickInputValue: ''
-          })
-        }
+      } else {
+        // API 返回失败，尝试从缓存兜底
+        this._applyRoleFallback()
       }
     } catch (err) {
       console.error('获取昵称信息失败', err)
+      // 网络异常，从缓存兜底
+      this._applyRoleFallback()
+    }
+  },
+
+  // 从 perm 缓存回退角色信息
+  _applyRoleFallback() {
+    const role = perm.getRoleSync()
+    if (role) {
+      const isManager = role === 'super_admin' || role === 'admin'
+      this.setData({
+        userRole: role,
+        isAdmin: isManager,
+        unlimitedNick: isManager
+      })
     }
   },
 
   // 点击修改昵称 → 始终打开弹窗（次数用完在弹窗内提示）
-  editNickname() {
+  async editNickname() {
     const currentNick = this.data.nickName
+    // 获取 openid 展示
+    let openid = this.data.userOpenid
+    if (!openid) {
+      try {
+        const app = getApp()
+        if (!app.globalData.openid) {
+          await app.getOpenId()
+        }
+        openid = app.globalData.openid || ''
+      } catch (e) {}
+    }
     this.setData({
       showNickModal: true,
-      nickInputValue: currentNick || ''
+      nickInputValue: currentNick || '',
+      userOpenid: openid || ''
     })
   },
 
   // 关闭昵称弹窗
   closeNickModal() {
+    this._nickModalAutoShown = true  // 关闭后不再自动弹
     this.setData({ showNickModal: false, nickInputValue: '' })
   },
 
   // 输入框内容变化
   onNickInput(e) {
     this.setData({ nickInputValue: e.detail.value })
+  },
+
+  // 点击复制 openid
+  copyOpenid() {
+    const openid = this.data.userOpenid
+    if (!openid) return
+    wx.setClipboardData({
+      data: openid,
+      success: () => {
+        wx.showToast({ title: '已复制 OpenID', icon: 'success' })
+      }
+    })
   },
 
   // 弹窗内点击保存
@@ -193,9 +237,8 @@ Page({
 
     // 非管理员且次数用完 → 拦截保存
     if (currentNick && !this.data.unlimitedNick && this.data.nickChangeCount >= this.data.nickChangeLimit) {
-      const names = this.data.superAdminNames
       wx.showToast({
-        title: '修改次数已用完，请联系超级管理员重置' + (names.length > 0 ? '：' + names.join('、') : ''),
+        title: '修改次数已用完，请联系超级管理员重置',
         icon: 'none',
         duration: 3000
       })
@@ -217,30 +260,28 @@ Page({
   // 防止弹窗背景滚动
   preventMove() {},
 
-  // 调用云函数保存昵称
+  // 调用 API 保存昵称
   async doSaveNickname(newNick) {
     wx.showLoading({ title: '保存中...' })
     try {
-      const res = await wx.cloud.callFunction({
-        name: 'manageUser',
-        data: { action: 'checkRole', nickName: newNick }
-      })
+      const res = await api.put('/users/me/nickname', { nickName: newNick })
       wx.hideLoading()
 
-      if (res.result.success) {
+      if (res.success) {
         perm.saveNickName(newNick)
-        const newCount = res.result.nickChangeCount || 0
+        const newCount = res.nickChangeCount || 0
         this.setData({
           nickName: newNick,
-          nickChangeCount: newCount
+          nickChangeCount: newCount,
+          remainingCount: Math.max(0, this.data.nickChangeLimit - newCount)
         })
         setTimeout(() => { wx.showToast({ title: '昵称已更新', icon: 'success' }) }, 300)
       } else {
         // 可能是超限被后端拒绝，刷新次数
-        if (res.result.nickChangeCount !== undefined) {
-          this.setData({ nickChangeCount: res.result.nickChangeCount })
+        if (res.nickChangeCount !== undefined) {
+          this.setData({ nickChangeCount: res.nickChangeCount })
         }
-        setTimeout(() => { wx.showToast({ title: res.result.message || '修改失败', icon: 'none', duration: 2500 }) }, 300)
+        setTimeout(() => { wx.showToast({ title: res.message || '修改失败', icon: 'none', duration: 2500 }) }, 300)
       }
     } catch (err) {
       wx.hideLoading()
@@ -252,6 +293,8 @@ Page({
   onPullDownRefresh() {
     this.loadAllPlayers().then(() => {
       wx.stopPullDownRefresh()
+    }).catch(() => {
+      wx.stopPullDownRefresh()
     })
   },
 
@@ -260,28 +303,14 @@ Page({
     this.loadMore()
   },
 
-  // ====== 数据加载（分页拉取全部数据） ======
+  // ====== 数据加载（一次性拉取全部数据） ======
   async loadAllPlayers() {
     if (this._loading) return
     this._loading = true
     try {
-      const all = []
-      const batchSize = C.BATCH_LOAD_SIZE
-      let skipCount = 0
-      const db = wx.cloud.database()
-      while (true) {
-        const res = await db.collection('dota2_players')
-          .orderBy('_id', 'asc')
-          .skip(skipCount)
-          .limit(batchSize)
-          .get()
-        const batch = res.data || []
-        if (batch.length === 0) break
-        all.push.apply(all, batch)
-        skipCount += batch.length
-      }
+      const res = await api.get('/players', { pageSize: 1000 })
+      const all = res.data || []
 
-      console.log('[loadAllPlayers] 共加载 ' + all.length + ' 条数据')
       this.setData({
         allPlayers: all,
         loaded: true
@@ -356,20 +385,30 @@ Page({
     this.filterAndDisplay()
   },
 
-  onSortFilter(e) {
-    this.setData({ sortFilter: e.currentTarget.dataset.sort })
+  onSortToggle() {
+    const next = this.data.sortFilter === 'rank-desc' ? 'rank-asc' : 'rank-desc'
+    this.setData({ sortFilter: next })
     this.filterAndDisplay()
   },
 
   switchGame(e) {
     const game = e.currentTarget.dataset.game
     if (game === this.data.currentGame) return
-    if (game === 'cs2') {
-      wx.showToast({ title: '暂未开放，敬请期待', icon: 'none' })
-      return
-    }
     this.setData({ currentGame: game })
   },
+
+  // 点击游戏标签中间的 + 号
+  onGamePlusTap() {
+    wx.showToast({ title: '更多精彩内容后续开放', icon: 'none', duration: 2000 })
+  },
+
+  // 子分页切换
+  switchSubTab(e) {
+    const tab = e.currentTarget.dataset.tab
+    if (tab === this.data.subTab) return
+    this.setData({ subTab: tab })
+  },
+
 
 
   // 筛选 + 排序 + 显示
@@ -475,18 +514,21 @@ Page({
   // 跳转管理员页面
   goAdmin() {
     this._needsReload = true
+    this._nickMayBeChanged = true
     wx.navigateTo({ url: '/pages/admin/admin' })
   },
 
   // ====== 段位分布饼图 ======
   toggleChart() {
-    const show = !this.data.showChart
-    this.setData({ showChart: show })
-    if (show) {
-      this.computeRankDistribution()
-      if (this._pieTimer) clearTimeout(this._pieTimer)
-      this._pieTimer = setTimeout(() => { this.drawPieChart() }, 300)
-    }
+    // 始终打开饼图（关闭请用饼图右上角 ✕）
+    this.setData({ showChart: true })
+    this.computeRankDistribution()
+    if (this._pieTimer) clearTimeout(this._pieTimer)
+    this._pieTimer = setTimeout(() => { this.drawPieChart() }, 300)
+  },
+
+  closeChart() {
+    this.setData({ showChart: false })
   },
 
   computeRankDistribution() {
@@ -497,23 +539,17 @@ Page({
       if (!dist[tier]) dist[tier] = 0
       dist[tier]++
     }
-    // 按段位从高到低排序（先构建，再按人数降序排列用于图例）
     const result = []
-    const RANK_COLORS_MAP = {}
-    for (let j = 0; j < RANK_ORDER.length; j++) {
-      RANK_COLORS_MAP[RANK_ORDER[j]] = RANK_COLORS[j]
-    }
     for (let j = 0; j < RANK_ORDER.length; j++) {
       const key = RANK_ORDER[j]
       if (dist[key]) {
         const ico = RANK_ICONS[key]
-        result.push({ tier: key, label: RANK_LABELS[key], icon: ico, iconIsImg: R.isRankIconImage(ico), count: dist[key], color: RANK_COLORS_MAP[key] })
+        result.push({ tier: key, label: RANK_LABELS[key], icon: ico, iconIsImg: R.isRankIconImage(ico), count: dist[key], color: RANK_COLORS[j] })
       }
     }
     if (dist['unknown']) {
       result.push({ tier: 'unknown', label: '未定段位', icon: '❓', count: dist['unknown'], color: '#666' })
     }
-    // 保持段位从高到低排序（冠绝→先锋），不按人数排序
     this.setData({ rankDistribution: result })
   },
 
@@ -611,17 +647,14 @@ Page({
   async doBatchDelete(ids) {
     wx.showLoading({ title: '删除中...' })
     try {
-      const res = await wx.cloud.callFunction({
-        name: 'managePlayer',
-        data: { action: 'batchDelete', ids: ids }
-      })
+      const res = await api.post('/players/batch-delete', { ids: ids })
       wx.hideLoading()
-      if (res.result.success) {
-        setTimeout(() => { wx.showToast({ title: '已删除 ' + (res.result.deleted || ids.length) + ' 名选手', icon: 'success' }) }, 300)
+      if (res.success) {
+        setTimeout(() => { wx.showToast({ title: '已删除 ' + (res.deleted || ids.length) + ' 名选手', icon: 'success' }) }, 300)
         this.setData({ deleteMode: false, selectedIds: {}, selectedCount: 0 })
         this.loadAllPlayers()
       } else {
-        setTimeout(() => { wx.showToast({ title: res.result.message || '删除失败', icon: 'none' }) }, 300)
+        setTimeout(() => { wx.showToast({ title: res.message || '删除失败', icon: 'none' }) }, 300)
       }
     } catch (err) {
       wx.hideLoading()
@@ -633,50 +666,95 @@ Page({
   // ====== 分享 ======
   onShareAppMessage() {
     return {
-      title: '蜀军战力排行 - 看看大家的Dota2段位！',
+      title: '蜀国争霸系统 - 看看大家的Dota2段位！',
       path: '/pages/dota2/dota2'
     }
   },
 
-  // 批量导出
+  // 批量导出（JSON数据 → CSV）
   async doExport() {
     wx.showLoading({ title: '导出中...' })
     try {
-      const res = await wx.cloud.callFunction({ name: 'batchExport' })
+      const res = await api.get('/players/export/all')
       wx.hideLoading()
-      if (res.result.success) {
-        const url = res.result.tempFileURL
-        const count = res.result.count
-        setTimeout(() => {
-          wx.showModal({
-            title: '导出成功',
-            content: '共导出 ' + count + ' 名选手数据，是否下载文件？',
-            success: (modalRes) => {
-              if (modalRes.confirm) {
-                wx.downloadFile({
-                  url: url,
-                  success: (dlRes) => {
-                    if (dlRes.statusCode === 200) {
-                      wx.openDocument({ filePath: dlRes.tempFilePath, showMenu: true })
-                    }
-                  }
-                })
-              }
-            }
-          })
-        }, 300)
-      } else {
-        setTimeout(() => { wx.showToast({ title: res.result.message || '导出失败', icon: 'none' }) }, 300)
+      
+      if (!res) {
+        wx.showToast({ title: '服务器无响应', icon: 'none' })
+        return
       }
+      if (!res.success) {
+        wx.showToast({ title: res.error || res.message || '导出失败', icon: 'none' })
+        return
+      }
+      const players = res.data
+      if (!players || !Array.isArray(players) || players.length === 0) {
+        wx.showToast({ title: '暂无选手数据', icon: 'none' })
+        return
+      }
+      
+      const count = players.length
+      // 生成CSV
+      const header = '微信群昵称,Steam ID,Dota2游戏昵称,核准段位,核准星数,擅长位置,报名位置'
+      const escapeCSV = (v) => {
+        const s = String(v == null ? '' : v)
+        return s.indexOf(',') >= 0 || s.indexOf('"') >= 0 || s.indexOf('\n') >= 0 ? '"' + s.replace(/"/g, '""') + '"' : s
+      }
+      const rows = players.map(p => {
+        const pos = Array.isArray(p.goodAtPositions) ? p.goodAtPositions.join(';') : (p.goodAtPositions || '')
+        const sp = Array.isArray(p.signupPosition) ? p.signupPosition.join(';') : (p.signupPosition || '')
+        return [p.wxNickname, p.steamId, p.gameId, p.calibrateRankName, p.calibrateRankStar, pos, sp].map(escapeCSV).join(',')
+      })
+      const csv = '\ufeff' + header + '\n' + rows.join('\n')
+      
+      // 写入文件
+      let filePath = ''
+      try {
+        const fs = wx.getFileSystemManager()
+        const userPath = (wx.env && wx.env.USER_DATA_PATH) || ''
+        filePath = (userPath || wx.env.USER_DATA_PATH) + '/dota2_export_' + Date.now() + '.csv'
+        fs.writeFileSync(filePath, csv, 'utf8')
+      } catch (fileErr) {
+        console.error('[导出] 文件写入失败:', fileErr)
+        // 备选方案：直接复制到剪贴板
+        wx.setClipboardData({
+          data: csv,
+          success: () => {
+            wx.showToast({ title: '已复制 ' + count + ' 条数据到剪贴板', icon: 'success', duration: 2500 })
+          },
+          fail: () => {
+            wx.showToast({ title: '导出失败，请重试', icon: 'none' })
+          }
+        })
+        return
+      }
+      
+      // 弹窗询问是否打开
+      setTimeout(() => {
+        wx.showModal({
+          title: '导出成功',
+          content: '共导出 ' + count + ' 名选手数据',
+          confirmText: '打开文件',
+          cancelText: '关闭',
+          success: (modalRes) => {
+            if (modalRes.confirm && filePath) {
+              wx.openDocument({ 
+                filePath: filePath, 
+                showMenu: true,
+                fail: (err) => {
+                  console.error('[导出] 打开文件失败:', err)
+                  wx.showToast({ title: '打开失败，文件已保存', icon: 'none' })
+                }
+              })
+            }
+          }
+        })
+      }, 300)
     } catch (err) {
       wx.hideLoading()
-      console.error('导出失败', err)
-      setTimeout(() => { wx.showToast({ title: '导出失败', icon: 'none' }) }, 300)
+      console.error('[导出] 异常:', err)
+      wx.showToast({ title: '导出失败: ' + (err.message || '未知错误'), icon: 'none', duration: 2500 })
     }
   }
 })
-
-
-
 
 

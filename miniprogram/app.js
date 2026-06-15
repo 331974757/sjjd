@@ -1,35 +1,51 @@
 // app.js
+const api = require('./utils/api.js')
+
 App({
   onLaunch() {
-    if (!wx.cloud) {
-      console.error('请使用 2.2.3 或以上的基础库以使用云能力')
-    } else {
-      wx.cloud.init({
-        env: 'prod-d3gac4qo6d76e770c',
-        traceUser: true
-      })
-    }
-
-    // 延迟获取 openid，避免阻塞启动
-    setTimeout(() => {
-      this.getOpenId()
-    }, 500)
+    this.getOpenId()
   },
 
   getOpenId() {
     if (this.globalData.openid) return Promise.resolve(this.globalData.openid)
     if (this.globalData._openIdPromise) return this.globalData._openIdPromise
 
-    const promise = wx.cloud.callFunction({
-      name: 'getOpenId'
-    }).then((res) => {
-      this.globalData.openid = res.result.openid
-      this.globalData._openIdPromise = null
-      return res.result.openid
-    }).catch((err) => {
-      console.error('获取 openid 失败', err)
-      this.globalData._openIdPromise = null
-      return null
+    const promise = new Promise((resolve) => {
+      wx.login({
+        success: (loginRes) => {
+          if (!loginRes.code) {
+            console.error('[App] wx.login 未返回 code')
+            this.globalData._openIdPromise = null
+            resolve('')
+            return
+          }
+          wx.request({
+            url: api.API_BASE + '/auth/login?code=' + loginRes.code,
+            method: 'GET',
+            success: (res) => {
+              if (res.data && res.data.success && res.data.openid) {
+                this.globalData.openid = res.data.openid
+                this.globalData._openIdPromise = null
+                resolve(res.data.openid)
+              } else {
+                console.error('[App] 登录接口返回错误:', res.data)
+                this.globalData._openIdPromise = null
+                resolve('')
+              }
+            },
+            fail: (err) => {
+              console.error('[App] 登录接口请求失败:', err)
+              this.globalData._openIdPromise = null
+              resolve('')
+            }
+          })
+        },
+        fail: (err) => {
+          console.error('[App] wx.login 失败:', err)
+          this.globalData._openIdPromise = null
+          resolve('')
+        }
+      })
     })
 
     this.globalData._openIdPromise = promise

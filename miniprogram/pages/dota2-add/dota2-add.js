@@ -1,6 +1,7 @@
 // pages/dota2-add/dota2-add.js
 const perm = require('../../utils/permission.js')
 const R = require('../../utils/rank-utils.js')
+const api = require('../../utils/api.js')
 
 // 段位选项（与详情页保持一致）
 const RANK_OPTIONS = R.RANK_OPTIONS
@@ -30,19 +31,26 @@ Page({
   },
 
   async checkAccess() {
-    const isAdmin = await perm.isAdmin()
-    if (!isAdmin) {
+    try {
+      const isAdmin = await perm.isAdmin()
+      if (!isAdmin) {
+        this.setData({ accessChecked: true, accessDenied: true })
+        wx.showModal({
+          title: '仅管理员可添加选手',
+          content: '请联系管理员添加选手',
+          showCancel: false,
+          success: () => {
+            wx.navigateBack()
+          }
+        })
+      } else {
+        this.setData({ accessChecked: true, accessDenied: false })
+      }
+    } catch (err) {
+      console.error('权限检查失败', err)
       this.setData({ accessChecked: true, accessDenied: true })
-      wx.showModal({
-        title: '仅管理员可添加选手',
-        content: '请联系管理员添加选手',
-        showCancel: false,
-        success: () => {
-          wx.navigateBack()
-        }
-      })
-    } else {
-      this.setData({ accessChecked: true, accessDenied: false })
+      wx.showToast({ title: '权限检查失败，请重试', icon: 'none' })
+      setTimeout(() => { wx.navigateBack() }, 1500)
     }
   },
 
@@ -62,19 +70,29 @@ Page({
       success: (res) => {
         const tempPath = res.tempFiles[0].tempFilePath
         wx.showLoading({ title: '上传中...' })
-        const cloudPath = 'avatars/' + Date.now() + '-' + Math.random().toString(36).substr(2, 6) + '.jpg'
-        wx.cloud.uploadFile({
-          cloudPath: cloudPath,
+        const app = getApp()
+        const openid = app.globalData.openid || ''
+        const uploadUrl = api.API_BASE + '/upload' + (openid ? '?openid=' + openid : '')
+        wx.uploadFile({
+          url: uploadUrl,
           filePath: tempPath,
+          name: 'file',
           success: (uploadRes) => {
-            this.setData({ avatarUrl: uploadRes.fileID })
-            wx.hideLoading()
+            try {
+              const data = JSON.parse(uploadRes.data)
+              if (data.success && data.data) {
+                this.setData({ avatarUrl: api.API_BASE.replace('/api', '') + data.data.url })
+              } else {
+                wx.showToast({ title: '头像上传失败', icon: 'none' })
+              }
+            } catch (e) {
+              wx.showToast({ title: '头像上传失败', icon: 'none' })
+            }
           },
           fail: () => {
-            wx.hideLoading()
-            // 本地临时路径预览（上传失败时也显示）
-            this.setData({ avatarUrl: tempPath })
-          }
+            wx.showToast({ title: '头像上传失败', icon: 'none' })
+          },
+          complete: () => { wx.hideLoading() }
         })
       }
     })
@@ -210,38 +228,43 @@ Page({
     this.setData({ submitting: true })
 
     try {
-      const res = await wx.cloud.callFunction({
-        name: 'managePlayer',
-        data: {
-          action: 'add',
-          data: {
-            avatarUrl: this.data.avatarUrl || '',
-            wxNickname: wxNickname,
-            steamId: this.data.steamId.trim(),
-            gameId: gameId,
-            calibrateRankName: rankTitle,
-            calibrateRankStar: this.data.rankStars,
-            calibrateRankLabel: R.calcRankLabel(rankTitle, this.data.rankStars),
-            calibrateRankSort: R.calcRankSort(rankTitle, this.data.rankStars),
-            goodAtPositions: goodAtPositions,
-            signupPosition: signupPosition
-          }
-        }
+      const res = await api.post('/players', {
+        avatarUrl: this.data.avatarUrl || '',
+        wxNickname: wxNickname,
+        steamId: this.data.steamId.trim(),
+        gameId: gameId,
+        calibrateRankName: rankTitle,
+        calibrateRankStar: this.data.rankStars,
+        calibrateRankLabel: R.calcRankLabel(rankTitle, this.data.rankStars),
+        calibrateRankSort: R.calcRankSort(rankTitle, this.data.rankStars),
+        goodAtPositions: goodAtPositions,
+        signupPosition: signupPosition
       })
 
-      if (res.result.success) {
-        const action = res.result.action
+      if (res.success) {
+        // 通知首页强制刷新
+        this._notifyHomeRefresh()
+        const action = res.action
         const msg = action === 'updated' ? '已更新已有选手信息' : '添加成功！'
         wx.showToast({ title: msg, icon: 'success' })
         setTimeout(() => { wx.navigateBack() }, 800)
       } else {
-        wx.showToast({ title: res.result.message || '添加失败', icon: 'none' })
+        wx.showToast({ title: res.message || '添加失败', icon: 'none' })
       }
     } catch (err) {
       console.error('添加失败', err)
       wx.showToast({ title: '添加失败', icon: 'none' })
     } finally {
       this.setData({ submitting: false })
+    }
+  },
+
+  // 通知首页下次 onShow 时刷新数据
+  _notifyHomeRefresh() {
+    const pages = getCurrentPages()
+    const homePage = pages[pages.length - 2]
+    if (homePage && homePage.loadAllPlayers) {
+      homePage._needsReload = true
     }
   }
 })

@@ -1,0 +1,83 @@
+// utils/api.js - ECS REST API 统一请求模块
+const API_BASE = 'https://congqin.online/api'
+
+// 缓存 openid 避免每次都调 getApp
+let _openidCache = null
+
+async function getOpenId() {
+  if (_openidCache) return _openidCache
+  try {
+    const app = getApp()
+    // 如果 globalData.openid 为空，等待 app.getOpenId() 完成
+    if (!app.globalData.openid) {
+      await app.getOpenId()
+    }
+    _openidCache = app.globalData.openid || ''
+  } catch (e) { /* 静默降级 */ }
+  return _openidCache || ''
+}
+
+async function request(options, retryCount) {
+  retryCount = retryCount || 0
+  const MAX_RETRIES = 1  // GET 请求最多重试1次
+  const openid = await getOpenId()
+  let url = API_BASE + options.url
+  const method = (options.method || 'GET').toUpperCase()
+
+  // GET 参数拼接到 URL
+  if (method === 'GET' && options.data) {
+    const params = Object.keys(options.data).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(options.data[k])).join('&')
+    if (params) url += (url.indexOf('?') >= 0 ? '&' : '?') + params
+  }
+
+  // body 数据仅用于非 GET
+  // 必须显式 JSON.stringify，微信 wx.request 传对象时可能不按 Content-Type 序列化
+  const data = method === 'GET' ? undefined : JSON.stringify(options.data || {})
+
+  // openid 通过 query 传递
+  if (openid) {
+    const sep = url.indexOf('?') >= 0 ? '&' : '?'
+    url += sep + 'openid=' + openid
+  }
+
+  // GET 请求添加防缓存时间戳，确保每次拉取最新数据
+  if (method === 'GET') {
+    url += (url.indexOf('?') >= 0 ? '&' : '?') + '_t=' + Date.now()
+  }
+
+  return new Promise((resolve, reject) => {
+    wx.request({
+      url: url,
+      method: method,
+      data: data,
+      timeout: 15000,
+      header: { 'Content-Type': 'application/json' },
+      success: (res) => {
+        // 200~499 都 resolve，让调用方通过 res.success 判断业务成败
+        // 否则 400 校验错误（如昵称重复）会走 reject 导致看不到具体错误消息
+        if (res.statusCode < 500) {
+          resolve(res.data || {})
+        } else {
+          reject(Object.assign(new Error('HTTP ' + res.statusCode), { data: res.data }))
+        }
+      },
+      fail: (err) => {
+        if (method === 'GET' && retryCount < MAX_RETRIES) {
+          setTimeout(() => {
+            request(options, retryCount + 1).then(resolve).catch(reject)
+          }, 1000)
+        } else {
+          reject(err)
+        }
+      }
+    })
+  })
+}
+
+module.exports = {
+  get: (url, data) => request({ url, method: 'GET', data }),
+  post: (url, data) => request({ url, method: 'POST', data }),
+  put: (url, data) => request({ url, method: 'PUT', data }),
+  del: (url, data) => request({ url, method: 'DELETE', data }),
+  API_BASE
+}

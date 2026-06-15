@@ -42,7 +42,7 @@
 .nav-title-line {
   width: 280rpx;
   height: 4rpx;
-  margin: 4rpx auto 8rpx;
+  margin: 4rpx auto 24rpx;
   border-radius: 2rpx;
   background: linear-gradient(90deg, transparent, #e8b84a, #f5d799, #e8b84a, transparent);
 }
@@ -63,50 +63,65 @@
   margin-right: 12rpx;
 }
 
+/* ===== 子分页栏 ===== */
+.sub-tabs {
+  display: flex;
+  flex-direction: row;
+  padding: 12rpx 36rpx 18rpx;
+  gap: 16rpx;
+}
 
-
-/* 管理员图标按钮 */
-.admin-icon-btn {
-  width: 52rpx;
-  min-width: 52rpx;
-  height: 52rpx;
-  border-radius: 26rpx;
+.sub-tab {
+  flex: 1;
+  height: 68rpx;
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: 34rpx;
+  background-color: rgba(255, 255, 255, 0.04);
+  border: 1rpx solid transparent;
+  transition: all 0.25s ease;
+}
+
+.sub-tab.sub-active {
+  background-color: #d4a03a;
+  border-color: #e8b84a;
+  box-shadow: 0 4rpx 16rpx rgba(212, 160, 58, 0.35);
+}
+
+.sub-tab-text {
   font-size: 26rpx;
-  line-height: 1;
-  box-sizing: border-box;
-  padding: 0;
-  border: 1rpx solid rgba(217, 168, 52, 0.3);
-  background-color: rgba(217, 168, 52, 0.15);
-  color: #d4a03a;
-  flex-shrink: 0;
+  color: #8b949e;
+  font-weight: 600;
+  letter-spacing: 2rpx;
 }
 
-.admin-icon-btn:active {
-  background-color: rgba(217, 168, 52, 0.25);
+.sub-tab.sub-active .sub-tab-text {
+  color: #0d1117;
 }
 
 
-
-/* ===== 游戏标签切换 ===== */
+/* ===== 游戏标签（主导航） ===== */
 .game-tabs {
   display: flex;
   flex-direction: row;
-  padding: 10rpx 32rpx 12rpx;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 20rpx 36rpx 12rpx;
+  gap: 10rpx;
 }
 
 .game-tab {
-  height: 64rpx;
-  padding: 0 36rpx;
+  height: 52rpx;
+  padding: 0 28rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 32rpx;
+  border-radius: 26rpx;
   background-color: rgba(255, 255, 255, 0.05);
-  margin-right: 16rpx;
   border: 1rpx solid transparent;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
 }
 
 .game-tab.tab-active {
@@ -115,7 +130,7 @@
 }
 
 .tab-text {
-  font-size: 26rpx;
+  font-size: 24rpx;
   color: #8b949e;
   font-weight: 500;
 }
@@ -124,9 +139,36 @@
   color: #ffffff;
 }
 
+/* 右侧 + 号 */
+.game-plus {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 22rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(255, 255, 255, 0.04);
+  border: 1rpx solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+  margin-left: 2rpx;
+  transition: all 0.15s ease;
+}
+
+.game-plus:active {
+  background-color: rgba(255, 255, 255, 0.1);
+  transform: scale(0.92);
+}
+
+.plus-icon {
+  font-size: 28rpx;
+  color: #8b949e;
+  font-weight: 300;
+  line-height: 1;
+}
+
 /* ===== 搜索栏 ===== */
 .search-bar {
-  padding: 4rpx 32rpx 8rpx;
+  padding: 6rpx 36rpx 10rpx;
   position: relative;
 }
 
@@ -158,50 +200,61 @@
 }
 .search-clear:active { color: #e6edf3; }
 
-/* ===== 筛选区 ===== */
-.filter-area {
-  padding: 0 32rpx 12rpx;
+/* ===== 筛选行 ===== */
+.filter-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 6rpx 36rpx;
+  gap: 10rpx;
+}
+
+.ftag-fixed {
+  flex-shrink: 0;
 }
 
 .filter-scroll {
   white-space: nowrap;
-  margin-bottom: 12rpx;
+  flex: 1;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
+.filter-scroll::-webkit-scrollbar { display: none; }
 
-.filter-tag {
+.ftag {
   display: inline-block;
-  padding: 10rpx 24rpx;
-  border-radius: 20rpx;
-  font-size: 24rpx;
+  padding: 8rpx 18rpx;
+  border-radius: 18rpx;
+  font-size: 22rpx;
   color: #8b949e;
   background-color: rgba(255, 255, 255, 0.04);
-  border: 1rpx solid rgba(255, 255, 255, 0.08);
-  margin-right: 14rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.06);
+  margin-right: 10rpx;
+  line-height: 1.4;
+  transition: all 0.15s ease;
+}
+.ftag:active { opacity: 0.7; }
+
+.ftag.ftag-on {
+  background-color: rgba(31, 111, 235, 0.15);
+  color: #58a6ff;
+  border-color: rgba(31, 111, 235, 0.35);
 }
 
-.filter-tag.tag-active {
-  background-color: #1f6feb;
-  color: #ffffff;
-  border-color: #1f6feb;
-  box-shadow: 0 2rpx 8rpx rgba(31, 111, 235, 0.3);
-}
-
-/* ===== 排序行 ===== */
-.sort-row {
+/* 操作按钮行：左右分布 */
+.action-row {
   display: flex;
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  margin-top: 2rpx;
+  padding: 14rpx 36rpx;
 }
 
-.sort-left {
+/* 段位排序切换按钮 */
+.tbtn-sort {
   display: flex;
   flex-direction: row;
   align-items: center;
-}
-
-.sort-tag {
   height: 52rpx;
   padding: 0 24rpx;
   border-radius: 26rpx;
@@ -209,86 +262,62 @@
   color: #8b949e;
   background-color: rgba(255, 255, 255, 0.04);
   border: 1rpx solid rgba(255, 255, 255, 0.08);
-  margin-right: 14rpx;
-  display: flex;
-  align-items: center;
-  box-sizing: border-box;
+  transition: all 0.15s ease;
 }
+.tbtn-sort:active { opacity: 0.7; }
 
-.sort-tag.sort-active {
-  background-color: rgba(31, 111, 235, 0.15);
+.tbtn-sort.sort-desc {
   color: #58a6ff;
-  border-color: rgba(31, 111, 235, 0.35);
+  background-color: rgba(31, 111, 235, 0.12);
+  border-color: rgba(31, 111, 235, 0.3);
 }
 
-/* 排序行图标按钮（段位分布、昵称） */
-.sort-icon-btn,
-.nickname-icon-btn {
+.tbtn-sort.sort-asc {
+  color: #3bfb83;
+  background-color: rgba(59, 251, 131, 0.08);
+  border-color: rgba(59, 251, 131, 0.2);
+}
+
+.sort-arrow {
+  margin-left: 4rpx;
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+/* 右侧功能图标区 */
+.action-right {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.tbtn-icon {
   width: 52rpx;
-  min-width: 52rpx;
   height: 52rpx;
+  min-width: 52rpx;
+  max-width: 52rpx;
   border-radius: 26rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 28rpx;
-  line-height: 1;
-  box-sizing: border-box;
-  padding: 0;
-}
-
-.sort-icon-btn {
-  color: #d4a03a;
-  border: 1rpx solid rgba(217, 168, 52, 0.3);
-  background-color: rgba(217, 168, 52, 0.08);
-  margin-right: 14rpx;
-}
-
-.sort-icon-btn.chart-active {
-  background-color: rgba(217, 168, 52, 0.2);
-  color: #e8b84a;
-  border-color: rgba(217, 168, 52, 0.5);
-}
-
-/* 查看管理员图标按钮 */
-.sort-info-btn {
-  color: #58a6ff;
-  border-color: rgba(31, 111, 235, 0.3);
-  background-color: rgba(31, 111, 235, 0.08);
-}
-
-.sort-info-btn:active {
-  background-color: rgba(31, 111, 235, 0.2);
-}
-
-/* 昵称图标按钮 */
-.nickname-icon-btn {
-  border: 1rpx solid rgba(255, 255, 255, 0.1);
-  background-color: rgba(255, 255, 255, 0.06);
-  color: #8b949e;
   font-size: 26rpx;
-  margin-right: 12rpx;
+  line-height: 1;
+  border: 1rpx solid rgba(212, 160, 58, 0.25);
+  background-color: rgba(212, 160, 58, 0.08);
+  color: #d4a03a;
   flex-shrink: 0;
+  overflow: hidden;
 }
 
-.nickname-icon-btn:active {
-  background-color: rgba(255, 255, 255, 0.14);
-}
-
-/* 排序行右侧操作按钮区 */
-.sort-right {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  flex-shrink: 0;
-}
+.chart-btn.chart-active { background-color: rgba(212, 160, 58, 0.22); border-color: rgba(212, 160, 58, 0.5); }
 
 /* ===== 双列卡片网格 ===== */
 .card-grid {
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
-  padding: 16rpx 24rpx;
+  padding: 20rpx 28rpx;
   /* 用padding替代gap，子元素用margin控制间距 */
 }
 
@@ -313,8 +342,6 @@
 .grid-card:nth-child(odd) {
   margin-right: 12rpx;
 }
-
-
 
 /* 卡片头像区 */
 .card-avatar-wrap {
@@ -387,7 +414,7 @@
 
 /* ===== 段位分布饼图 ===== */
 .chart-section {
-  margin: 8rpx 32rpx 20rpx;
+  margin: 10rpx 36rpx 24rpx;
   background: linear-gradient(180deg, #1a1f2b 0%, #161b22 100%);
   border-radius: 24rpx;
   overflow: hidden;
@@ -596,53 +623,39 @@
   color: #484f58;
 }
 
-/* ===== FAB 按钮 ===== */
+/* ===== FAB 添加按钮 ===== */
 .fab-btn {
   position: fixed;
-  bottom: 60rpx;
-  right: 40rpx;
-  width: 100rpx;
-  height: 100rpx;
-  border-radius: 50rpx;
-  background-color: #1f6feb;
+  bottom: 48rpx;
+  right: 36rpx;
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 44rpx;
   display: flex;
   align-items: center;
   justify-content: center;
+  background-color: #1f6feb;
   box-shadow: 0 8rpx 28rpx rgba(31, 111, 235, 0.45);
   z-index: 50;
+  transition: all 0.15s ease;
 }
 
 .fab-btn:active {
+  transform: scale(0.92);
   opacity: 0.85;
-  transform: scale(0.95);
 }
 
 .fab-text {
-  font-size: 52rpx;
+  font-size: 56rpx;
   color: #ffffff;
   font-weight: 300;
   line-height: 1;
+  transform: translate(0rpx, -4rpx);
 }
 
-/* ===== CS2 占位 ===== */
-.cs2-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding-top: 320rpx;
-}
-
-.cs2-icon {
-  font-size: 96rpx;
-  opacity: 0.5;
-}
-
-.cs2-text {
-  font-size: 28rpx;
-  color: rgba(255, 255, 255, 0.35);
-  letter-spacing: 2rpx;
-  margin-top: 24rpx;
+/* ===== CS:GO 占位 ===== */
+.csgo-placeholder {
+  padding-top: 260rpx;
 }
 
 /* ===== 昵称编辑弹窗 ===== */
@@ -721,6 +734,32 @@
   flex-direction: row;
   align-items: center;
   margin-bottom: 36rpx;
+}
+
+.nick-openid-row {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 12rpx;
+  background-color: rgba(255, 255, 255, 0.04);
+  border: 1rpx solid rgba(255, 255, 255, 0.06);
+}
+
+.nick-openid-label {
+  font-size: 24rpx;
+  color: #7d8590;
+}
+
+.nick-openid-value {
+  font-size: 24rpx;
+  color: #58a6ff;
+  word-break: break-all;
+  text-decoration: underline;
+  text-underline-offset: 4rpx;
 }
 
 .nick-remain-label {
@@ -927,4 +966,32 @@
   font-size: 22rpx;
   color: #5a6678;
   line-height: 1.6;
+}
+
+/* ===== 占位页（赛事章程 / 历史赛事） ===== */
+.placeholder-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-top: 320rpx;
+}
+
+.ph-icon {
+  font-size: 120rpx;
+  opacity: 0.35;
+  margin-bottom: 28rpx;
+}
+
+.ph-main {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.6);
+  letter-spacing: 4rpx;
+  margin-bottom: 12rpx;
+}
+
+.ph-sub {
+  font-size: 26rpx;
+  color: rgba(139, 148, 158, 0.7);
 }

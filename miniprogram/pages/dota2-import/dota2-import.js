@@ -1,5 +1,6 @@
 // pages/dota2-import/dota2-import.js
 const perm = require('../../utils/permission.js')
+const api = require('../../utils/api.js')
 const COLUMN_MAP = [
   { name: '微信群昵称', field: 'wxNickname', required: true, hint: '' },
   { name: 'Steam ID', field: 'steamId', required: false, hint: '选填' },
@@ -15,17 +16,24 @@ const TEMPLATE_ROW = '示例选手\t123456789\tDota2示例昵称\t统帅\t3\t1,2
 
 Page({
   async onLoad() {
-    const isAdmin = await perm.isAdmin()
-    if (!isAdmin) {
+    try {
+      const isAdmin = await perm.isAdmin()
+      if (!isAdmin) {
+        this.setData({ accessChecked: true, accessDenied: true })
+        wx.showModal({
+          title: '仅管理员可导入',
+          content: '请联系管理员操作',
+          showCancel: false,
+          success: () => { wx.navigateBack() }
+        })
+      } else {
+        this.setData({ accessChecked: true, accessDenied: false })
+      }
+    } catch (err) {
+      console.error('权限检查失败', err)
       this.setData({ accessChecked: true, accessDenied: true })
-      wx.showModal({
-        title: '仅管理员可导入',
-        content: '请联系管理员操作',
-        showCancel: false,
-        success: () => { wx.navigateBack() }
-      })
-    } else {
-      this.setData({ accessChecked: true, accessDenied: false })
+      wx.showToast({ title: '权限检查失败，请重试', icon: 'none' })
+      setTimeout(() => { wx.navigateBack() }, 1500)
     }
   },
 
@@ -172,7 +180,7 @@ Page({
     const data = this.data.parsedData
     if (data.length === 0) return
 
-    // 去掉预览用字段，只传数据字段给云函数
+    // 去掉预览用字段，只传数据字段给 API
     const cleanData = data.map(row => {
       return {
         wxNickname: row.wxNickname,
@@ -188,27 +196,26 @@ Page({
     this.setData({ importing: true })
     wx.showLoading({ title: '导入中...' })
     try {
-      const res = await wx.cloud.callFunction({
-        name: 'batchImport',
-        data: { players: cleanData }
-      })
+      const res = await api.post('/players/import', { players: cleanData })
       wx.hideLoading()
 
-      const result = res.result
       this.setData({
         importing: false,
         importDone: true,
-        importedCount: result.imported || 0,
-        replacedCount: result.updated || 0,
-        failCount: result.failed || 0
+        importedCount: res.imported || 0,
+        replacedCount: res.updated || 0,
+        failCount: res.failed || 0
       })
 
-      if (result.errors && result.errors.length > 0) {
-        this.setData({ errorRows: result.errors })
+      // 通知首页下次返回时刷新
+      this._notifyHomeRefresh()
+
+      if (res.errors && res.errors.length > 0) {
+        this.setData({ errorRows: res.errors })
       }
 
       let tip = '导入完成！'
-      if (result.updated > 0) tip = '导入完成，更新' + result.updated + '条已有记录'
+      if (res.updated > 0) tip = '导入完成，更新' + res.updated + '条已有记录'
       wx.showToast({ title: tip, icon: 'success' })
     } catch (err) {
       wx.hideLoading()
@@ -222,39 +229,52 @@ Page({
     if (this.data.importing || !this.data.filePath) return
     this.setData({ importing: true })
 
-    const fs = wx.getFileSystemManager()
-    try {
-      const fileBuf = fs.readFileSync(this.data.filePath)
-      const base64 = wx.arrayBufferToBase64(fileBuf)
+    const app = getApp()
+    const openid = app.globalData.openid || ''
+    const uploadUrl = api.API_BASE + '/players/import/xlsx' + (openid ? '?openid=' + openid : '')
 
-      wx.showLoading({ title: '上传解析中...' })
-      const res = await wx.cloud.callFunction({
-        name: 'batchImport',
-        data: { fileType: 'xlsx', fileContent: base64 }
-      })
-      wx.hideLoading()
-
-      const result = res.result
-      this.setData({
-        importing: false,
-        importDone: true,
-        importedCount: result.imported || 0,
-        replacedCount: result.updated || 0,
-        failCount: result.failed || 0
-      })
-
-      if (result.errors && result.errors.length > 0) {
-        this.setData({ errorRows: result.errors })
+    wx.showLoading({ title: '上传解析中...' })
+    wx.uploadFile({
+      url: uploadUrl,
+      filePath: this.data.filePath,
+      name: 'file',
+      success: (uploadRes) => {
+        wx.hideLoading()
+        try {
+          const result = JSON.parse(uploadRes.data)
+          this.setData({
+            importing: false,
+            importDone: true,
+            importedCount: result.imported || 0,
+            replacedCount: result.updated || 0,
+            failCount: result.failed || 0
+          })
+          // 通知首页下次返回时刷新
+          this._notifyHomeRefresh()
+          if (result.errors && result.errors.length > 0) {
+            this.setData({ errorRows: result.errors })
+          }
+          let tip = '导入完成！'
+          if (result.updated > 0) tip = '导入完成，更新' + result.updated + '条已有记录'
+          wx.showToast({ title: tip, icon: 'success' })
+        } catch (e) {
+          wx.showToast({ title: '解析失败', icon: 'none' })
+        }
+      },
+      fail: () => {
+        wx.hideLoading()
+        this.setData({ importing: false })
+        wx.showToast({ title: '上传失败', icon: 'none' })
       }
+    })
+  },
 
-      let tip = '导入完成！'
-      if (result.updated > 0) tip = '导入完成，更新' + result.updated + '条已有记录'
-      wx.showToast({ title: tip, icon: 'success' })
-    } catch (err) {
-      wx.hideLoading()
-      this.setData({ importing: false })
-      console.error('导入失败', err)
-      wx.showToast({ title: '导入失败', icon: 'none' })
+  // 通知首页下次 onShow 时刷新数据
+  _notifyHomeRefresh() {
+    const pages = getCurrentPages()
+    const homePage = pages[pages.length - 2]
+    if (homePage && homePage.loadAllPlayers) {
+      homePage._needsReload = true
     }
   }
 })
@@ -309,7 +329,13 @@ const splitCSVLine = (line) => {
   for (let i = 0; i < line.length; i++) {
     const ch = line[i]
     if (ch === '"') {
-      inQuotes = !inQuotes
+      if (inQuotes && i + 1 < line.length && line[i + 1] === '"') {
+        // 遇到 "" 转义 → 保留一个双引号并跳过下一个字符
+        current += '"'
+        i++
+      } else {
+        inQuotes = !inQuotes
+      }
     } else if (ch === ',' && !inQuotes) {
       result.push(current)
       current = ''

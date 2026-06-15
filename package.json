@@ -1,8 +1,10 @@
 {
-  "dependencies": {
-    "@cloudbase/node-sdk": "^3.18.1"
+  "scripts": {
+    "dev": "cd server && npm run dev",
+    "deploy": "node deploy-server.js",
+    "deploy:check": "node deploy-server.js"
   },
-  "devDependencies": {
-    "@cloudbase/cli": "^3.5.6"
+  "dependencies": {
+    "ssh2": "^1.17.0"
   }
 }

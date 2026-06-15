@@ -4,7 +4,7 @@
   <view class="nav-custom" style="padding-top:{{statusBarHeight}}px;">
     <view class="nav-inner">
       <view class="nav-left-space"></view>
-      <text class="nav-gold-title">蜀军战力排行</text>
+      <text class="nav-gold-title">蜀国争霸系统</text>
       <view class="nav-right-area">
         <image class="user-avatar" src="{{userInfo.avatarUrl}}" wx:if="{{userInfo.avatarUrl}}" mode="aspectFill" />
       </view>
@@ -12,159 +12,189 @@
     <view class="nav-title-line"></view>
   </view>
 
-  <!-- 游戏切换标签 -->
+  <!-- 游戏切换标签（主导航） -->
   <view class="game-tabs">
     <view class="game-tab {{currentGame === 'dota2' ? 'tab-active' : ''}}" bindtap="switchGame" data-game="dota2">
       <text class="tab-text">Dota2</text>
     </view>
-    <view class="game-tab {{currentGame === 'cs2' ? 'tab-active' : ''}}" bindtap="switchGame" data-game="cs2">
-      <text class="tab-text">CS2</text>
+    <view class="game-tab {{currentGame === 'csgo' ? 'tab-active' : ''}}" bindtap="switchGame" data-game="csgo">
+      <text class="tab-text">CS:GO</text>
     </view>
-
+    <view class="game-plus" bindtap="onGamePlusTap">
+      <text class="plus-icon">+</text>
+    </view>
   </view>
 
-  <!-- Dota2 内容区 -->
+  <!-- ====== Dota2 区域 ====== -->
   <block wx:if="{{currentGame === 'dota2'}}">
-  <!-- 搜索 -->
-  <view class="search-bar">
-    <input class="search-input" placeholder="搜索微信昵称 / Dota2 游戏昵称" value="{{_searchText}}" bindinput="onKeywordInput" bindconfirm="onSearchConfirm" />
-    <view class="search-clear" wx:if="{{_searchText}}" bindtap="clearSearch">✕</view>
-  </view>
 
-  <!-- 筛选区 -->
-  <view class="filter-area">
-    <!-- 位置筛选 -->
-    <scroll-view class="filter-scroll" scroll-x="true" enhanced show-scrollbar="{{false}}">
-      <view class="filter-tag {{positionFilter === 'all' ? 'tag-active' : ''}}" bindtap="onPosFilter" data-pos="all">全部</view>
-      <view class="filter-tag {{positionFilter === '1' ? 'tag-active' : ''}}" bindtap="onPosFilter" data-pos="1">1号位</view>
-      <view class="filter-tag {{positionFilter === '2' ? 'tag-active' : ''}}" bindtap="onPosFilter" data-pos="2">2号位</view>
-      <view class="filter-tag {{positionFilter === '3' ? 'tag-active' : ''}}" bindtap="onPosFilter" data-pos="3">3号位</view>
-      <view class="filter-tag {{positionFilter === '4' ? 'tag-active' : ''}}" bindtap="onPosFilter" data-pos="4">4号位</view>
-      <view class="filter-tag {{positionFilter === '5' ? 'tag-active' : ''}}" bindtap="onPosFilter" data-pos="5">5号位</view>
-    </scroll-view>
-
-    <!-- 段位筛选 -->
-    <scroll-view class="filter-scroll" scroll-x="true" enhanced show-scrollbar="{{false}}">
-      <view class="filter-tag {{rankFilter === 'all' ? 'tag-active' : ''}}" bindtap="onRankFilter" data-rank="all">全部段位</view>
-      <view class="filter-tag {{rankFilter === 'herald' ? 'tag-active' : ''}}" bindtap="onRankFilter" data-rank="herald">先锋</view>
-      <view class="filter-tag {{rankFilter === 'guardian' ? 'tag-active' : ''}}" bindtap="onRankFilter" data-rank="guardian">卫士</view>
-      <view class="filter-tag {{rankFilter === 'crusader' ? 'tag-active' : ''}}" bindtap="onRankFilter" data-rank="crusader">中军</view>
-      <view class="filter-tag {{rankFilter === 'archon' ? 'tag-active' : ''}}" bindtap="onRankFilter" data-rank="archon">统帅</view>
-      <view class="filter-tag {{rankFilter === 'legend' ? 'tag-active' : ''}}" bindtap="onRankFilter" data-rank="legend">传奇</view>
-      <view class="filter-tag {{rankFilter === 'ancient' ? 'tag-active' : ''}}" bindtap="onRankFilter" data-rank="ancient">万古</view>
-      <view class="filter-tag {{rankFilter === 'divine' ? 'tag-active' : ''}}" bindtap="onRankFilter" data-rank="divine">超凡</view>
-      <view class="filter-tag {{rankFilter === 'immortal' ? 'tag-active' : ''}}" bindtap="onRankFilter" data-rank="immortal">冠绝</view>
-    </scroll-view>
-
-    <!-- 排序 + 操作按钮行 -->
-    <view class="sort-row">
-      <view class="sort-left">
-        <view class="sort-tag {{sortFilter === 'rank-desc' ? 'sort-active' : ''}}" bindtap="onSortFilter" data-sort="rank-desc">最高段位 ↓</view>
-        <view class="sort-tag {{sortFilter === 'rank-asc' ? 'sort-active' : ''}}" bindtap="onSortFilter" data-sort="rank-asc">最低段位 ↑</view>
-        <view class="sort-tag sort-icon-btn chart-toggle {{showChart ? 'chart-active' : ''}}" bindtap="toggleChart">◔</view>
+    <!-- 子分页栏 -->
+    <view class="sub-tabs">
+      <view class="sub-tab {{subTab === 'profile' ? 'sub-active' : ''}}" bindtap="switchSubTab" data-tab="profile">
+        <text class="sub-tab-text">选手档案</text>
       </view>
-      <view class="sort-right">
-        <view class="sort-icon-btn sort-info-btn" bindtap="showSuperAdminInfo">👤</view>
-        <view class="nickname-area nickname-icon-btn" bindtap="editNickname">✎</view>
-        <view class="admin-nav-btn admin-icon-btn" wx:if="{{isAdmin}}" bindtap="showAdminMenu">⚙</view>
+      <view class="sub-tab {{subTab === 'rules' ? 'sub-active' : ''}}" bindtap="switchSubTab" data-tab="rules">
+        <text class="sub-tab-text">赛事章程</text>
+      </view>
+      <view class="sub-tab {{subTab === 'history' ? 'sub-active' : ''}}" bindtap="switchSubTab" data-tab="history">
+        <text class="sub-tab-text">历史赛事</text>
       </view>
     </view>
-  </view>
 
-  <!-- 段位分布饼图 -->
-  <view class="chart-section" wx:if="{{showChart}}">
-    <view class="chart-header">
-      <text class="chart-title">段位分布</text>
-      <text class="chart-close" bindtap="toggleChart">✕</text>
+    <!-- 选手档案 -->
+    <block wx:if="{{subTab === 'profile'}}">
+
+    <!-- 搜索栏 -->
+    <view class="search-bar">
+      <input class="search-input" placeholder="搜索微信昵称 / Dota2 游戏昵称" value="{{_searchText}}" bindinput="onKeywordInput" bindconfirm="onSearchConfirm" />
+      <view class="search-clear" wx:if="{{_searchText}}" bindtap="clearSearch">✕</view>
     </view>
-    <view class="chart-body">
-      <canvas type="2d" id="rankPieCanvas" class="pie-canvas" style="width:360rpx;height:360rpx;"></canvas>
-      <!-- 右侧颜色+数量 -->
-      <view class="chart-legend">
-        <view class="legend-item" wx:for="{{rankDistribution}}" wx:key="tier">
-          <view class="legend-dot" style="background-color:{{item.color}};"></view>
-          <text class="legend-label">{{item.label}}</text>
-          <text class="legend-count">{{item.count}}</text>
-        </view>
+
+    <!-- 第一行：位置筛选 -->
+    <view class="filter-row">
+      <scroll-view class="filter-scroll" scroll-x="true" enhanced show-scrollbar="{{false}}">
+        <view class="ftag {{positionFilter === 'all' ? 'ftag-on' : ''}}" bindtap="onPosFilter" data-pos="all">擅长位置</view>
+        <view class="ftag {{positionFilter === '1' ? 'ftag-on' : ''}}" bindtap="onPosFilter" data-pos="1">1号位</view>
+        <view class="ftag {{positionFilter === '2' ? 'ftag-on' : ''}}" bindtap="onPosFilter" data-pos="2">2号位</view>
+        <view class="ftag {{positionFilter === '3' ? 'ftag-on' : ''}}" bindtap="onPosFilter" data-pos="3">3号位</view>
+        <view class="ftag {{positionFilter === '4' ? 'ftag-on' : ''}}" bindtap="onPosFilter" data-pos="4">4号位</view>
+        <view class="ftag {{positionFilter === '5' ? 'ftag-on' : ''}}" bindtap="onPosFilter" data-pos="5">5号位</view>
+      </scroll-view>
+    </view>
+    <!-- 第二行：段位筛选 -->
+    <view class="filter-row">
+      <view class="ftag ftag-fixed {{rankFilter === 'all' ? 'ftag-on' : ''}}" bindtap="onRankFilter" data-rank="all">校准段位</view>
+      <scroll-view class="filter-scroll" scroll-x="true" enhanced show-scrollbar="{{false}}">
+        <view class="ftag {{rankFilter === 'herald' ? 'ftag-on' : ''}}" bindtap="onRankFilter" data-rank="herald">先锋</view>
+        <view class="ftag {{rankFilter === 'guardian' ? 'ftag-on' : ''}}" bindtap="onRankFilter" data-rank="guardian">卫士</view>
+        <view class="ftag {{rankFilter === 'crusader' ? 'ftag-on' : ''}}" bindtap="onRankFilter" data-rank="crusader">中军</view>
+        <view class="ftag {{rankFilter === 'archon' ? 'ftag-on' : ''}}" bindtap="onRankFilter" data-rank="archon">统帅</view>
+        <view class="ftag {{rankFilter === 'legend' ? 'ftag-on' : ''}}" bindtap="onRankFilter" data-rank="legend">传奇</view>
+        <view class="ftag {{rankFilter === 'ancient' ? 'ftag-on' : ''}}" bindtap="onRankFilter" data-rank="ancient">万古流芳</view>
+        <view class="ftag {{rankFilter === 'divine' ? 'ftag-on' : ''}}" bindtap="onRankFilter" data-rank="divine">超凡入圣</view>
+        <view class="ftag {{rankFilter === 'immortal' ? 'ftag-on' : ''}}" bindtap="onRankFilter" data-rank="immortal">冠绝一世</view>
+      </scroll-view>
+    </view>
+    <!-- 第三行：操作按钮（左排序 / 右功能） -->
+    <view class="action-row">
+      <view class="tbtn-sort {{sortFilter === 'rank-desc' ? 'sort-desc' : 'sort-asc'}}" bindtap="onSortToggle">
+        <text>段位</text><text class="sort-arrow">{{sortFilter === 'rank-desc' ? '↓' : '↑'}}</text>
+      </view>
+      <view class="action-right">
+        <view class="tbtn-icon chart-btn {{showChart ? 'chart-active' : ''}}" bindtap="toggleChart">◔</view>
+        <view class="tbtn-icon" bindtap="showSuperAdminInfo">👤︎</view>
+        <view class="tbtn-icon" bindtap="editNickname">🖋</view>
+        <view class="tbtn-icon" wx:if="{{isAdmin}}" bindtap="showAdminMenu">⚙</view>
       </view>
     </view>
-  </view>
 
-  <!-- 批量删除工具栏 -->
-  <view class="batch-toolbar" wx:if="{{deleteMode}}">
-    <text class="batch-count">已选 {{selectedCount}} 项</text>
-    <view class="batch-actions">
-      <view class="batch-btn batch-btn-cancel" bindtap="toggleDeleteMode">取消</view>
-      <view class="batch-btn batch-btn-del" bindtap="batchDelete">删除</view>
-    </view>
-  </view>
-
-  <!-- 双列卡片网格 -->
-  <view class="card-grid" wx:if="{{displayPlayers.length > 0}}">
-    <view class="grid-card {{selectedIds[item._id] ? 'card-selected' : ''}}" wx:for="{{displayPlayers}}" wx:key="_id"
-      bindtap="{{deleteMode ? 'onSelectCard' : 'goDetail'}}"
-      data-id="{{item._id}}" data-gameid="{{item.gameId}}">
-      <view class="card-avatar-wrap">
-        <image class="card-avatar" src="{{item.avatarUrl || '/assets/default-avatar.png'}}" mode="aspectFill" />
-        <!-- 批量删除模式 → 选中勾 -->
-        <view class="card-check" wx:if="{{deleteMode}}">
-          <text class="check-icon">{{selectedIds[item._id] ? '✓' : ''}}</text>
-        </view>
-        <view class="card-name-overlay">
-          <text class="card-name-text">{{item.wxNickname}}</text>
-          <view class="card-rank-row">
-            <image class="rank-icon-img" wx:if="{{item._rankIconIsImg && item.calibrateRankName}}" src="{{item._rankIcon}}" mode="aspectFit" />
-            <text class="rank-icon" wx:elif="{{item._rankIcon && item.calibrateRankName}}">{{item._rankIcon}}</text>
-            <text class="card-rank-text">{{item.calibrateRankName || '核准中'}}</text>
-            <text class="card-rank-stars" wx:if="{{item.calibrateRankStar > 0}}">{{item.calibrateRankStar}}★</text>
+    <!-- 段位分布饼图 -->
+    <view class="chart-section" wx:if="{{showChart}}">
+      <view class="chart-header">
+        <text class="chart-title">段位分布</text>
+        <text class="chart-close" bindtap="closeChart">✕</text>
+      </view>
+      <view class="chart-body">
+        <canvas type="2d" id="rankPieCanvas" class="pie-canvas" style="width:360rpx;height:360rpx;"></canvas>
+        <view class="chart-legend">
+          <view class="legend-item" wx:for="{{rankDistribution}}" wx:key="tier">
+            <view class="legend-dot" style="background-color:{{item.color}};"></view>
+            <text class="legend-label">{{item.label}}</text>
+            <text class="legend-count">{{item.count}}</text>
           </view>
         </view>
       </view>
     </view>
-  </view>
 
-  <!-- 数据统计 & 分页状态 -->
-  <view class="load-more-tip" wx:if="{{loaded && filteredCount > 0}}">
-    <text wx:if="{{hasMore}}">已显示 {{displayPlayers.length}} / 共 {{filteredCount}} 名选手，上拉加载更多</text>
-    <text wx:else>已显示全部，共 {{filteredCount}} 名选手</text>
-  </view>
+    <!-- 批量删除工具栏 -->
+    <view class="batch-toolbar" wx:if="{{deleteMode}}">
+      <text class="batch-count">已选 {{selectedCount}} 项</text>
+      <view class="batch-actions">
+        <view class="batch-btn batch-btn-cancel" bindtap="toggleDeleteMode">取消</view>
+        <view class="batch-btn batch-btn-del" bindtap="batchDelete">删除</view>
+      </view>
+    </view>
 
-  <!-- 空状态 -->
-  <view class="empty-state" wx:if="{{displayPlayers.length === 0 && loaded}}">
-    <text class="empty-icon">🎮</text>
-    <text class="empty-text">暂无符合条件的选手</text>
-  </view>
+    <!-- 双列卡片网格 -->
+    <view class="card-grid" wx:if="{{displayPlayers.length > 0}}">
+      <view class="grid-card {{selectedIds[item._id] ? 'card-selected' : ''}}" wx:for="{{displayPlayers}}" wx:key="_id"
+        bindtap="{{deleteMode ? 'onSelectCard' : 'goDetail'}}"
+        data-id="{{item._id}}" data-gameid="{{item.gameId}}">
+        <view class="card-avatar-wrap">
+          <image class="card-avatar" src="{{item.avatarUrl || '/assets/default-avatar.png'}}" mode="aspectFill" />
+          <view class="card-check" wx:if="{{deleteMode}}">
+            <text class="check-icon">{{selectedIds[item._id] ? '✓' : ''}}</text>
+          </view>
+          <view class="card-name-overlay">
+            <text class="card-name-text">{{item.wxNickname}}</text>
+            <view class="card-rank-row">
+              <image class="rank-icon-img" wx:if="{{item._rankIconIsImg && item.calibrateRankName}}" src="{{item._rankIcon}}" mode="aspectFit" />
+              <text class="rank-icon" wx:elif="{{item._rankIcon && item.calibrateRankName}}">{{item._rankIcon}}</text>
+              <text class="card-rank-text">{{item.calibrateRankName || '核准中'}}</text>
+              <text class="card-rank-stars" wx:if="{{item.calibrateRankStar > 0}}">{{item.calibrateRankStar}}★</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
 
-  <!-- 加载中 -->
-  <view class="loading-state" wx:if="{{!loaded}}">
-    <text class="loading-text">加载中...</text>
-  </view>
+    <!-- 数据统计 & 分页状态 -->
+    <view class="load-more-tip" wx:if="{{loaded && filteredCount > 0}}">
+      <text wx:if="{{hasMore}}">已显示 {{displayPlayers.length}} / 共 {{filteredCount}} 名选手，上拉加载更多</text>
+      <text wx:else>已显示全部，共 {{filteredCount}} 名选手</text>
+    </view>
 
-  <!-- FAB 添加按钮（仅管理员可见） -->
-  <view class="fab-btn" wx:if="{{isAdmin}}" bindtap="goAdd">
-    <text class="fab-text">+</text>
-  </view>
+    <!-- 空状态 -->
+    <view class="empty-state" wx:if="{{displayPlayers.length === 0 && loaded}}">
+      <text class="empty-icon">🎮</text>
+      <text class="empty-text">暂无符合条件的选手</text>
+    </view>
+
+    <!-- 加载中 -->
+    <view class="loading-state" wx:if="{{!loaded}}">
+      <text class="loading-text">加载中...</text>
+    </view>
+
+    <!-- 添加选手按钮 -->
+    <view class="fab-btn" wx:if="{{isAdmin}}" bindtap="goAdd">
+      <text class="fab-text">+</text>
+    </view>
+
+    </block>
+
+    <!-- Dota2 赛事章程 -->
+    <view class="placeholder-page" wx:if="{{subTab === 'rules'}}">
+      <text class="ph-icon">📋</text>
+      <text class="ph-main">Dota2 赛事章程</text>
+      <text class="ph-sub">内容筹备中，敬请期待</text>
+    </view>
+
+    <!-- Dota2 历史赛事 -->
+    <view class="placeholder-page" wx:if="{{subTab === 'history'}}">
+      <text class="ph-icon">🏆</text>
+      <text class="ph-main">Dota2 历史赛事</text>
+      <text class="ph-sub">精彩回顾即将上线</text>
+    </view>
+
   </block>
 
-  <!-- CS2 占位 -->
-  <view class="cs2-placeholder" wx:if="{{currentGame === 'cs2'}}">
-    <text class="cs2-icon">🎮</text>
-    <text class="cs2-text">暂未开放，敬请期待</text>
-  </view>
+  <!-- ====== CS:GO 区域（尚未开放） ====== -->
+  <block wx:if="{{currentGame === 'csgo'}}">
+    <view class="placeholder-page csgo-placeholder">
+      <text class="ph-icon">🎯</text>
+      <text class="ph-main">CS:GO 选手档案</text>
+      <text class="ph-sub">暂未开放，敬请期待</text>
+    </view>
+  </block>
 
   <!-- 昵称编辑弹窗 -->
   <view class="nick-modal-mask" wx:if="{{showNickModal}}" catchtouchmove="preventMove">
     <view class="nick-modal">
-      <!-- 关闭按钮 -->
       <view class="nick-modal-close" bindtap="closeNickModal">
         <text class="nick-close-icon">✕</text>
       </view>
-
-      <!-- 标题 -->
       <text class="nick-modal-title">{{nickName ? '修改昵称' : '请输入昵称'}}</text>
       <text class="nick-modal-desc">{{nickName ? '与微信群昵称一致可修改本人信息' : '需要与录入选手微信昵称一致方可修改资料'}}</text>
-
-      <!-- 输入框 -->
       <input
         class="nick-modal-input"
         value="{{nickInputValue}}"
@@ -174,26 +204,20 @@
         focus="{{showNickModal}}"
         maxlength="20"
       />
-
-      <!-- 剩余次数 -->
-      <view class="nick-remain-row">
+      <view class="nick-openid-row" wx:if="{{userOpenid}}">
+        <text class="nick-openid-label">我的 OpenID：</text>
+        <text class="nick-openid-value" bindtap="copyOpenid">{{userOpenid}}</text>
+      </view>
+      <view class="nick-remain-row" wx:if="{{nickName}}">
         <text class="nick-remain-label">剩余修改次数：</text>
-        <text class="nick-remain-value {{unlimitedNick ? 'remain-unlimited' : ''}}">{{unlimitedNick ? '无限' : (nickChangeLimit - nickChangeCount)}}</text>
+        <text class="nick-remain-value {{unlimitedNick ? 'remain-unlimited' : ''}}">{{unlimitedNick ? '无限' : remainingCount}}</text>
       </view>
-
-      <!-- 次数用完提示超管 -->
-      <view class="nick-superadmin-tip" wx:if="{{!unlimitedNick && nickChangeCount >= nickChangeLimit}}">
-        <text>修改次数已用完，请联系超级管理员重置<text wx:if="{{superAdminNames.length > 0}}">：{{superAdminNames.join('、')}}</text></text>
+      <view class="nick-superadmin-tip" wx:if="{{nickName && !unlimitedNick && nickChangeCount >= nickChangeLimit}}">
+        <text>修改次数已用完，请联系超级管理员重置</text>
       </view>
-
-      <!-- 按钮 -->
       <view class="nick-btn-row">
-        <view class="nick-btn nick-btn-cancel" bindtap="closeNickModal">
-          <text>取消</text>
-        </view>
-        <view class="nick-btn nick-btn-save {{!unlimitedNick && nickChangeCount >= nickChangeLimit ? 'nick-btn-disabled' : ''}}" bindtap="saveNickFromModal">
-          <text>保存</text>
-        </view>
+        <view class="nick-btn nick-btn-cancel" bindtap="closeNickModal"><text>取消</text></view>
+        <view class="nick-btn nick-btn-save {{!unlimitedNick && nickChangeCount >= nickChangeLimit ? 'nick-btn-disabled' : ''}}" bindtap="saveNickFromModal"><text>保存</text></view>
       </view>
     </view>
   </view>

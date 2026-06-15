@@ -3,7 +3,7 @@
   "projectname": "Dota2%E9%80%89%E6%89%8B%E7%AE%A1%E7%90%86",
   "condition": {},
   "setting": {
-    "urlCheck": true,
+    "urlCheck": false,
     "coverView": true,
     "lazyloadPlaceholderEnable": false,
     "skylineRenderEnable": false,

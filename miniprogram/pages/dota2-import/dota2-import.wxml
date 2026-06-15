@@ -85,7 +85,7 @@
     </view>
   </view>
 
-  <!-- XLSX 直接上传到云函数 -->
+  <!-- XLSX 直接上传到服务器解析 -->
   <view class="xlsx-section" wx:if="{{isXlsx && !parsedData.length}}">
     <view class="import-btn {{importing ? 'btn-disabled' : ''}}" bindtap="doImportXlsx">
       <text class="import-btn-text">{{importing ? '导入中...' : '上传并导入'}}</text>

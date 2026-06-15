@@ -1,11 +1,11 @@
 // pages/admin/admin.js
 const perm = require('../../utils/permission.js')
 const C = require('../../utils/constants.js')
+const api = require('../../utils/api.js')
 const PAGE_SIZE = C.PAGE_SIZE
 
 Page({
   data: {
-    isAdmin: false,
     isSuperAdmin: false,
     myOpenId: '',
     allUsers: [],
@@ -17,25 +17,16 @@ Page({
     _filteredTotal: 0
   },
 
-  onLoad() {
+  async onLoad() {
     // 仅超级管理员可访问权限设置
-    if (!perm.isSuperAdminSync()) {
-      perm.isSuperAdmin().then((ok) => {
-        if (!ok) {
-          wx.showToast({ title: '仅超级管理员可访问', icon: 'none' })
-          setTimeout(() => { wx.navigateBack() }, 1500)
-        } else {
-          this.initAfterPerm()
-        }
-      })
+    // 始终异步校验（避免缓存过期导致权限错误）
+    const isSuper = await perm.isSuperAdmin()
+    if (!isSuper) {
+      wx.showToast({ title: '仅超级管理员可访问', icon: 'none' })
+      setTimeout(() => { wx.navigateBack() }, 1500)
       return
     }
-    this.initAfterPerm()
-  },
-
-  async initAfterPerm() {
-    const isSuper = await perm.isSuperAdmin()
-    this.setData({ isSuperAdmin: isSuper, isAdmin: true })
+    this.setData({ isSuperAdmin: true })
     this.loadAll()
   },
 
@@ -49,13 +40,10 @@ Page({
       } catch (e) {}
 
       wx.showLoading({ title: '加载用户列表...' })
-      const res = await wx.cloud.callFunction({
-        name: 'manageUser',
-        data: { action: 'listUsers' }
-      })
+      const res = await api.get('/users')
       wx.hideLoading()
 
-      let rawUsers = (res.result && res.result.data) ? res.result.data : []
+      let rawUsers = (res && res.data) ? res.data : []
       rawUsers = rawUsers.map((u) => {
         return {
           _id: u._id,
@@ -185,17 +173,13 @@ Page({
     })
   },
 
-
   async doSetAdmin(openid) {
     wx.showLoading({ title: '设置中...' })
     try {
-      const res = await wx.cloud.callFunction({
-        name: 'manageUser',
-        data: { action: 'setAdmin', targetOpenId: openid }
-      })
+      const res = await api.put('/users/' + openid + '/role', { role: 'admin', operatorOpenid: this.data.myOpenId })
       wx.hideLoading()
-      wx.showToast({ title: res.result.success ? '已设为管理员' : (res.result.message || '失败'), icon: res.result.success ? 'success' : 'none' })
-      if (res.result.success) this.loadAll()
+      wx.showToast({ title: res.success ? '已设为管理员' : (res.message || '失败'), icon: res.success ? 'success' : 'none' })
+      if (res.success) this.loadAll()
     } catch (e) {
       wx.hideLoading()
       wx.showToast({ title: '操作失败', icon: 'none' })
@@ -205,13 +189,10 @@ Page({
   async doRemoveAdmin(openid) {
     wx.showLoading({ title: '操作中...' })
     try {
-      const res = await wx.cloud.callFunction({
-        name: 'manageUser',
-        data: { action: 'removeAdmin', targetOpenId: openid }
-      })
+      const res = await api.put('/users/' + openid + '/role', { role: 'user', operatorOpenid: this.data.myOpenId })
       wx.hideLoading()
-      wx.showToast({ title: res.result.success ? '已取消管理员' : (res.result.message || '失败'), icon: res.result.success ? 'success' : 'none' })
-      if (res.result.success) this.loadAll()
+      wx.showToast({ title: res.success ? '已取消管理员' : (res.message || '失败'), icon: res.success ? 'success' : 'none' })
+      if (res.success) this.loadAll()
     } catch (e) {
       wx.hideLoading()
       wx.showToast({ title: '操作失败', icon: 'none' })
@@ -221,13 +202,10 @@ Page({
   async doSetSuperAdmin(openid) {
     wx.showLoading({ title: '设置中...' })
     try {
-      const res = await wx.cloud.callFunction({
-        name: 'manageUser',
-        data: { action: 'setSuperAdmin', targetOpenId: openid }
-      })
+      const res = await api.put('/users/' + openid + '/role', { role: 'super_admin', operatorOpenid: this.data.myOpenId })
       wx.hideLoading()
-      wx.showToast({ title: res.result.success ? '已设为超级管理员' : (res.result.message || '失败'), icon: res.result.success ? 'success' : 'none' })
-      if (res.result.success) this.loadAll()
+      wx.showToast({ title: res.success ? '已设为超级管理员' : (res.message || '失败'), icon: res.success ? 'success' : 'none' })
+      if (res.success) this.loadAll()
     } catch (e) {
       wx.hideLoading()
       wx.showToast({ title: '操作失败', icon: 'none' })
@@ -237,13 +215,10 @@ Page({
   async doRemoveSuperAdmin(openid) {
     wx.showLoading({ title: '操作中...' })
     try {
-      const res = await wx.cloud.callFunction({
-        name: 'manageUser',
-        data: { action: 'removeSuperAdmin', targetOpenId: openid }
-      })
+      const res = await api.put('/users/' + openid + '/role', { role: 'user', operatorOpenid: this.data.myOpenId })
       wx.hideLoading()
-      wx.showToast({ title: res.result.success ? '已取消超级管理员' : (res.result.message || '失败'), icon: res.result.success ? 'success' : 'none' })
-      if (res.result.success) this.loadAll()
+      wx.showToast({ title: res.success ? '已取消超级管理员' : (res.message || '失败'), icon: res.success ? 'success' : 'none' })
+      if (res.success) this.loadAll()
     } catch (e) {
       wx.hideLoading()
       wx.showToast({ title: '操作失败', icon: 'none' })
@@ -268,13 +243,10 @@ Page({
   async doResetNickCount(openid) {
     wx.showLoading({ title: '重置中...' })
     try {
-      const res = await wx.cloud.callFunction({
-        name: 'manageUser',
-        data: { action: 'resetNickCount', targetOpenId: openid }
-      })
+      const res = await api.put('/users/' + openid + '/reset-nickcount')
       wx.hideLoading()
-      wx.showToast({ title: res.result.success ? '已重置' : (res.result.message || '失败'), icon: res.result.success ? 'success' : 'none' })
-      if (res.result.success) this.loadAll()
+      wx.showToast({ title: res.success ? '已重置' : (res.message || '失败'), icon: res.success ? 'success' : 'none' })
+      if (res.success) this.loadAll()
     } catch (e) {
       wx.hideLoading()
       wx.showToast({ title: '操作失败', icon: 'none' })
