@@ -1003,15 +1003,34 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
     try {
       const { eventId, signupId } = req.params;
 
-      // 【校验1】赛事状态：取消报名仅允许在报名中阶段
-      const statusCheck = await validateSignupEvent(pool, eventId);
-      if (!statusCheck.valid) {
-        return res.status(400).json({ success: false, error: statusCheck.error, code: 'EVENT_NOT_OPEN' });
-      }
-
       const openid = req.query.openid || '';
       const role = await getCallerRole(openid);
       const isAdmin = role === 'admin' || role === 'super_admin';
+
+      // 【校验1】赛事存在 + 未归档
+      const eventResult = await validateEvent(pool, eventId);
+      if (!eventResult.valid) {
+        return res.status(400).json({ success: false, error: eventResult.error, code: 'EVENT_NOT_FOUND' });
+      }
+      const event = eventResult.event;
+      if (event.is_archived === 1) {
+        return res.status(400).json({ success: false, error: '赛事已归档，不可进行报名操作', code: 'ARCHIVED' });
+      }
+
+      // 【校验2】赛事状态：
+      //   - 管理员：分组编队前（状态 0/1/2）均可删除报名
+      //   - 普通用户：仅报名中（状态 1）可取消自己的报名
+      if (!isAdmin) {
+        if (event.event_status !== 1) {
+          const map = { 0: '赛事尚未开启报名', 2: '报名已截止', 3: '赛事已进入分组阶段', 4: '赛事对战中', 5: '赛事已归档' };
+          return res.status(400).json({ success: false, error: map[event.event_status] || '当前赛事不在报名阶段', code: 'EVENT_NOT_OPEN' });
+        }
+      } else {
+        if (event.event_status >= 3) {
+          const statusMap = { 3: '赛事已进入分组阶段', 4: '赛事对战中', 5: '赛事已归档' };
+          return res.status(400).json({ success: false, error: (statusMap[event.event_status] || '当前阶段') + '，不可删除报名', code: 'EVENT_LOCKED' });
+        }
+      }
 
       // 查询报名记录
       const [signups] = await pool.query(
@@ -1023,7 +1042,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
         return res.status(400).json({ success: false, error: '该报名记录已取消' });
       }
 
-      // 【校验2】普通用户需验证身份：通过 nick_name 匹配选手的 wx_nickname
+      // 【校验3】普通用户需验证身份：通过 nick_name 匹配选手的 wx_nickname
       if (!isAdmin) {
         const [userRows] = await pool.query('SELECT nick_name FROM dota2_users WHERE openid = ?', [openid]);
         const userNick = (userRows.length && userRows[0].nick_name) ? userRows[0].nick_name : '';

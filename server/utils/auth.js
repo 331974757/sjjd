@@ -453,7 +453,7 @@ const PERMISSION_MATRIX = [
   { method: 'POST',   path: '/api/events/:eventId/signups',     roles: ['user','admin','super_admin'],   status: 1,         note: '自主报名（status=1）' },
   { method: 'POST',   path: '/api/events/:eventId/signups/admin', roles: ['admin','super_admin'],       status: 'any',     note: '管理员添加报名' },
   { method: 'POST',   path: '/api/events/:eventId/signups/batch', roles: ['admin','super_admin'],       status: 'any',     note: '批量添加报名' },
-  { method: 'DELETE', path: '/api/events/:eventId/signups/:signupId', roles: ['user','admin','super_admin'], status: 1,  note: '取消报名（自己或管理员）' },
+  { method: 'DELETE', path: '/api/events/:eventId/signups/:signupId', roles: ['user','admin','super_admin'], status: '0,1,2',  note: '取消报名（管理员赛事未分组前均可删除，普通用户仅报名中）' },
   { method: 'GET',    path: '/api/search/players',              roles: ['user','admin','super_admin'],   status: null,      note: '选手搜索' },
 
   // ─── 队伍管理 ───
