@@ -585,6 +585,10 @@ app.put('/api/users/:openid/reset-nickcount', async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
+// ============== 赛事业务模块（赛事/报名/队伍/对战/名次/章程） ==============
+// 注：该模块复用 pool / assertAdmin / getCallerRole，与现有代码共享连接和权限
+require('./event-routes')(app, { pool, assertAdmin, getCallerRole });
+
 // === 全局错误处理（防止无效 JSON 等导致进程崩溃） ===
 // body-parser 遇到非法 JSON 时会抛 SyntaxError，Express 4 默认不捕获会导致 crash
 app.use((err, req, res, next) => {
