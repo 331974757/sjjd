@@ -27,6 +27,7 @@ const pool = mysql.createPool({
   user: process.env.DB_USER || 'dota2',
   password: process.env.DB_PASSWORD || 'Yang8728135@',
   database: process.env.DB_NAME || 'dota2',
+  charset: 'utf8mb4',              // 必须显式指定，否则中文会变乱码
   waitForConnections: true,
   connectionLimit: 10,
 });
