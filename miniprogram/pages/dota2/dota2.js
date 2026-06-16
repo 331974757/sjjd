@@ -3,6 +3,7 @@ const perm = require('../../utils/permission.js')
 const R = require('../../utils/rank-utils.js')
 const C = require('../../utils/constants.js')
 const api = require('../../utils/api.js')
+const pad2 = n => String(n).padStart(2, '0')
 
 const RANK_ORDER = R.RANK_ORDER
 const RANK_ICONS = R.RANK_ICONS
@@ -337,6 +338,8 @@ Page({
   async loadAllPlayers() {
     if (this._loading) return
     this._loading = true
+    // 5秒超时自动释放锁，防止请求卡死导致永远无法重新加载
+    const lockTimer = setTimeout(() => { this._loading = false }, 5000)
     try {
       const res = await api.get('/players', { pageSize: 1000 })
       const all = res.data || []
@@ -351,6 +354,7 @@ Page({
       this.setData({ loaded: true })
       wx.showToast({ title: '加载失败', icon: 'none' })
     } finally {
+      clearTimeout(lockTimer)
       this._loading = false
     }
   },
@@ -573,7 +577,7 @@ Page({
   formatEventTime(ts) {
     if (!ts) return '待定'
     const d = new Date(parseInt(ts))
-    return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0')
+    return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes())
   },
 
   // 【第4轮新增】跳转赛事详情页
@@ -628,11 +632,11 @@ Page({
       list.sort((a, b) => { return (a.calibrateRankSort || 0) - (b.calibrateRankSort || 0) })
     }
 
-    for (let i = 0; i < list.length; i++) {
-      const icon = R.getRankIcon(list[i].calibrateRankName)
-      list[i]._rankIcon = icon
-      list[i]._rankIconIsImg = R.isRankIconImage(icon)
-    }
+    // 为每个元素添加 _rankIcon / _rankIconIsImg（使用 map 创建新数组，避免修改 allPlayers 引用）
+    list = list.map(p => {
+      const icon = R.getRankIcon(p.calibrateRankName)
+      return { ...p, _rankIcon: icon, _rankIconIsImg: R.isRankIconImage(icon) }
+    })
 
     // 全量排序后存入 filteredPlayers，displayPlayers 只取前 pageSize 条
     const pageSize = this.data.pageSize

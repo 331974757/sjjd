@@ -376,7 +376,7 @@ Page({
     const countRes = await new Promise(r => {
       wx.showModal({
         title: '分队参数',
-        content: `共计 ${playerCount} 名选手，建议 ${defaultTeamCount} 支队伍（每队约${Math.ceil(playerCount / defaultTeamCount)}人）。\\n使用建议数量？\\n\\n（点「取消」可手动输入数量）`,
+        content: `共计 ${playerCount} 名选手，建议 ${defaultTeamCount} 支队伍（每队约${Math.ceil(playerCount / defaultTeamCount)}人）。\n使用建议数量？\n\n（点「取消」可手动输入数量）`,
         confirmText: '使用建议',
         cancelText: '手动输入',
         success: r,
@@ -451,7 +451,7 @@ Page({
           }
           wx.showModal({
             title: '分队完成',
-            content: info.join('\\n'),
+            content: info.join('\n'),
             showCancel: false,
             confirmText: '好的',
           })
@@ -541,7 +541,7 @@ Page({
     const confirmRes = await new Promise(r => {
       wx.showModal({
         title: '开始比赛',
-        content: `确认开始比赛？\\n\\n这将永久锁定 ${this.data.teams.length} 支队伍的编组结果，锁定后无法修改。`,
+        content: `确认开始比赛？\n\n这将永久锁定 ${this.data.teams.length} 支队伍的编组结果，锁定后无法修改。`,
         confirmText: '确认开赛',
         cancelText: '取消',
         confirmColor: '#f85149',

@@ -29,7 +29,7 @@
             <text>{{item.role === 'super_admin' ? '超' : (item.role === 'admin' ? '管' : '普')}}</text>
           </view>
           <text class="user-nick" wx:if="{{item.nickName}}">{{item.nickName}}</text>
-          <text class="user-openid">{{item.openidShort}}</text>
+          <text class="user-openid" wx:else>{{item.openidShort}}</text>
           <text class="user-me" wx:if="{{item.isMe}}">（我）</text>
           <view class="nick-count-info" wx:if="{{item.nickName && isSuperAdmin && item.role !== 'admin' && item.role !== 'super_admin'}}">
             <text class="nick-count-text">已改{{item.nickChangeCount}}次</text>
@@ -64,8 +64,15 @@
         <text class="empty-hint">暂无注册用户，用户打开小程序后将自动注册</text>
       </view>
 
-      <view class="load-more" wx:if="{{hasMore}}">
-        <text>上拉加载更多</text>
+      <!-- 翻页按钮 -->
+      <view class="pagination" wx:if="{{totalPages > 1}}">
+        <view class="page-btn {{currentPage <= 1 ? 'page-btn-disabled' : ''}}" bindtap="prevPage">
+          <text>上一页</text>
+        </view>
+        <text class="page-info">{{currentPage}} / {{totalPages}}</text>
+        <view class="page-btn {{currentPage >= totalPages ? 'page-btn-disabled' : ''}}" bindtap="nextPage">
+          <text>下一页</text>
+        </view>
       </view>
     </view>
   </view>

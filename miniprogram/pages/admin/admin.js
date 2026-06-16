@@ -9,12 +9,13 @@ Page({
     isSuperAdmin: false,
     myOpenId: '',
     allUsers: [],
-    users: [],
+    users: [],          // 当前页数据
     keyword: '',
-    displayCount: PAGE_SIZE,
-    hasMore: false,
+    currentPage: 1,     // 当前页码
+    totalPages: 0,      // 总页数
     loading: true,
-    _filteredTotal: 0
+    _filteredTotal: 0,  // 筛选后总数
+    _filtered: []       // 筛选后的全量列表（内存缓存）
   },
 
   async onLoad() {
@@ -45,10 +46,12 @@ Page({
 
       let rawUsers = (res && res.data) ? res.data : []
       rawUsers = rawUsers.map((u) => {
+        const shortId = u.openid ? (u.openid.slice(0, 6) + '...' + u.openid.slice(-4)) : '-'
         return {
           _id: u._id,
           openid: u.openid,
-          openidShort: u.openid ? (u.openid.slice(0, 6) + '...' + u.openid.slice(-4)) : '-',
+          openidShort: shortId,
+          displayName: u.nickName || shortId,   // 有昵称显示昵称，否则显示 openid
           role: u.role,
           nickName: u.nickName || '',
           isMe: u.openid === openid,
@@ -72,7 +75,7 @@ Page({
     const value = e.detail.value.trim()
     if (this._searchTimer) clearTimeout(this._searchTimer)
     this._searchTimer = setTimeout(() => {
-      this.setData({ keyword: value, displayCount: PAGE_SIZE })
+      this.setData({ keyword: value, currentPage: 1 })
       this.filterUsers()
     }, 300)
   },
@@ -80,7 +83,7 @@ Page({
   // 清除搜索关键词
   onClearKeyword() {
     if (this._searchTimer) clearTimeout(this._searchTimer)
-    this.setData({ keyword: '', displayCount: PAGE_SIZE })
+    this.setData({ keyword: '', currentPage: 1 })
     this.filterUsers()
   },
 
@@ -99,25 +102,34 @@ Page({
   // 筛选 + 分页
   filterUsers() {
     const list = this._getFiltered()
-    const count = Math.min(PAGE_SIZE, list.length)
+    const totalPages = Math.ceil(list.length / PAGE_SIZE)
+    // 确保当前页不超出范围
+    let page = this.data.currentPage
+    if (page > totalPages && totalPages > 0) page = totalPages
+    if (page < 1) page = 1
+
+    const start = (page - 1) * PAGE_SIZE
     this.setData({
-      users: list.slice(0, count),
-      displayCount: count,
-      hasMore: count < list.length,
-      _filteredTotal: list.length
+      users: list.slice(start, start + PAGE_SIZE),
+      currentPage: page,
+      totalPages: totalPages,
+      _filteredTotal: list.length,
+      _filtered: list   // 缓存筛选后全量，分页按钮用
     })
   },
 
-  // 触底加载更多
-  onReachBottom() {
-    if (!this.data.hasMore || this.data.loading) return
-    const list = this._getFiltered()
-    const newCount = Math.min(this.data.displayCount + PAGE_SIZE, list.length)
-    this.setData({
-      users: list.slice(0, newCount),
-      displayCount: newCount,
-      hasMore: newCount < list.length
-    })
+  // 上一页
+  prevPage() {
+    if (this.data.currentPage <= 1) return
+    this.setData({ currentPage: this.data.currentPage - 1 })
+    this.filterUsers()
+  },
+
+  // 下一页
+  nextPage() {
+    if (this.data.currentPage >= this.data.totalPages) return
+    this.setData({ currentPage: this.data.currentPage + 1 })
+    this.filterUsers()
   },
 
   // 切换权限（仅超级管理员可操作，ActionSheet 多选）

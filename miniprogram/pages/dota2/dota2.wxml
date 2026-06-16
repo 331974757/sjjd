@@ -202,7 +202,7 @@
         <text class="empty-icon">📋</text>
         <text class="empty-text">暂无进行中的赛事</text>
         <text class="empty-sub" wx:if="{{isAdmin}}">点击上方「+ 新建赛事」创建第一场赛事</text>
-        <text class="empty-sub" wx:elif="{{true}}">请联系管理员创建赛事</text>
+        <text class="empty-sub" wx:else>请联系管理员创建赛事</text>
       </view>
     </view>
 
