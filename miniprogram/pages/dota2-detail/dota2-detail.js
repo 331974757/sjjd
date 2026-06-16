@@ -88,7 +88,7 @@ Page({
             try {
               const data = JSON.parse(uploadRes.data)
               if (data.success && data.data) {
-                const fullUrl = api.API_BASE.replace('/api', '') + data.data.url
+                const fullUrl = api.API_BASE.replace(/\/api$/, '') + data.data.url
                 this.updateField('avatarUrl', fullUrl)
               } else {
                 wx.showToast({ title: '上传失败', icon: 'none' })

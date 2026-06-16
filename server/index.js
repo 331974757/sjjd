@@ -378,6 +378,39 @@ app.post('/api/players/import/xlsx', uploadXlsx.single('file'), async (req, res)
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
+// ============== 下载导入模板（Excel） ==============
+app.get('/api/players/template/xlsx', async (req, res) => {
+  try {
+    const workbook = xlsx.utils.book_new();
+    const headers = ['微信群昵称', 'Steam ID', 'Dota2游戏昵称', '核准段位', '核准星数', '擅长游戏位置', '比赛报名位置'];
+    const exampleRow = ['示例选手', '123456789', 'Dota2示例昵称', '统帅', 3, '1,2,3', '1'];
+    const dataRows = [headers, exampleRow];
+
+    // 添加说明行（合并样式）
+    const sheet = xlsx.utils.aoa_to_sheet(dataRows);
+
+    // 设置列宽
+    sheet['!cols'] = [
+      { wch: 16 },  // 微信群昵称
+      { wch: 16 },  // Steam ID
+      { wch: 20 },  // Dota2游戏昵称
+      { wch: 14 },  // 核准段位
+      { wch: 10 },  // 核准星数
+      { wch: 16 },  // 擅长游戏位置
+      { wch: 16 }   // 比赛报名位置
+    ];
+
+    xlsx.utils.book_append_sheet(workbook, sheet, '选手导入模板');
+    const buf = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="dota2_import_template.xlsx"');
+    res.send(buf);
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // ============== 导出（必须在 /:id 路由前定义，避免路由冲突） ==============
 app.get('/api/players/export/all', async (req, res) => {
   try {
@@ -398,9 +431,12 @@ app.get('/api/stats/ranks', async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
-app.post('/api/upload', upload.single('file'), (req, res) => {
-  if (!req.file) return res.status(400).json({ success: false, error: 'no file' });
-  res.json({ success: true, data: { url: '/uploads/' + req.file.filename } });
+app.post('/api/upload', upload.single('file'), async (req, res) => {
+  try {
+    if (!await assertAdmin(req, res)) return;
+    if (!req.file) return res.status(400).json({ success: false, error: 'no file' });
+    res.json({ success: true, data: { url: '/uploads/' + req.file.filename } });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
 // ============== 权限校验中间件/工具 ==============

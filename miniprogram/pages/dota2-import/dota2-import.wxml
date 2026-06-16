@@ -35,10 +35,10 @@
 
     <!-- 获取导入模板按钮 -->
     <view class="template-btn" bindtap="downloadTemplate">
-      <text class="template-icon">📋</text>
-      <text class="template-text">获取导入模板</text>
+      <text class="template-icon">📥</text>
+      <text class="template-text">下载导入模板 (Excel)</text>
     </view>
-    <text class="template-hint">点击后将模板复制到剪贴板，打开 Excel 粘贴即可自动分列</text>
+    <text class="template-hint">点击下载标准 Excel 模板，填入选手数据后直接上传即可</text>
   </view>
 
   <!-- 选择文件 -->

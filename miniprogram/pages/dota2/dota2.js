@@ -711,7 +711,7 @@ Page({
       try {
         const fs = wx.getFileSystemManager()
         const userPath = (wx.env && wx.env.USER_DATA_PATH) || ''
-        filePath = (userPath || wx.env.USER_DATA_PATH) + '/dota2_export_' + Date.now() + '.csv'
+        filePath = userPath + '/dota2_export_' + Date.now() + '.csv'
         fs.writeFileSync(filePath, csv, 'utf8')
       } catch (fileErr) {
         console.error('[导出] 文件写入失败:', fileErr)

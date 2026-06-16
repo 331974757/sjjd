@@ -81,7 +81,7 @@ Page({
             try {
               const data = JSON.parse(uploadRes.data)
               if (data.success && data.data) {
-                this.setData({ avatarUrl: api.API_BASE.replace('/api', '') + data.data.url })
+                this.setData({ avatarUrl: api.API_BASE.replace(/\/api$/, '') + data.data.url })
               } else {
                 wx.showToast({ title: '头像上传失败', icon: 'none' })
               }

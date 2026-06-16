@@ -53,13 +53,56 @@ Page({
     accessDenied: false
   },
 
-  // 获取导入模板（复制到剪贴板）
+  // 获取导入模板：优先下载 Excel 文件，失败时回退到剪贴板
   downloadTemplate() {
+    wx.showLoading({ title: '生成模板中...' })
+
+    const templateUrl = api.API_BASE + '/players/template/xlsx'
+    wx.downloadFile({
+      url: templateUrl,
+      timeout: 15000,
+      success: (res) => {
+        wx.hideLoading()
+        if (res.statusCode === 200 && res.tempFilePath) {
+          // 下载成功，自动打开 Excel 文件
+          wx.openDocument({
+            filePath: res.tempFilePath,
+            showMenu: true,
+            success: () => {
+              wx.showToast({ title: '模板已打开', icon: 'success' })
+            },
+            fail: () => {
+              wx.showToast({ title: '模板已下载，请到文件管理查看', icon: 'none', duration: 2500 })
+            }
+          })
+        } else {
+          // 服务器返回非 200 → 回退剪贴板
+          this._fallbackToClipboard()
+        }
+      },
+      fail: () => {
+        wx.hideLoading()
+        // 下载失败 → 回退剪贴板
+        this._fallbackToClipboard()
+      }
+    })
+  },
+
+  // 回退方案：复制模板到剪贴板
+  _fallbackToClipboard() {
     const content = TEMPLATE_HEADER + '\n' + TEMPLATE_ROW
     wx.setClipboardData({
       data: content,
       success: () => {
-        wx.showToast({ title: '已复制到剪贴板', icon: 'success' })
+        wx.showModal({
+          title: '已复制到剪贴板',
+          content: '请打开一个空白 Excel，直接粘贴（Ctrl+V）即可自动分列，然后另存为 .xlsx 格式上传。',
+          showCancel: false,
+          confirmText: '知道了'
+        })
+      },
+      fail: () => {
+        wx.showToast({ title: '复制失败，请手动输入', icon: 'none' })
       }
     })
   },
