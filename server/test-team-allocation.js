@@ -1,256 +1,209 @@
 /**
  * ============================================================
- * MMR 均衡分队算法 - 模拟测试用例 & 后端调用示例
+ * 段位分值均衡分队算法 — 模拟测试 & 后端集成示例
  * ============================================================
  *
  * 运行方式：
  *   cd server && node test-team-allocation.js
  *
- * 如果需要在服务器运行：
- *   scp server/utils/team-allocation.js server/test-team-allocation.js root@121.41.191.80:/opt/dota2-api/
+ * 在服务器运行：
+ *   scp server/utils/rank-score.js server/utils/team-allocation.js server/test-team-allocation.js root@121.41.191.80:/opt/dota2-api/
  *   ssh root@121.41.191.80 "cd /opt/dota2-api && node test-team-allocation.js"
  * ============================================================
  */
 
 const { allocateTeams, ALL_POSITIONS } = require('./utils/team-allocation');
+const { getScore, getRankConfigTable } = require('./utils/rank-score');
+
 
 // ============================================================
-// 测试数据生成工具
+// 测试1：20名选手，4支队伍 — 纯 actual MMR，覆盖全段位
 // ============================================================
 
-/** 随机生成选手 */
-function makePlayer(id, mmr, positions) {
-  return {
-    id: id || `player_${Math.random().toString(36).slice(2, 8)}`,
-    calibrate_mmr: mmr || Math.round(2000 + Math.random() * 6000),
-    good_at_positions: positions || [1, 2, 3, 4, 5].filter(() => Math.random() > 0.5).join(','),
-    wx_nickname: `选手${id}`,
-  };
-}
+function test1_allActualMmr() {
+  console.log('\n' + '='.repeat(65));
+  console.log('  测试1：20名选手 → 4支队伍');
+  console.log('  特征：全部提供实际 calibrate_mmr，覆盖先锋→冠绝一世');
+  console.log('  验证：纯 MMR 蛇形均衡分配效果');
+  console.log('='.repeat(65));
 
-/** 按一套完整的阵容生成20人 */
-function generateBalancedRoster(prefix, count) {
-  const players = [];
-  // MMR区间：3000-9000，正态分布倾向
-  const mmrPool = [8900, 8600, 8200, 7900, 7500, 7200, 6800, 6500, 6100, 5800,
-                   5400, 5100, 4800, 4500, 4200, 3900, 3600, 3400, 3200, 3100,
-                   5000, 5500, 6000, 6500, 7000, 4100, 4600, 5300, 5700, 6300];
+  // 20 名选手，覆盖 8 个段位，位置互补分布
+  const players = [
+    // --- 冠绝一世 (8000+) ---
+    { id: 'P01', calibrate_mmr: 8500,  calibrate_rank_sort: 8, calibrate_rank_star: 0, calibrate_rank_name: '冠绝一世',
+      good_at_positions: '1,3',    wx_nickname: '神域之光' },
+    { id: 'P02', calibrate_mmr: 8200,  calibrate_rank_sort: 8, calibrate_rank_star: 0, calibrate_rank_name: '冠绝一世',
+      good_at_positions: '2',      wx_nickname: '中路皇帝' },
 
-  // 位置分布模板：[1号位, 2号位, 3号位, 4号位, 5号位] × 每队各一套
-  const positionTemplates = [
-    '1',        '1,3',      '2',        '2,4',      '3',
-    '3,1',      '4,5',      '4',        '5',        '5,3',
-    '1,4',      '2,3',      '3,5',      '4,1',      '5,2',
-    '1,5',      '2,1',      '3,4',      '4,2',      '5,1',
+    // --- 超凡入圣 (5100-5999) ---
+    { id: 'P03', calibrate_mmr: 5800,  calibrate_rank_sort: 7, calibrate_rank_star: 4, calibrate_rank_name: '超凡入圣',
+      good_at_positions: '3',      wx_nickname: '劣单铁壁' },
+    { id: 'P04', calibrate_mmr: 5600,  calibrate_rank_sort: 7, calibrate_rank_star: 3, calibrate_rank_name: '超凡入圣',
+      good_at_positions: '1,5',    wx_nickname: '战术核心' },
+    { id: 'P05', calibrate_mmr: 5300,  calibrate_rank_sort: 7, calibrate_rank_star: 2, calibrate_rank_name: '超凡入圣',
+      good_at_positions: '4,5',    wx_nickname: '辅助天才' },
+
+    // --- 万古流芳 (4250-5099) ---
+    { id: 'P06', calibrate_mmr: 4900,  calibrate_rank_sort: 6, calibrate_rank_star: 4, calibrate_rank_name: '万古流芳',
+      good_at_positions: '2,4',    wx_nickname: '节奏大师' },
+    { id: 'P07', calibrate_mmr: 4600,  calibrate_rank_sort: 6, calibrate_rank_star: 3, calibrate_rank_name: '万古流芳',
+      good_at_positions: '3,1',    wx_nickname: '多面手' },
+
+    // --- 传奇 (3350-4249) ---
+    { id: 'P08', calibrate_mmr: 4100,  calibrate_rank_sort: 5, calibrate_rank_star: 5, calibrate_rank_name: '传奇',
+      good_at_positions: '4',      wx_nickname: '游走之王' },
+    { id: 'P09', calibrate_mmr: 3800,  calibrate_rank_sort: 5, calibrate_rank_star: 3, calibrate_rank_name: '传奇',
+      good_at_positions: '5,3',    wx_nickname: '奉献之光' },
+    { id: 'P10', calibrate_mmr: 3500,  calibrate_rank_sort: 5, calibrate_rank_star: 2, calibrate_rank_name: '传奇',
+      good_at_positions: '1,2',    wx_nickname: '全能摇摆' },
+
+    // --- 统帅 (2650-3349) ---
+    { id: 'P11', calibrate_mmr: 3200,  calibrate_rank_sort: 4, calibrate_rank_star: 5, calibrate_rank_name: '统帅',
+      good_at_positions: '2',      wx_nickname: '中单新星' },
+    { id: 'P12', calibrate_mmr: 2900,  calibrate_rank_sort: 4, calibrate_rank_star: 3, calibrate_rank_name: '统帅',
+      good_at_positions: '3,4',    wx_nickname: '攻守兼备' },
+
+    // --- 中军 (1750-2649) ---
+    { id: 'P13', calibrate_mmr: 2500,  calibrate_rank_sort: 3, calibrate_rank_star: 5, calibrate_rank_name: '中军',
+      good_at_positions: '4,5',    wx_nickname: '眼位精通' },
+    { id: 'P14', calibrate_mmr: 2100,  calibrate_rank_sort: 3, calibrate_rank_star: 3, calibrate_rank_name: '中军',
+      good_at_positions: '1',      wx_nickname: '打钱机器' },
+    { id: 'P15', calibrate_mmr: 1900,  calibrate_rank_sort: 3, calibrate_rank_star: 2, calibrate_rank_name: '中军',
+      good_at_positions: '5',      wx_nickname: '团队之盾' },
+
+    // --- 卫士 (900-1749) ---
+    { id: 'P16', calibrate_mmr: 1600,  calibrate_rank_sort: 2, calibrate_rank_star: 5, calibrate_rank_name: '卫士',
+      good_at_positions: '3,5',    wx_nickname: '铁血抗压' },
+    { id: 'P17', calibrate_mmr: 1300,  calibrate_rank_sort: 2, calibrate_rank_star: 3, calibrate_rank_name: '卫士',
+      good_at_positions: '4',      wx_nickname: '默默付出' },
+    { id: 'P18', calibrate_mmr: 1000,  calibrate_rank_sort: 2, calibrate_rank_star: 2, calibrate_rank_name: '卫士',
+      good_at_positions: '2,1',    wx_nickname: '新手中路' },
+
+    // --- 先锋 (0-899) ---
+    { id: 'P19', calibrate_mmr: 700,   calibrate_rank_sort: 1, calibrate_rank_star: 4, calibrate_rank_name: '先锋',
+      good_at_positions: '1,4',    wx_nickname: '萌新Carry' },
+    { id: 'P20', calibrate_mmr: 300,   calibrate_rank_sort: 1, calibrate_rank_star: 2, calibrate_rank_name: '先锋',
+      good_at_positions: '5,3',    wx_nickname: '勤能补拙' },
   ];
 
-  for (let i = 0; i < count; i++) {
-    const mmr = mmrPool[i % mmrPool.length] - Math.round(Math.random() * 200);
-    const pos = positionTemplates[i % positionTemplates.length];
-    players.push({
-      id: `${prefix}_${String(i + 1).padStart(2, '0')}`,
-      calibrate_mmr: mmr,
-      good_at_positions: pos,
-      wx_nickname: `${prefix}_选手${i + 1}`,
-    });
-  }
-  return players;
-}
-
-
-// ============================================================
-// 测试1：20名选手，4支队伍，位置齐全
-// ============================================================
-
-function test1_balancedAllocation() {
-  console.log('\n' + '='.repeat(60));
-  console.log(' 测试1：20名选手 → 4支队伍（位置齐全），验证均衡分配效果');
-  console.log('='.repeat(60));
-
-  const players = generateBalancedRoster('T1', 20);
-
-  console.log('\n【选手术语】');
-  players.forEach((p, i) => {
-    console.log(`  ${String(i + 1).padStart(2)}. ${p.wx_nickname.padEnd(12)} MMR:${String(p.calibrate_mmr).padStart(4)}  擅长位置: ${p.good_at_positions}`);
-  });
+  printPlayerTable(players);
 
   const result = allocateTeams(players, 4);
 
   printResult(result);
+
+  return result;
 }
 
 
 // ============================================================
-// 测试2：15名选手，3支队伍，部分位置人员不足 + 强制规则
+// 测试2：15名选手，3支队伍 — 无实际 MMR，仅段位+星级
 // ============================================================
 
-function test2_partialPositionsAndRules() {
-  console.log('\n' + '='.repeat(60));
-  console.log(' 测试2：15名选手 → 3支队伍（部分位置不足 + 强制规则）');
-  console.log('='.repeat(60));
+function test2_rankFormulaOnly() {
+  console.log('\n' + '='.repeat(65));
+  console.log('  测试2：15名选手 → 3支队伍');
+  console.log('  特征：无实际 MMR（calibrate_mmr 为空/0），全部靠段位+星级推算等效分');
+  console.log('  特殊：2号位仅有2人、5号位仅3人 → 验证位置补全+警告效果');
+  console.log('='.repeat(65));
 
-  // 手动构造：故意让某些位置缺人，测试补全微调效果
+  // calibrate_mmr 设为 null/0，强制走 rank_sort + rank_star 公式推算
   const players = [
-    // 偏1号位（Carry）
-    { id: 'P01', calibrate_mmr: 8200, good_at_positions: '1',    wx_nickname: 'Carry大师' },
-    { id: 'P02', calibrate_mmr: 7800, good_at_positions: '1,3',  wx_nickname: 'C位出道' },
-    { id: 'P03', calibrate_mmr: 6500, good_at_positions: '1,5',  wx_nickname: '补刀狂魔' },
-    // 偏2号位（Mid）- 只有2人，3队不够分
-    { id: 'P04', calibrate_mmr: 8500, good_at_positions: '2',    wx_nickname: '中路杀神' },
-    { id: 'P05', calibrate_mmr: 7200, good_at_positions: '2,4',  wx_nickname: '对线王者' },
-    // 偏3号位（Offlane）
-    { id: 'P06', calibrate_mmr: 7600, good_at_positions: '3',    wx_nickname: '劣单霸主' },
-    { id: 'P07', calibrate_mmr: 6900, good_at_positions: '3,1',  wx_nickname: '抗压战士' },
-    { id: 'P08', calibrate_mmr: 5800, good_at_positions: '3,4',  wx_nickname: '铁血三号位' },
-    // 偏4号位（Support）
-    { id: 'P09', calibrate_mmr: 7100, good_at_positions: '4',    wx_nickname: '游走之王' },
-    { id: 'P10', calibrate_mmr: 6400, good_at_positions: '4,5',  wx_nickname: '全图亮' },
-    { id: 'P11', calibrate_mmr: 5200, good_at_positions: '4,2',  wx_nickname: '四号位之光' },
-    // 偏5号位（Hard Support）- 只有2人
-    { id: 'P12', calibrate_mmr: 6000, good_at_positions: '5',    wx_nickname: '辅助之神' },
-    { id: 'P13', calibrate_mmr: 4800, good_at_positions: '5,4',  wx_nickname: '默默奉献' },
-    // 多面手
-    { id: 'P14', calibrate_mmr: 9000, good_at_positions: '1,2,3', wx_nickname: '全能大腿' },
-    { id: 'P15', calibrate_mmr: 5500, good_at_positions: '3,4,5', wx_nickname: '万金油' },
+    // --- 冠绝一世 (等效6000) ---
+    { id: 'R01', calibrate_mmr: null, calibrate_rank_sort: 8, calibrate_rank_star: 0, calibrate_rank_name: '冠绝一世',
+      good_at_positions: '1,3',    wx_nickname: '冠绝大腿' },
+    // --- 超凡入圣 (等效分按公式: 5100 + (star-1)*180) ---
+    { id: 'R02', calibrate_mmr: 0, calibrate_rank_sort: 7, calibrate_rank_star: 5, calibrate_rank_name: '超凡入圣',
+      good_at_positions: '2',      wx_nickname: '圣剑中单' },       // 等效: 5100+4*180=5820
+    { id: 'R03', calibrate_mmr: 0, calibrate_rank_sort: 7, calibrate_rank_star: 3, calibrate_rank_name: '超凡入圣',
+      good_at_positions: '3,1',    wx_nickname: '三号位支柱' },     // 等效: 5100+2*180=5460
+    // --- 万古流芳 (等效: 4250 + (star-1)*170) ---
+    { id: 'R04', calibrate_mmr: null, calibrate_rank_sort: 6, calibrate_rank_star: 4, calibrate_rank_name: '万古流芳',
+      good_at_positions: '4,5',    wx_nickname: '万古游走' },       // 等效: 4250+3*170=4760
+    { id: 'R05', calibrate_mmr: null, calibrate_rank_sort: 6, calibrate_rank_star: 2, calibrate_rank_name: '万古流芳',
+      good_at_positions: '1,4',    wx_nickname: '节奏发动机' },     // 等效: 4250+1*170=4420
+    // --- 传奇 (等效: 3350 + (star-1)*180) ---
+    { id: 'R06', calibrate_mmr: 0, calibrate_rank_sort: 5, calibrate_rank_star: 5, calibrate_rank_name: '传奇',
+      good_at_positions: '2,3',    wx_nickname: '传奇摇摆' },       // 等效: 3350+4*180=4070
+    { id: 'R07', calibrate_mmr: 0, calibrate_rank_sort: 5, calibrate_rank_star: 3, calibrate_rank_name: '传奇',
+      good_at_positions: '4',      wx_nickname: '传奇辅助' },       // 等效: 3350+2*180=3710
+    // --- 统帅 (等效: 2650 + (star-1)*140) ---
+    { id: 'R08', calibrate_mmr: null, calibrate_rank_sort: 4, calibrate_rank_star: 4, calibrate_rank_name: '统帅',
+      good_at_positions: '3',      wx_nickname: '统帅三号位' },     // 等效: 2650+3*140=3070
+    { id: 'R09', calibrate_mmr: null, calibrate_rank_sort: 4, calibrate_rank_star: 2, calibrate_rank_name: '统帅',
+      good_at_positions: '5,4',    wx_nickname: '统帅老将' },       // 等效: 2650+1*140=2790
+    // --- 中军 (等效: 1750 + (star-1)*180) ---
+    { id: 'R10', calibrate_mmr: 0, calibrate_rank_sort: 3, calibrate_rank_star: 4, calibrate_rank_name: '中军',
+      good_at_positions: '1',      wx_nickname: '中军Carry' },      // 等效: 1750+3*180=2290
+    { id: 'R11', calibrate_mmr: 0, calibrate_rank_sort: 3, calibrate_rank_star: 2, calibrate_rank_name: '中军',
+      good_at_positions: '5,3',    wx_nickname: '中军之盾' },       // 等效: 1750+1*180=1930
+    // --- 卫士 (等效: 900 + (star-1)*170) ---
+    { id: 'R12', calibrate_mmr: null, calibrate_rank_sort: 2, calibrate_rank_star: 5, calibrate_rank_name: '卫士',
+      good_at_positions: '4,5',    wx_nickname: '卫士之光' },       // 等效: 900+4*170=1580
+    { id: 'R13', calibrate_mmr: null, calibrate_rank_sort: 2, calibrate_rank_star: 2, calibrate_rank_name: '卫士',
+      good_at_positions: '1,3',    wx_nickname: '新手之勇' },       // 等效: 900+1*170=1070
+    // --- 先锋 (等效: 0 + (star-1)*180) ---
+    { id: 'R14', calibrate_mmr: 0, calibrate_rank_sort: 1, calibrate_rank_star: 4, calibrate_rank_name: '先锋',
+      good_at_positions: '3,4',    wx_nickname: '先锋小将' },       // 等效: 0+3*180=540
+    { id: 'R15', calibrate_mmr: 0, calibrate_rank_sort: 1, calibrate_rank_star: 1, calibrate_rank_name: '先锋',
+      good_at_positions: '5',      wx_nickname: '纯真辅助' },       // 等效: 0+0*180=0
   ];
 
-  console.log('\n【选手列表】');
-  console.log('  注意：2号位仅2人、5号位仅2人，3支队伍无法平均分配');
-  players.forEach((p, i) => {
-    console.log(`  ${String(i + 1).padStart(2)}. ${p.wx_nickname.padEnd(12)} MMR:${String(p.calibrate_mmr).padStart(4)}  位置: ${p.good_at_positions}`);
-  });
+  // 打印选手+等效分
+  printPlayerWithRankScore(players);
 
-  // 强制规则：中路杀神和C位出道不能同队（恩怨局）
-  //          Carry大师和对线王者必须同队（好基友）
-  const forceRules = {
-    mustSameTeam: [['P01', 'P05']],           // Carry大师 + 对线王者 绑定
-    mustNotSameTeam: [['P04', 'P02']],         // 中路杀神 vs C位出道 拆开
-  };
+  console.log('\n  ⚠ 注意：15名选手中，专精2号位的仅2人（圣剑中单、传奇摇摆），');
+  console.log('         3支队伍各需要1个2号位，算法将产生位置缺失警告');
 
-  console.log('\n【强制规则】');
-  console.log('  ✓ 必须同队：Carry大师 ↔ 对线王者');
-  console.log('  ✗ 禁止同队：中路杀神 ↔ C位出道（恩怨局）');
-
-  const result = allocateTeams(players, 3, forceRules);
+  const result = allocateTeams(players, 3);
 
   printResult(result);
 
-  // 验证强制规则
-  verifyForceRules(result, forceRules);
-  // 验证位置缺失提示是否合理
-  console.log('\n【位置不足分析】');
-  console.log('  理论上3队各需要1个2号位，但只有2个专精2号位的选手');
-  console.log('  理论上3队各需要1个5号位，但只有2个专精5号位的选手');
-  console.log('  算法的警告信息会明确提示哪些队伍仍缺位，方便手动调整');
+  return result;
 }
 
 
 // ============================================================
-// 输出格式化
-// ============================================================
-
-function printResult(result) {
-  console.log('\n【分队结果】');
-
-  if (result.teams.length === 0) {
-    console.log('  ✗ 分配失败');
-    return;
-  }
-
-  result.teams.forEach(team => {
-    const status = team.positionStats.isComplete ? '✓' : '⚠';
-    console.log(`\n  ┌─ ${team.teamName} ${status} ─────────────────────────────`);
-    console.log(`  │ 人数: ${team.memberCount}  │  总MMR: ${team.totalMmr}  │  均分: ${Math.round(team.mmrPerPlayer)}`);
-    console.log(`  │ 队长: ${team.playerList.find(p => p.id === team.captainId)?.wx_nickname || 'N/A'}`);
-    console.log(`  │ 位置覆盖:`);
-    ALL_POSITIONS.forEach(pos => {
-      const names = team.positionStats.coverage[pos] || [];
-      console.log(`  │   ${pos}号位: ${names.length > 0 ? names.join(', ') : '(缺失)'}`);
-    });
-    console.log(`  │ 成员详情:`);
-    team.playerList.forEach(p => {
-      console.log(`  │   · ${p.wx_nickname.padEnd(12)} MMR:${String(p.calibrate_mmr).padStart(4)}  位置:${p.good_at_positions}`);
-    });
-    console.log(`  └──────────────────────────────────────────────`);
-  });
-
-  console.log('\n【均衡度统计】');
-  if (result.balanceInfo) {
-    const b = result.balanceInfo;
-    console.log(`  总分区间: ${b.mmrStats.min} ~ ${b.mmrStats.max}`);
-    console.log(`  平均总MMR: ${b.mmrStats.average}`);
-    console.log(`  最大分差: ${b.mmrStats.maxDiff}`);
-    console.log(`  标准差: ${b.mmrStats.stdDeviation}`);
-    console.log(`  评级: ${b.mmrStats.grade}`);
-    console.log(`  位置满足率: ${b.positionRate.completeTeams}/${b.positionRate.totalTeams} (${(b.positionRate.rate * 100).toFixed(0)}%) ${b.positionRate.grade}`);
-    console.log(`  人数分布: ${b.memberDistribution.min}~${b.memberDistribution.max} 平均${b.memberDistribution.avg}`);
-  }
-
-  if (result.warnings && result.warnings.length > 0) {
-    console.log('\n【警告信息】');
-    result.warnings.forEach(w => console.log(`  ⚠ ${w}`));
-  }
-}
-
-/** 验证强制规则是否正确执行 */
-function verifyForceRules(result, rules) {
-  console.log('\n【强制规则验证】');
-
-  // 找选手所在队伍
-  function findTeam(playerId) {
-    for (const team of result.teams) {
-      if (team.playerList.some(p => p.id === playerId)) return team.teamIndex;
-    }
-    return -1;
-  }
-
-  // 验证 mustSameTeam
-  if (rules.mustSameTeam) {
-    for (const group of rules.mustSameTeam) {
-      const teamIdx = findTeam(group[0]);
-      const allSame = group.every(id => findTeam(id) === teamIdx);
-      console.log(`  ${allSame ? '✓' : '✗'} 同队 [${group.join(', ')}] → 队伍${teamIdx}`);
-    }
-  }
-
-  // 验证 mustNotSameTeam
-  if (rules.mustNotSameTeam) {
-    for (const pair of rules.mustNotSameTeam) {
-      const tA = findTeam(pair[0]), tB = findTeam(pair[1]);
-      console.log(`  ${tA !== tB ? '✓' : '✗'} 禁同队 [${pair[0]}, ${pair[1]}] → 队${tA} vs 队${tB}`);
-    }
-  }
-}
-
-
-// ============================================================
-// 测试3（附赠）：后端接口调用示例
+// 测试3：后端 Service 层集成示例
 // ============================================================
 
 function test3_apiIntegrationExample() {
-  console.log('\n' + '='.repeat(60));
-  console.log(' 测试3（示例）：后端接口中如何调用算法并写入数据库');
-  console.log('='.repeat(60));
+  console.log('\n' + '='.repeat(65));
+  console.log('  示例：后端接口中调用算法并批量写入 dota2_event_teams 表');
+  console.log('='.repeat(65));
 
   console.log(`
-  【后端集成代码示例】
+  ┌─────────────────────────────────────────────────────────────┐
+  │  在 server/index.js 中添加以下路由                            │
+  │                                                              │
+  │  POST /api/events/:eventId/allocate-teams                    │
+  │  请求体：{ teamCount, forceRules?, config? }                  │
+  └─────────────────────────────────────────────────────────────┘
 
-  在 server/index.js 或 server/event-routes.js 中添加以下路由：
+  // ============ 后端代码 ============
 
-  // POST /api/events/:eventId/allocate-teams
-  // 请求体：{ teamCount: 4, forceRules: { mustSameTeam: [["P01","P05"]], mustNotSameTeam: [["P04","P02"]] } }
+  const { allocateTeams } = require('./utils/team-allocation');
+
   app.post('/api/events/:eventId/allocate-teams', async (req, res) => {
     try {
       const { eventId } = req.params;
-      const { teamCount, forceRules } = req.body;
+      const { teamCount, forceRules, config } = req.body;
 
-      // 1. 权限校验
+      // 1. 权限校验（admin 和 super_admin 均可操作）
       const role = await getCallerRole(req.query.openid);
       if (role !== 'admin' && role !== 'super_admin') {
         return res.json({ success: false, error: '仅管理员可操作' });
       }
 
-      // 2. 从报名表获取已报名选手ID列表
+      // 2. 校验赛事存在
+      const [events] = await pool.query(
+        'SELECT event_id FROM dota2_events WHERE event_id = ?', [eventId]
+      );
+      if (!events.length) {
+        return res.json({ success: false, error: '赛事不存在' });
+      }
+
+      // 3. 获取已报名选手ID
       const [signups] = await pool.query(
         'SELECT player_id FROM dota2_event_signup WHERE event_id = ? AND signup_status = 1',
         [eventId]
@@ -259,41 +212,47 @@ function test3_apiIntegrationExample() {
         return res.json({ success: false, error: '暂无有效报名选手' });
       }
 
-      // 3. 批量查询选手详情（含MMR和擅长位置）
+      // 4. 批量查询选手完整信息（含段位字段）
       const playerIds = signups.map(s => s.player_id);
       const [players] = await pool.query(
-        'SELECT id, wx_nickname, calibrate_mmr, good_at_positions FROM dota2_players WHERE id IN (?)',
+        \`SELECT id, wx_nickname, calibrate_mmr, calibrate_rank_sort,
+                calibrate_rank_star, calibrate_rank_name, good_at_positions
+         FROM dota2_players WHERE id IN (?)\`,
         [playerIds]
       );
 
       if (players.length < teamCount * 5) {
-        return res.json({ success: false, error: \`选手不足：\${players.length}人，至少需要\${teamCount * 5}人\` });
+        return res.json({
+          success: false,
+          error: \`选手不足：\${players.length}人，至少需要\${teamCount * 5}人\`
+        });
       }
 
-      // 4. 调用分队算法
-      const { allocateTeams } = require('./utils/team-allocation');
-      const result = allocateTeams(players, teamCount, forceRules);
+      // 5. 调用分队算法（入参字段与 dota2_players 完全一致）
+      const result = allocateTeams(players, teamCount, forceRules, config);
 
-      // 5. 批量写入 dota2_event_teams 表
-      const connection = await pool.getConnection();
+      // 6. 事务写入 dota2_event_teams
+      const conn = await pool.getConnection();
       try {
-        await connection.beginTransaction();
+        await conn.beginTransaction();
 
-        // 先清空该赛事已有队伍（重新分队场景）
-        await connection.execute('DELETE FROM dota2_event_teams WHERE event_id = ?', [eventId]);
+        // 清空该赛事已有队伍（重新分队场景）
+        await conn.execute('DELETE FROM dota2_event_teams WHERE event_id = ?', [eventId]);
 
+        const now = Date.now();
         for (const team of result.teams) {
-          const teamId = Date.now().toString(16) + Math.random().toString(16).slice(2, 10);
+          const teamId = genId();
+          // player_ids 存 JSON 数组，total_mmr 存计算后的总分
           const playerIdsJson = JSON.stringify(team.playerList.map(p => p.id));
-          const now = Date.now();
-
-          await connection.execute(
-            'INSERT INTO dota2_event_teams (team_id, event_id, team_name, captain_id, player_ids, total_mmr, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [teamId, eventId, team.teamName, team.captainId, playerIdsJson, team.totalMmr, now, now]
+          await conn.execute(
+            \`INSERT INTO dota2_event_teams
+             (team_id, event_id, team_name, captain_id, player_ids, total_mmr, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)\`,
+            [teamId, eventId, team.teamName, team.captainId, playerIdsJson, team.totalScore, now, now]
           );
         }
 
-        await connection.commit();
+        await conn.commit();
 
         res.json({
           success: true,
@@ -304,10 +263,10 @@ function test3_apiIntegrationExample() {
           }
         });
       } catch (err) {
-        await connection.rollback();
+        await conn.rollback();
         throw err;
       } finally {
-        connection.release();
+        conn.release();
       }
     } catch (err) {
       console.error('分队失败:', err);
@@ -315,44 +274,174 @@ function test3_apiIntegrationExample() {
     }
   });
 
-  【前端调用（微信小程序）】
+
+  // ============ 前端小程序调用 ============
+
+  // pages/dota2-event-manage/dota2-event-manage.js
 
   const { get } = require('../../utils/api');
 
-  // 在赛事管理页调用分队接口
-  async function allocateTeams(eventId, teamCount, forceRules) {
+  async function doAllocateTeams(eventId) {
     const openid = wx.getStorageSync('openid');
     const result = await get(\`/api/events/\${eventId}/allocate-teams\`, {
       method: 'POST',
-      data: { teamCount, forceRules },
+      data: {
+        teamCount: 4,
+        forceRules: {
+          mustSameTeam: [['P01', 'P05']],      // 这些选手必须同队
+          mustNotSameTeam: [['P04', 'P02']]     // 这些选手禁止同队
+        },
+        config: {
+          positionRequired: true,               // 启用位置强制校验
+        }
+      },
       openid
     });
+
     if (result.success) {
-      console.log('分队完成!', result.data);
-      // 展示分队结果 + 均衡度统计
+      const { teams, balanceInfo, warnings } = result.data;
+      console.log('分队完成!', \`最大分差: \${balanceInfo.scoreStats.maxDiff}\`);
+      // 渲染队伍卡片 + 均衡度面板 + 警告列表
     }
   }
-
-  allocateTeams('your_event_id', 4, {
-    mustSameTeam: [['P01', 'P05']],      // 必须同队
-    mustNotSameTeam: [['P04', 'P02']]     // 禁止同队
-  });
 `);
 }
 
 
 // ============================================================
-// 运行所有测试
+// 输出格式化
 // ============================================================
 
-console.log('\n' + '█'.repeat(60));
-console.log('█  MMR 均衡分队算法 — 自动化测试套件');
-console.log('█'.repeat(60));
+/** 打印选手列表（测试1：含 MMR） */
+function printPlayerTable(players) {
+  console.log('\n【选手列表】');
+  console.log('  ' + '─'.repeat(58));
+  players.forEach((p, i) => {
+    const id = String(i + 1).padStart(2);
+    const name = p.wx_nickname.padEnd(10);
+    const mmr = String(p.calibrate_mmr ?? '-').padStart(6);
+    const rank = (p.calibrate_rank_name || '').padEnd(8);
+    console.log(`  ${id}. ${name}  MMR:${mmr}  ${rank}  位置: ${p.good_at_positions}`);
+  });
+  console.log('  ' + '─'.repeat(58));
+}
 
-test1_balancedAllocation();
-test2_partialPositionsAndRules();
+/** 打印选手列表（测试2：含等效分计算） */
+function printPlayerWithRankScore(players) {
+  console.log('\n【选手列表（MMR为空→按段位公式推算等效分）】');
+  console.log('  ' + '─'.repeat(68));
+  players.forEach((p, i) => {
+    const { score, source } = getScore(p);
+    const id = String(i + 1).padStart(2);
+    const name = p.wx_nickname.padEnd(10);
+    const rank = (p.calibrate_rank_name || '').padEnd(8);
+    const star = p.calibrate_rank_star || 0;
+    const tag = source === 'rank_formula' ? '公式推算' :
+                source === 'default_immortal' ? '冠绝默认' : source;
+    console.log(`  ${id}. ${name}  ${rank} [${star}★]  → 等效分:${String(score).padStart(5)}  (${tag})  位置: ${p.good_at_positions}`);
+  });
+  console.log('  ' + '─'.repeat(68));
+}
+
+/** 通用输出 */
+function printResult(result) {
+  console.log('\n【分队结果】');
+
+  if (!result.teams || result.teams.length === 0) {
+    console.log('  ✗ 分配失败');
+    return;
+  }
+
+  result.teams.forEach(team => {
+    const status = team.positionStats.isComplete ? '✓ 位置齐全' : '⚠ 缺位';
+    const bar = '─'.repeat(58);
+    console.log(`\n  ${bar}`);
+    console.log(`  │ ${team.teamName}  ${status}`);
+    console.log(`  │ 人数: ${team.memberCount}  │  总分: ${team.totalScore}  │  均分: ${team.avgScore}`);
+    console.log(`  │ 队长: ${team.playerList.find(p => p.id === team.captainId)?.wx_nickname || 'N/A'}`);
+    console.log(`  │ 位置覆盖:`);
+    ALL_POSITIONS.forEach(pos => {
+      const names = team.positionStats.coverage[pos] || [];
+      const mark = names.length > 0 ? `✓ ${names.join(', ')}` : '✗ (缺失!!)';
+      console.log(`  │   ${pos}号位: ${mark}`);
+    });
+    console.log(`  │ 成员详情:`);
+    team.playerList.forEach(p => {
+      const name = (p.wx_nickname || '').padEnd(10);
+      const score = String(p.computedScore).padStart(5);
+      const src = p.scoreSource === 'actual_mmr' ? 'MMR' :
+                   p.scoreSource === 'rank_formula' ? '段位' : '—';
+      const pos = (p.good_at_positions || '');
+      console.log(`  │   · ${name} 分值:${score}(${src})  位置: ${pos}`);
+    });
+    console.log(`  ${bar}`);
+  });
+
+  console.log('\n【均衡度统计】');
+  if (result.balanceInfo) {
+    const b = result.balanceInfo;
+    console.log(`  总分区间  : ${b.scoreStats.min} ~ ${b.scoreStats.max}`);
+    console.log(`  平均总分  : ${b.scoreStats.average}`);
+    console.log(`  最大分差  : ${b.scoreStats.maxDiff}`);
+    console.log(`  标准差    : ${b.scoreStats.stdDeviation}`);
+    console.log(`  评级      : ${b.scoreStats.grade}`);
+    console.log(`  位置满足  : ${b.positionRate.completeTeams}/${b.positionRate.totalTeams} ` +
+                `(${(b.positionRate.rate * 100).toFixed(0)}%) ${b.positionRate.grade}`);
+    console.log(`  人数分布  : ${b.memberDistribution.min}~${b.memberDistribution.max} ` +
+                `(平均${b.memberDistribution.avg}人)`);
+    console.log(`  交换次数  : ${b.swapCount} 次`);
+    if (b.scoreSource) {
+      console.log(`  分值来源  : 实际MMR=${b.scoreSource.actual_mmr || 0} ` +
+                  `段位推算=${b.scoreSource.rank_formula || 0} ` +
+                  `冠绝默认=${b.scoreSource.default_immortal || 0}`);
+    }
+  }
+
+  if (result.warnings && result.warnings.length > 0) {
+    console.log('\n【警告信息】');
+    result.warnings.forEach(w => console.log(`  ⚠ ${w}`));
+  }
+}
+
+
+// ============================================================
+// 段位配置表展示
+// ============================================================
+
+function showRankConfig() {
+  console.log('\n' + '='.repeat(65));
+  console.log('  DOTA2 段位分值配置表（内置数据源）');
+  console.log('='.repeat(65));
+
+  const table = getRankConfigTable();
+  console.log('\n  rank_sort  段位名称        分数区间          单星步长  星级');
+  console.log('  ' + '─'.repeat(58));
+  table.forEach(row => {
+    const sort = String(row.rankSort).padStart(9);
+    const name = row.rankName.padEnd(14);
+    const range = row.scoreRange.padEnd(16);
+    const step = row.hasStars ? String(row.stepPerStar).padStart(5) : '  无';
+    const star = row.hasStars ? `1~5星` : '无星级';
+    console.log(`  ${sort}  ${name}  ${range}  ${step}    ${star}`);
+  });
+  console.log('  ' + '─'.repeat(58));
+}
+
+
+// ============================================================
+// 运行入口
+// ============================================================
+
+console.log('\n' + '█'.repeat(65));
+console.log('█  DOTA2 段位分值均衡分队算法 — 自动化测试套件');
+console.log('█'.repeat(65));
+
+showRankConfig();
+
+const r1 = test1_allActualMmr();
+const r2 = test2_rankFormulaOnly();
 test3_apiIntegrationExample();
 
-console.log('\n' + '█'.repeat(60));
+console.log('\n' + '█'.repeat(65));
 console.log('█  全部测试完成');
-console.log('█'.repeat(60) + '\n');
+console.log('█'.repeat(65) + '\n');
