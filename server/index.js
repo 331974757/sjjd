@@ -585,6 +585,21 @@ app.put('/api/users/:openid/reset-nickcount', async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
+// === 全局错误处理（防止无效 JSON 等导致进程崩溃） ===
+// body-parser 遇到非法 JSON 时会抛 SyntaxError，Express 4 默认不捕获会导致 crash
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.type === 'entity.parse.failed') {
+    return res.status(400).json({ success: false, error: '请求 JSON 格式错误' });
+  }
+  console.error('[UNHANDLED]', err.message || err);
+  res.status(500).json({ success: false, error: '服务器内部错误' });
+});
+
+// 未匹配路由 404
+app.use((req, res) => {
+  res.status(404).json({ success: false, error: '接口不存在' });
+});
+
 app.listen(PORT, () => {
   console.log(`Dota2 API running on http://localhost:${PORT}`);
 });
