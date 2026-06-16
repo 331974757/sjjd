@@ -197,8 +197,15 @@ function checkAction(action, options) {
     // ─── 自主报名 ───
     case 'signup':
     case 'cancel_signup':
-      if (status !== EVENT_STATUS.SIGNUP_OPEN) {
-        return { allowed: false, disabled: true, reason: STATUS_NAMES[status] ? `「${STATUS_NAMES[status]}」阶段不可报名` : '非报名阶段' };
+      // 管理员在报名截止（状态≤2）前均可操作；普通用户仅在报名中（状态=1）可操作
+      if (isAdmin) {
+        if (status > EVENT_STATUS.SIGNUP_CLOSED) {
+          return { allowed: false, disabled: true, reason: STATUS_NAMES[status] ? `「${STATUS_NAMES[status]}」阶段不可操作报名` : '非报名阶段' };
+        }
+      } else {
+        if (status !== EVENT_STATUS.SIGNUP_OPEN) {
+          return { allowed: false, disabled: true, reason: STATUS_NAMES[status] ? `「${STATUS_NAMES[status]}」阶段不可报名` : '非报名阶段' };
+        }
       }
       return { allowed: true, disabled: false, reason: '' };
 
@@ -237,8 +244,11 @@ function checkAction(action, options) {
     // ─── 管理员：锁定队伍开赛 ───
     case 'lock_teams':
       if (!isAdmin) return { allowed: false, disabled: true, reason: '仅管理员可操作' };
-      if (status !== EVENT_STATUS.TEAMS_LOCKED) {
-        return { allowed: false, disabled: true, reason: '仅在「分组锁定」状态可开赛' };
+      if (status < EVENT_STATUS.SIGNUP_CLOSED) {
+        return { allowed: false, disabled: true, reason: '报名尚未截止，无法开赛' };
+      }
+      if (status >= EVENT_STATUS.BATTLE_ACTIVE) {
+        return { allowed: false, disabled: true, reason: '赛事已开赛，无需重复锁定' };
       }
       return { allowed: true, disabled: false, reason: '' };
 

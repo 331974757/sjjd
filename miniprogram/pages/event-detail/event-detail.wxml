@@ -12,7 +12,16 @@
     <!-- ====== 赛事基本信息头部 ====== -->
     <view class="event-card">
       <view class="event-header">
-        <text class="event-name">{{event.event_name}}</text>
+        <!-- 赛事名：admin 且非归档时可点击编辑 -->
+        <view class="event-name-row" wx:if="{{!editingName}}">
+          <text class="event-name">{{event.event_name}}</text>
+          <text class="edit-pencil" wx:if="{{isAdmin && !isArchived}}" bindtap="startEditName">✎</text>
+        </view>
+        <view class="event-name-row event-name-editing" wx:else>
+          <input class="event-name-input" value="{{editNameValue}}" placeholder="赛事名称" bindinput="onEditNameInput" focus="{{true}}" maxlength="50"/>
+          <text class="edit-done" bindtap="confirmEditName">✓</text>
+          <text class="edit-cancel" bindtap="cancelEditName">✕</text>
+        </view>
         <view class="event-status {{event._statusClass}}">
           <text>{{event._statusName}}</text>
         </view>
@@ -55,8 +64,19 @@
     <view class="tab-content" wx:if="{{activeTab === 'overview'}}">
       <!-- 赛事简介 -->
       <view class="overview-section">
-        <text class="os-title">📋 赛事简介</text>
-        <text class="os-desc">{{event.event_desc || '暂无简介'}}</text>
+        <view class="os-title-row">
+          <text class="os-title">📋 赛事简介</text>
+          <text class="edit-pencil edit-pencil-sm" wx:if="{{isAdmin && !isArchived && !editingDesc}}" bindtap="startEditDesc">✎</text>
+        </view>
+        <!-- 简介内容：admin 且非归档时可点击编辑 -->
+        <text class="os-desc {{isAdmin && !isArchived ? 'os-desc-editable' : ''}}" wx:if="{{!editingDesc}}" bindtap="{{isAdmin && !isArchived ? 'startEditDesc' : ''}}">{{event.event_desc || '暂无简介'}}</text>
+        <view class="os-desc-editing" wx:else>
+          <textarea class="os-desc-textarea" value="{{editDescValue}}" placeholder="请输入赛事简介..." bindinput="onEditDescInput" focus="{{true}}" auto-height maxlength="500"/>
+          <view class="os-desc-actions">
+            <text class="edit-done" bindtap="confirmEditDesc">✓ 确认</text>
+            <text class="edit-cancel" bindtap="cancelEditDesc">✕ 取消</text>
+          </view>
+        </view>
         <text class="os-creator" wx:if="{{event.creator_nickname}}">创建人：{{event.creator_nickname}}</text>
         <text class="os-time" wx:if="{{event.created_at}}">创建时间：{{event.created_at}}</text>
         <!-- 归档信息（仅历史赛事/已归档展示） -->
@@ -84,13 +104,13 @@
 
       <!-- 普通用户报名入口 -->
       <view class="overview-signup" wx:if="{{!readonly}}">
-        <button class="signup-btn btn-primary" wx:if="{{signupBtn.allowed && (!mySignup || !mySignup.signedUp)}}" bindtap="doSignup" loading="{{loading}}">立即报名</button>
+        <button class="signup-btn btn-primary" wx:if="{{signupBtn.allowed && mySignupLoaded && (!mySignup || !mySignup.signedUp)}}" bindtap="doSignup" loading="{{loading}}">立即报名</button>
         <view class="signup-done" wx:if="{{signupBtn.allowed && mySignup && mySignup.signedUp}}">
           <view class="sd-left"><text class="done-icon">✓</text><text class="done-text">已报名</text><text class="done-type" wx:if="{{mySignup.signupType === 'admin_add'}}">（管理员添加）</text></view>
           <button class="signup-btn btn-cancel" wx:if="{{cancelSignupBtn.allowed}}" bindtap="showCancelSignup">取消报名</button>
         </view>
-        <button class="signup-btn btn-disabled" wx:if="{{!signupBtn.allowed && (!mySignup || !mySignup.signedUp)}}" disabled>立即报名</button>
-        <view class="signup-hint" wx:if="{{!signupBtn.allowed && (!mySignup || !mySignup.signedUp)}}"><text>{{signupDisabledReason}}</text></view>
+        <button class="signup-btn btn-disabled" wx:if="{{!signupBtn.allowed && mySignupLoaded && (!mySignup || !mySignup.signedUp)}}" disabled>立即报名</button>
+        <view class="signup-hint" wx:if="{{!signupBtn.allowed && mySignupLoaded && (!mySignup || !mySignup.signedUp)}}"><text>{{signupDisabledReason}}</text></view>
         <view class="signup-done" wx:if="{{!signupBtn.allowed && mySignup && mySignup.signedUp}}">
           <view class="sd-left"><text class="done-icon">✓</text><text class="done-text">已报名</text></view>
         </view>
@@ -107,7 +127,7 @@
         <text class="ss-count">已报名：<text class="ss-num">{{signupCount}}</text> 人</text>
       </view>
 
-      <!-- 管理员操作区：搜索+批量添加 -->
+      <!-- 管理员操作区：搜索选手添加 -->
       <view class="signup-admin-area" wx:if="{{actions.manage_signups.allowed && !isArchived}}">
         <view class="sa-search-bar">
           <input class="sa-search-input" placeholder="搜索选手昵称..." value="{{searchKeyword}}" bindinput="onSearchInput" />
@@ -118,19 +138,16 @@
         <view class="sa-search-results" wx:if="{{searchResults.length > 0}}">
           <view class="sa-result-header">
             <text class="sar-title">搜索结果</text>
-            <button class="sar-batch-btn" bindtap="doBatchAdd" loading="{{batchAddLoading}}" wx:if="{{searchSelectedCount > 0}}" size="mini">批量添加 ({{searchSelectedCount}})</button>
           </view>
           <view
-            class="sa-result-item {{item._alreadySigned ? 'sar-disabled' : ''}} {{item._selected ? 'sar-selected' : ''}}"
+            class="sa-result-item {{item._alreadySigned ? 'sar-disabled' : ''}}"
             wx:for="{{searchResults}}"
             wx:key="_id"
-            bindtap="{{!item._alreadySigned ? 'toggleSelectPlayer' : ''}}"
-            data-pid="{{item._id}}"
           >
-            <view class="sari-checkbox {{item._selected ? 'cb-on' : ''}} {{item._alreadySigned ? 'cb-disabled' : ''}}">✓</view>
             <text class="sari-name">{{item.wx_nickname || '未知'}}</text>
             <text class="sari-rank">{{item.calibrate_rank_name || '未定段'}}</text>
             <text class="sari-tag" wx:if="{{item._alreadySigned}}">已报名</text>
+            <button class="sari-add-btn" wx:if="{{!item._alreadySigned}}" catchtap="doSingleAdd" data-pid="{{item._id}}" size="mini">添加</button>
           </view>
         </view>
         <view class="sa-no-result" wx:if="{{searchKeyword && searchKeyword.length > 0 && !searchLoading && searchResults.length === 0}}">
@@ -140,7 +157,7 @@
 
       <!-- 报名人员列表 -->
       <view class="signup-list-section">
-        <view class="sls-header"><text class="sls-title">报名人员列表</text><text class="sls-count">共 {{signupCount}} 人</text></view>
+        <view class="sls-header"><text class="sls-title">报名人员列表</text><text class="sls-count">共 {{signupTotal}} 人</text></view>
         <view class="empty-state" wx:if="{{signups.length === 0}}">
           <text class="empty-icon">👥</text>
           <text class="empty-text">暂无报名选手</text>
@@ -164,11 +181,26 @@
             </view>
           </view>
         </view>
+
+        <!-- 分页控件 -->
+        <view class="signup-pagination" wx:if="{{signupTotal > signupPageSize}}">
+          <view class="sp-btn sp-prev {{signupPage <= 1 ? 'sp-disabled' : ''}}" bindtap="goSignupPage" data-page="{{signupPage - 1}}">
+            <text>上一页</text>
+          </view>
+          <view class="sp-info">
+            <text class="sp-current">{{signupPage}}</text>
+            <text class="sp-sep">/</text>
+            <text class="sp-total">{{Math.ceil(signupTotal / signupPageSize) || 1}}</text>
+          </view>
+          <view class="sp-btn sp-next {{!signupHasMore ? 'sp-disabled' : ''}}" bindtap="goSignupPage" data-page="{{signupPage + 1}}">
+            <text>下一页</text>
+          </view>
+        </view>
       </view>
 
       <!-- 普通用户报名按钮（底部固定） -->
       <view class="tab2-bottom-signup" wx:if="{{!readonly && !isArchived}}">
-        <button class="signup-btn btn-primary" wx:if="{{signupBtn.allowed && (!mySignup || !mySignup.signedUp)}}" bindtap="doSignup" loading="{{loading}}">我要报名</button>
+        <button class="signup-btn btn-primary" wx:if="{{signupBtn.allowed && mySignupLoaded && (!mySignup || !mySignup.signedUp)}}" bindtap="doSignup" loading="{{loading}}">我要报名</button>
         <view class="signup-done" wx:if="{{mySignup && mySignup.signedUp}}">
           <text class="done-icon">✓</text>
           <text class="done-text">已报名</text>
@@ -181,21 +213,59 @@
           Tab3: 分组编组
           ================================================================ -->
     <view class="tab-content" wx:if="{{activeTab === 'teams'}}">
+
+      <!-- 操作提示（仅管理员可编辑时） -->
+      <view class="team-hint" wx:if="{{actions.manage_teams.allowed && !isArchived && event.event_status < 4}}">
+        <text>👆 点击自由选手选中，再点击队伍卡片放入 · 点击队员 × 移回自由区 · 点击 ♔ 设为队长</text>
+      </view>
+
       <!-- 操作按钮区 -->
-      <view class="team-actions" wx:if="{{actions.manage_teams.allowed && !isArchived}}">
-        <button class="ta-btn" bindtap="goTeamEdit" wx:if="{{event.event_status >= 2}}">手动编组</button>
-        <button class="ta-btn ta-btn-auto" bindtap="doAutoAllocate" loading="{{allocating}}" wx:if="{{event.event_status >= 2}}">自动分队</button>
-        <button class="ta-btn ta-btn-lock" bindtap="doLockTeams" loading="{{locking}}" wx:if="{{actions.lock_teams.allowed && teams.length > 0 && event.event_status < 4}}">🔒 锁定开赛</button>
+      <!-- 状态2: 编辑阶段 → 自动分队 + 新建队伍 -->
+      <view class="team-actions" wx:if="{{actions.manage_teams.allowed && !isArchived && event.event_status === 2}}">
+        <button class="ta-btn ta-btn-auto" bindtap="doAutoAllocate" loading="{{allocating}}">🤖 自动分队</button>
+        <button class="ta-btn" bindtap="addTeam">+ 新建队伍</button>
+      </view>
+      <!-- 保存编组：独占一行在下方 -->
+      <view class="team-actions" wx:if="{{actions.manage_teams.allowed && !isArchived && teams.length > 0 && event.event_status === 2}}">
+        <button class="ta-btn ta-btn-save" bindtap="saveTeams" loading="{{teamsSaving}}">💾 保存编组</button>
+      </view>
+      <!-- 分隔线 -->
+      <view class="team-actions-divider" wx:if="{{actions.lock_teams.allowed && !isArchived && teams.length > 0 && (event.event_status === 2 || event.event_status === 3)}}">
+        <view class="tad-line"></view>
+        <text class="tad-label">— 确认编组无误后 —</text>
+        <view class="tad-line"></view>
+      </view>
+      <!-- 状态2/3: 有队伍 → 锁定开赛 -->
+      <view class="team-actions team-actions-lock" wx:if="{{actions.lock_teams.allowed && !isArchived && teams.length > 0 && (event.event_status === 2 || event.event_status === 3)}}">
+        <button class="ta-btn ta-btn-lock" bindtap="doLockTeams" loading="{{locking}}" disabled="{{teamsDirty}}">🔒 锁定开赛</button>
+        <view class="ta-lock-hint" wx:if="{{teamsDirty}}">⚠ 请先保存编组</view>
       </view>
 
       <!-- 自由选手池 -->
       <view class="team-section">
-        <view class="ts-header"><text class="ts-title">自由选手</text><text class="ts-count">{{freeAgents.length}} 人</text></view>
+        <view class="ts-header">
+          <text class="ts-title">🏊 自由选手</text>
+          <text class="ts-count">{{freeAgents.length}} 人</text>
+        </view>
         <view class="free-agent-list" wx:if="{{freeAgents.length > 0}}">
-          <view class="fa-item" wx:for="{{freeAgents}}" wx:key="_id">
-            <text class="fa-name">{{item.wx_nickname || item.nickName || '未知'}}</text>
-            <text class="fa-rank">{{item.calibrate_rank_name || '未定段'}}</text>
-            <text class="fa-score">{{item.calibrate_rank_sort || 0}}分</text>
+          <view
+            class="fa-item {{selectedPlayerId === item.id ? 'fa-selected' : ''}}"
+            wx:for="{{freeAgents}}"
+            wx:key="id"
+            wx:if="{{item.id}}"
+            bindtap="{{actions.manage_teams.allowed && !isArchived && event.event_status < 4 ? 'selectFreeAgent' : ''}}"
+            data-player-id="{{item.id}}"
+          >
+            <image class="fa-avatar" src="{{item.avatar_url || '/images/default-avatar.png'}}" mode="aspectFill" wx:if="{{item.avatar_url}}"/>
+            <view class="fa-info">
+              <text class="fa-name">{{item.wx_nickname || item.nickName || '未知'}}</text>
+              <text class="fa-rank">{{item.calibrate_rank_name || '未定段'}}{{item.calibrate_rank_star ? ' '+item.calibrate_rank_star+'★' : ''}}</text>
+            </view>
+            <view class="fa-meta">
+              <text class="fa-pos" wx:if="{{item._posText}}">{{item._posText}}</text>
+              <text class="fa-score">{{(item.calibrate_mmr || 0)}}分</text>
+            </view>
+            <view class="fa-check" wx:if="{{selectedPlayerId === item.id}}"><text>✓</text></view>
           </view>
         </view>
         <view class="empty-state mini" wx:if="{{freeAgents.length === 0}}">
@@ -205,35 +275,83 @@
 
       <!-- 队伍列表 -->
       <view class="team-section">
-        <view class="ts-header"><text class="ts-title">队伍列表</text><text class="ts-count">{{teams.length}} 队</text></view>
+        <view class="ts-header">
+          <text class="ts-title">🏴 队伍列表</text>
+          <text class="ts-count">{{teams.length}} 队</text>
+        </view>
         <view class="empty-state" wx:if="{{teams.length === 0 && teamsLoading}}">
           <text class="empty-text">加载中...</text>
         </view>
         <view class="empty-state" wx:if="{{teams.length === 0 && !teamsLoading}}">
           <text class="empty-icon">🏗</text>
           <text class="empty-text">尚未编组</text>
-          <text class="empty-sub" wx:if="{{actions.manage_teams.allowed}}">点击「手动编组」或「自动分队」开始</text>
+          <text class="empty-sub" wx:if="{{actions.manage_teams.allowed}}">点击「自动分队」或「新建队伍」开始</text>
         </view>
         <view class="team-list" wx:if="{{teams.length > 0}}">
-          <view class="team-card" wx:for="{{teams}}" wx:key="team_id">
+          <view
+            class="team-card {{selectedPlayerId && event.event_status < 4 && !isArchived ? 'tc-droppable' : ''}}"
+            wx:for="{{teams}}"
+            wx:key="team_id"
+            bindtap="{{selectedPlayerId && actions.manage_teams.allowed && !isArchived && event.event_status < 4 ? 'dropToTeam' : ''}}"
+            data-team-id="{{item.team_id}}"
+          >
             <view class="tc-header">
               <text class="tc-name">{{item.team_name || '未命名'}}</text>
-              <text class="tc-mmr">{{item.total_mmr || 0}} 分</text>
-            </view>
-            <view class="tc-members">
-              <view class="tcm-item" wx:for="{{item.members}}" wx:key="_id" wx:for-item="m">
-                <text class="tcm-captain" wx:if="{{m._id === item.captain_id}}">👑</text>
-                <text class="tcm-name">{{m.wx_nickname || m.nickName || '未知'}}</text>
-                <text class="tcm-rank">{{m.calibrate_rank_label || m.calibrate_rank_name || ''}}</text>
+              <view class="tc-header-right">
+                <text class="tc-mmr">总分 {{item.total_mmr || 0}}　均分 {{item._avgMmr || 0}}</text>
+                <text class="tc-count">{{item._memberCount}}人</text>
+                <view class="tc-del-btn" wx:if="{{actions.manage_teams.allowed && !isArchived && event.event_status < 4}}" catchtap="deleteTeam" data-team-id="{{item.team_id}}">
+                  <text>×</text>
+                </view>
               </view>
+            </view>
+            <!-- 队长行 -->
+            <view class="tc-captain" wx:if="{{item.captain_name || item.captain_id}}">
+              <text class="tcc-icon">👑</text>
+              <text class="tcc-name">队长：{{item.captain_name || '未知'}}</text>
+            </view>
+            <view class="tc-captain tc-no-captain" wx:elif="{{actions.manage_teams.allowed && !isArchived && event.event_status < 4 && item._memberCount > 0}}">
+              <text class="tcc-name">⚠ 未指定队长</text>
+            </view>
+            <!-- 队员列表 -->
+            <view class="tc-members">
+              <view
+                class="tcm-item {{m.id === item.captain_id ? 'tcm-captain' : ''}}"
+                wx:for="{{item.members || item.players}}"
+                wx:key="id"
+                wx:for-item="m"
+              >
+                <image class="tcm-avatar" src="{{m.avatar_url || '/images/default-avatar.png'}}" mode="aspectFill" wx:if="{{m.avatar_url}}"/>
+                <view class="tcm-info">
+                  <text class="tcm-name">{{m.wx_nickname || m.nickName || '未知'}}</text>
+                  <text class="tcm-rank">{{m.calibrate_rank_name || m.calibrate_rank_label || '未定段'}}{{m.calibrate_rank_star ? ' '+m.calibrate_rank_star+'★' : ''}}</text>
+                </view>
+                <view class="tcm-meta">
+                  <text class="tcm-pos" wx:if="{{m._posText}}">{{m._posText}}</text>
+                  <text class="tcm-mmr">{{(m.calibrate_mmr || 0)}}分</text>
+                </view>
+                <!-- 操作按钮 -->
+                <view class="tcm-actions" wx:if="{{actions.manage_teams.allowed && !isArchived && event.event_status < 4}}">
+                  <view class="tcm-set-capt {{m.id === item.captain_id ? 'tcm-is-capt' : ''}}" catchtap="setTeamCaptain" data-team-id="{{item.team_id}}" data-player-id="{{m.id}}">
+                    <text>{{m.id === item.captain_id ? '👑' : '♔'}}</text>
+                  </view>
+                  <view class="tcm-remove" catchtap="removeFromTeam" data-team-id="{{item.team_id}}" data-player-id="{{m.id}}">
+                    <text>×</text>
+                  </view>
+                </view>
+              </view>
+            </view>
+            <!-- 放入提示 -->
+            <view class="tc-drop-hint" wx:if="{{selectedPlayerId && actions.manage_teams.allowed && !isArchived && event.event_status < 4}}">
+              <text>📥 点击放入此队</text>
             </view>
           </view>
         </view>
       </view>
 
       <!-- 只读提示 -->
-      <view class="team-readonly-tip" wx:if="{{event.event_status >= 4}}">
-        <text>🔒 对战中/已归档，队伍信息为只读状态</text>
+      <view class="team-readonly-tip" wx:if="{{event.event_status >= 4 || isArchived}}">
+        <text>🔒 {{isArchived ? '赛事已归档，队伍信息为只读' : '对战中，队伍信息为只读状态'}}</text>
       </view>
     </view>
 
@@ -480,6 +598,31 @@
       <view class="modal-btns">
         <view class="modal-btn btn-secondary" bindtap="hideArchiveBtn"><text>取消</text></view>
         <view class="modal-btn btn-danger" bindtap="doArchive" loading="{{archiveSubmitting}}"><text>确认归档</text></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 自动分队：输入组数弹窗 -->
+  <view class="modal-mask" wx:if="{{showTeamCountModal}}" catchtouchmove="preventMove">
+    <view class="modal-box tcm-box">
+      <text class="modal-title">自动分队</text>
+      <text class="modal-content">当前赛事共 {{signupTotal || signupCount}} 名报名选手，请输入要分成的组数：</text>
+      <view class="tcm-input-row">
+        <input
+          class="tcm-input"
+          type="number"
+          value="{{autoTeamCount}}"
+          placeholder="请输入组数"
+          bindinput="onTeamCountInput"
+          focus="{{showTeamCountModal}}"
+          maxlength="4"
+        />
+        <text class="tcm-unit">组</text>
+      </view>
+      <text class="tcm-hint">建议每组5人，当前建议 {{autoTeamSuggestion}} 组</text>
+      <view class="modal-btns">
+        <view class="modal-btn btn-secondary" bindtap="closeTeamCountModal"><text>取消</text></view>
+        <view class="modal-btn btn-primary-confirm" bindtap="confirmAutoAllocate"><text>开始分队</text></view>
       </view>
     </view>
   </view>

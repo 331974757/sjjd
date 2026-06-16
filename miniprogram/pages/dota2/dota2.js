@@ -342,7 +342,10 @@ Page({
     const lockTimer = setTimeout(() => { this._loading = false }, 5000)
     try {
       const res = await api.get('/players', { pageSize: 1000 })
-      const all = res.data || []
+      const all = (res.data || []).map(p => ({
+        ...p,
+        calibrateRankName: R.normalizeRankName(p.calibrateRankName)
+      }))
 
       this.setData({
         allPlayers: all,
@@ -446,6 +449,24 @@ Page({
   // 点击游戏标签中间的 + 号
   onGamePlusTap() {
     wx.showToast({ title: '更多精彩内容后续开放', icon: 'none', duration: 2000 })
+  },
+
+  // 刷新按钮：重新加载当前页面数据
+  async onRefreshTap() {
+    wx.showLoading({ title: '刷新中...' })
+    try {
+      const tab = this.data.subTab
+      if (tab === 'profile') {
+        await this.loadAllPlayers()
+      } else if (tab === 'rules') {
+        await this.loadRuleEvents()
+      } else if (tab === 'history') {
+        await this.loadEvents(true)
+      }
+      wx.hideLoading()
+    } catch (e) {
+      wx.hideLoading()
+    }
   },
 
   // 子分页切换

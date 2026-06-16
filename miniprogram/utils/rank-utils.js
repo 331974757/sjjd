@@ -48,9 +48,61 @@ function getRankIcon(title) {
   return RANK_ICONS[tier] || ''
 }
 
+// ====== 等效 MMR 计算（对齐服务端 rank-score.js） ======
+const EQUIVALENT_MMR = {
+  '先锋':     { base: 0,    step: 180 },
+  '卫士':     { base: 900,  step: 170 },
+  '中军':     { base: 1750, step: 180 },
+  '统帅':     { base: 2650, step: 140 },
+  '传奇':     { base: 3350, step: 180 },
+  '万古流芳': { base: 4250, step: 170 },
+  '超凡入圣': { base: 5100, step: 180 },
+  '冠绝一世': { base: 6000, step: 0 }
+}
+
+/**
+ * 根据段位中文名 + 星级 推算等效 MMR
+ * @param {string} rankName - 段位中文名，如'超凡入圣'
+ * @param {number} star - 星级 1-5
+ * @param {number|null} actualMmr - 实际 MMR（优先使用）
+ * @returns {number}
+ */
+function calcEquivalentMmr(rankName, star, actualMmr) {
+  // 有实际 MMR 直接用
+  if (actualMmr != null && actualMmr > 0) return Number(actualMmr)
+  // 未定段/无段位 → 0 分
+  if (!rankName) return 0
+  const cfg = EQUIVALENT_MMR[rankName]
+  if (!cfg) return 0
+  // 冠绝一世没有星级
+  if (rankName === '冠绝一世') return cfg.base
+  const s = Math.max(1, Math.min(5, star || 1))
+  const score = cfg.base + (s - 1) * cfg.step
+  return Math.max(score, 100)
+}
+
 // 判断图标是否为图片路径
 function isRankIconImage(icon) {
   return icon && icon.indexOf(RANK_ICON_IMAGE_PREFIX) === 0
+}
+
+// ====== 段位名标准化（处理拼音/英文存储为中文显示） ======
+const RANK_NORMALIZE_MAP = {
+  'xianfeng': '先锋', 'weishi': '卫士', 'zhongjun': '中军', 'tongshuai': '统帅',
+  'chuanqi': '传奇', 'wanguliufang': '万古流芳', 'wangugu': '万古流芳',
+  'chaofanrusheng': '超凡入圣', 'chaofan': '超凡入圣',
+  'guanjueyishi': '冠绝一世', 'guanjue': '冠绝一世',
+  'herald': '先锋', 'guardian': '卫士', 'crusader': '中军',
+  'archon': '统帅', 'legend': '传奇',
+  'ancient': '万古流芳', 'divine': '超凡入圣', 'immortal': '冠绝一世'
+}
+function normalizeRankName(name) {
+  if (!name) return ''
+  if (RANK_OPTIONS.includes(name)) return name
+  const base = name.replace(/\d+$/, '')
+  if (RANK_NORMALIZE_MAP[base.toLowerCase()]) return RANK_NORMALIZE_MAP[base.toLowerCase()]
+  if (RANK_NORMALIZE_MAP[name.toLowerCase()]) return RANK_NORMALIZE_MAP[name.toLowerCase()]
+  return name
 }
 
 module.exports = {
@@ -62,7 +114,9 @@ module.exports = {
   RANK_COLORS,
   calcRankLabel,
   calcRankSort,
+  calcEquivalentMmr,
   getRankTier,
   getRankIcon,
-  isRankIconImage
+  isRankIconImage,
+  normalizeRankName
 }

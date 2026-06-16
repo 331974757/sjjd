@@ -10,8 +10,10 @@
  * ============================================================
  */
 
-// 【引入第3轮分队算法】蛇形均衡分队引擎
+// 【引入第3轮分队算法】均衡分队引擎
 const { allocateTeams } = require('./utils/team-allocation');
+// 段位分值计算（用于保存队伍时计算等效 MMR）
+const { getScore } = require('./utils/rank-score');
 
 const crypto = require('crypto');
 
@@ -35,7 +37,7 @@ function genId() {
 async function getPlayersByIds(pool, ids) {
   if (!ids || !ids.length) return [];
   const [rows] = await pool.query(
-    'SELECT id, wx_nickname, calibrate_rank_name, calibrate_rank_star, avatar_url, game_id FROM dota2_players WHERE id IN (?)',
+    'SELECT id, wx_nickname, calibrate_rank_name, calibrate_rank_star, calibrate_mmr, calibrate_rank_sort, avatar_url, game_id, good_at_positions, signup_position FROM dota2_players WHERE id IN (?)',
     [ids]
   );
   return rows;
@@ -54,7 +56,7 @@ async function validateEvent(pool, eventId) {
 // 超管权限校验（复用现有 getCallerRole）
 // ============================================================
 async function assertSuperAdmin(req, res, getCallerRole) {
-  const openid = req.query.openid || '';
+  const openid = req._openid || '';
   const role = await getCallerRole(openid);
   if (role !== 'super_admin') {
     res.status(403).json({ success: false, error: '仅超级管理员可操作' });
@@ -347,7 +349,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
       const now = Date.now();
       await pool.query(
         'INSERT INTO dota2_events (event_id, event_name, creator_id, event_status, start_time, is_archived, created_at, updated_at) VALUES (?, ?, ?, 0, ?, 0, ?, ?)',
-        [eventId, eventName, req.query.openid || '', startTime || null, now, now]
+        [eventId, eventName, req._openid || '', startTime || null, now, now]
       );
 
       res.json({ success: true, data: { eventId } });
@@ -402,7 +404,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
       // ── 【生成唯一 event_id】（varchar类型，雪花风格） ──
       var eventId = genId();
       var now = Date.now();
-      var openid = req.query.openid || '';
+      var openid = req._openid || '';
 
       // ── 【数据入库】初始状态=0(创建中)，is_archived=0(未归档) ──
       // 注意：event_desc 字段需要在 dota2_events 表中存在
@@ -435,7 +437,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
           var now2 = Date.now();
           var eventName2 = (req.body.event_name || '').trim();
           var startTime2 = req.body.start_time || null;
-          var openid2 = req.query.openid || '';
+          var openid2 = req._openid || '';
 
           await pool.query(
             'INSERT INTO dota2_events (event_id, event_name, creator_id, event_status, start_time, is_archived, created_at, updated_at) VALUES (?, ?, ?, 0, ?, 0, ?, ?)',
@@ -481,10 +483,11 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
         return res.status(403).json({ success: false, error: '赛事已归档，不可修改基本信息', code: 'ARCHIVED' });
       }
 
-      const { eventName, startTime } = req.body;
+      const { eventName, eventDesc, startTime } = req.body;
       const sets = [];
       const values = [];
       if (eventName !== undefined) { sets.push('event_name = ?'); values.push(eventName); }
+      if (eventDesc !== undefined) { sets.push('event_desc = ?'); values.push(eventDesc); }
       if (startTime !== undefined) { sets.push('start_time = ?'); values.push(startTime); }
 
       if (sets.length > 0) {
@@ -695,7 +698,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
       if (!event) return res.status(404).json({ success: false, error: '赛事不存在' });
 
       // 权限判断：普通用户只能看有效报名，管理员看全部
-      const openid = req.query.openid || '';
+      const openid = req._openid || '';
       const role = await getCallerRole(openid);
       const isAdmin = role === 'admin' || role === 'super_admin';
 
@@ -742,7 +745,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
       const event = await validateEvent(pool, eventId);
       if (!event) return res.status(404).json({ success: false, error: '赛事不存在' });
 
-      const openid = req.query.openid || '';
+      const openid = req._openid || '';
       // 通过 openid 获取用户设置的 nick_name
       const [userRows] = await pool.query('SELECT nick_name FROM dota2_users WHERE openid = ?', [openid]);
       const userNick = (userRows.length && userRows[0].nick_name) ? userRows[0].nick_name : '';
@@ -809,7 +812,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
         return res.status(400).json({ success: false, error: statusCheck.error, code: 'EVENT_NOT_OPEN' });
       }
 
-      const openid = req.query.openid || '';
+      const openid = req._openid || '';
 
       // 【校验2】昵称匹配：通过 openid 获取 nick_name，精确匹配选手档案
       const [userRows] = await pool.query('SELECT nick_name FROM dota2_users WHERE openid = ?', [openid]);
@@ -826,22 +829,40 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
 
       const playerId = matchResult.playerId;
 
-      // 【校验3】重复报名检查（同一赛事同一选手不可重复报名）
+      // 【校验3】检查是否已有报名记录（不限制状态），处理已取消重新报名场景
       const [existing] = await pool.query(
-        'SELECT signup_id FROM dota2_event_signup WHERE event_id = ? AND player_id = ? AND signup_status = 1',
+        'SELECT signup_id, signup_status FROM dota2_event_signup WHERE event_id = ? AND player_id = ?',
         [eventId, playerId]
       );
+
+      const now = Date.now();
       if (existing.length > 0) {
-        return res.status(400).json({
-          success: false,
-          error: '您已报名当前赛事',
-          code: 'ALREADY_SIGNED'
+        if (existing[0].signup_status === 1) {
+          return res.status(400).json({
+            success: false,
+            error: '您已报名当前赛事',
+            code: 'ALREADY_SIGNED'
+          });
+        }
+        // 之前取消过（status=0），重新激活
+        await pool.query(
+          'UPDATE dota2_event_signup SET signup_status = 1, signup_type = 0, operator_id = ?, created_at = ? WHERE signup_id = ?',
+          [openid, now, existing[0].signup_id]
+        );
+        return res.json({
+          success: true,
+          data: {
+            signupId: existing[0].signup_id,
+            playerId,
+            playerInfo: matchResult.playerInfo,
+            signupType: 'self_signup',
+            message: '报名成功'
+          }
         });
       }
 
       // 【执行报名】创建报名记录，signup_type=0(自主报名)，记录 operator_id
       const signupId = genId();
-      const now = Date.now();
       await pool.query(
         'INSERT INTO dota2_event_signup (signup_id, event_id, player_id, signup_type, signup_status, operator_id, created_at) VALUES (?, ?, ?, 0, 1, ?, ?)',
         [signupId, eventId, playerId, openid, now]
@@ -883,7 +904,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
         return res.status(403).json({ success: false, error: '赛事已归档，不可添加报名', code: 'ARCHIVED' });
       }
 
-      const openid = req.query.openid || '';
+      const openid = req._openid || '';
       const { playerId } = req.body;
       if (!playerId) return res.status(400).json({ success: false, error: '选手ID不能为空' });
 
@@ -894,37 +915,50 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
       );
       if (!players.length) return res.status(404).json({ success: false, error: '选手不存在' });
 
-      // 检查是否已报名
+      // 【修复】查询任意状态的已有记录（不限于status=1），处理已取消重新报名场景
       const [existing] = await pool.query(
-        'SELECT signup_id FROM dota2_event_signup WHERE event_id = ? AND player_id = ? AND signup_status = 1',
+        'SELECT signup_id, signup_status FROM dota2_event_signup WHERE event_id = ? AND player_id = ?',
         [eventId, playerId]
       );
-      if (existing.length > 0) {
-        return res.status(400).json({ success: false, error: '该选手已报名本赛事', code: 'ALREADY_SIGNED' });
-      }
 
-      try {
-        const signupId = genId();
-        const now = Date.now();
-        await pool.query(
-          'INSERT INTO dota2_event_signup (signup_id, event_id, player_id, signup_type, signup_status, operator_id, created_at) VALUES (?, ?, ?, 1, 1, ?, ?)',
-          [signupId, eventId, playerId, openid, now]
-        );
-        res.json({
-          success: true,
-          data: {
-            signupId,
-            playerId,
-            playerInfo: { wxNickname: players[0].wx_nickname, rankName: players[0].calibrate_rank_name, rankStar: players[0].calibrate_rank_star },
-            signupType: 'admin_add'
-          }
-        });
-      } catch (e) {
-        if (e.code === 'ER_DUP_ENTRY') {
+      const now = Date.now();
+      if (existing.length > 0) {
+        const row = existing[0];
+        if (row.signup_status === 1) {
           return res.status(400).json({ success: false, error: '该选手已报名本赛事', code: 'ALREADY_SIGNED' });
         }
-        throw e;
+        // 之前取消过（status=0），重新激活
+        await pool.query(
+          'UPDATE dota2_event_signup SET signup_status = 1, signup_type = 1, operator_id = ?, created_at = ? WHERE signup_id = ?',
+          [openid, now, row.signup_id]
+        );
+        return res.json({
+          success: true,
+          data: {
+            signupId: row.signup_id,
+            playerId,
+            playerInfo: { wxNickname: players[0].wx_nickname, rankName: players[0].calibrate_rank_name, rankStar: players[0].calibrate_rank_star },
+            signupType: 'admin_add',
+            reactivated: true
+          }
+        });
       }
+
+      // 完全新记录
+      const signupId = genId();
+      await pool.query(
+        'INSERT INTO dota2_event_signup (signup_id, event_id, player_id, signup_type, signup_status, operator_id, created_at) VALUES (?, ?, ?, 1, 1, ?, ?)',
+        [signupId, eventId, playerId, openid, now]
+      );
+      res.json({
+        success: true,
+        data: {
+          signupId,
+          playerId,
+          playerInfo: { wxNickname: players[0].wx_nickname, rankName: players[0].calibrate_rank_name, rankStar: players[0].calibrate_rank_star },
+          signupType: 'admin_add'
+        }
+      });
     } catch (e) {
       res.status(500).json({ success: false, error: e.message });
     }
@@ -949,7 +983,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
         return res.status(403).json({ success: false, error: '赛事已归档，不可添加报名', code: 'ARCHIVED' });
       }
 
-      const openid = req.query.openid || '';
+      const openid = req._openid || '';
       const { playerIds } = req.body;
       if (!playerIds || !playerIds.length) {
         return res.status(400).json({ success: false, error: '选手ID列表不能为空' });
@@ -960,17 +994,30 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
 
       for (const playerId of playerIds) {
         try {
-          // 检查是否已报名
+          // 【修复】查询任意状态的已有记录（不限于status=1），处理已取消重新报名场景
           const [existing] = await pool.query(
-            'SELECT signup_id FROM dota2_event_signup WHERE event_id = ? AND player_id = ? AND signup_status = 1',
+            'SELECT signup_id, signup_status FROM dota2_event_signup WHERE event_id = ? AND player_id = ?',
             [eventId, playerId]
           );
           if (existing.length > 0) {
-            results.skipped++;
-            results.details.push({ playerId, status: 'skipped', reason: '已报名' });
+            const row = existing[0];
+            if (row.signup_status === 1) {
+              // 已经有效报名，跳过
+              results.skipped++;
+              results.details.push({ playerId, status: 'skipped', reason: '已报名' });
+            } else {
+              // 之前取消过（status=0），重新激活
+              await pool.query(
+                'UPDATE dota2_event_signup SET signup_status = 1, signup_type = 1, operator_id = ?, created_at = ? WHERE signup_id = ?',
+                [openid, now, row.signup_id]
+              );
+              results.success++;
+              results.details.push({ playerId, status: 'success', signupId: row.signup_id, reactivated: true });
+            }
             continue;
           }
 
+          // 完全新记录
           const signupId = genId();
           await pool.query(
             'INSERT INTO dota2_event_signup (signup_id, event_id, player_id, signup_type, signup_status, operator_id, created_at) VALUES (?, ?, ?, 1, 1, ?, ?)',
@@ -980,7 +1027,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
           results.details.push({ playerId, status: 'success', signupId });
         } catch (e) {
           results.failed++;
-          results.details.push({ playerId, status: 'failed', reason: e.code === 'ER_DUP_ENTRY' ? '重复报名' : e.message });
+          results.details.push({ playerId, status: 'failed', reason: e.message });
         }
       }
 
@@ -1003,16 +1050,13 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
     try {
       const { eventId, signupId } = req.params;
 
-      const openid = req.query.openid || '';
+      const openid = req._openid || '';
       const role = await getCallerRole(openid);
       const isAdmin = role === 'admin' || role === 'super_admin';
 
       // 【校验1】赛事存在 + 未归档
-      const eventResult = await validateEvent(pool, eventId);
-      if (!eventResult.valid) {
-        return res.status(400).json({ success: false, error: eventResult.error, code: 'EVENT_NOT_FOUND' });
-      }
-      const event = eventResult.event;
+      const event = await validateEvent(pool, eventId);
+      if (!event) return res.status(404).json({ success: false, error: '赛事不存在' });
       if (event.is_archived === 1) {
         return res.status(400).json({ success: false, error: '赛事已归档，不可进行报名操作', code: 'ARCHIVED' });
       }
@@ -1192,7 +1236,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
       // 查询赛事全部有效报名选手（用于计算自由选手）
       const [allSignups] = await pool.query(
         `SELECT p.id, p.wx_nickname, p.calibrate_rank_name, p.calibrate_rank_star,
-                p.calibrate_mmr, p.calibrate_rank_sort, p.avatar_url, p.good_at_positions
+                p.calibrate_mmr, p.calibrate_rank_sort, p.avatar_url, p.good_at_positions, p.signup_position
          FROM dota2_event_signup s
          JOIN dota2_players p ON s.player_id = p.id
          WHERE s.event_id = ? AND s.signup_status = 1`,
@@ -1266,14 +1310,14 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
         const results = [];
         const now = Date.now();
         for (const t of teams) {
-          // 后端自动计算 total_mmr
+          // 使用 rank-score 模块计算等效总分（含段位+星级推算，未定段=0）
           let totalMmr = 0;
           try {
-            const [mmrRows] = await conn.query(
-              'SELECT COALESCE(SUM(calibrate_mmr), 0) as total FROM dota2_players WHERE id IN (?)',
+            const [playerRows] = await conn.query(
+              'SELECT id, calibrate_mmr, calibrate_rank_sort, calibrate_rank_star FROM dota2_players WHERE id IN (?)',
               [t.playerIds]
             );
-            totalMmr = mmrRows[0].total || 0;
+            totalMmr = playerRows.reduce((sum, p) => sum + getScore(p).score, 0);
           } catch (_) { /* MMR 计算失败不影响建队 */ }
 
           const teamId = genId();
@@ -1322,7 +1366,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
       // 从报名池获取所有有效报名选手（含段位/MMR/位置信息）
       const [signupPlayers] = await pool.query(
         `SELECT p.id, p.wx_nickname, p.calibrate_mmr, p.calibrate_rank_sort,
-                p.calibrate_rank_star, p.calibrate_rank_name, p.good_at_positions,
+                p.calibrate_rank_star, p.calibrate_rank_name, p.good_at_positions, p.signup_position,
                 p.avatar_url
          FROM dota2_event_signup s
          JOIN dota2_players p ON s.player_id = p.id
@@ -1346,7 +1390,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
 
       const prefix = teamNamePrefix || '战队';
 
-      // 【调用第3轮分队算法】蛇形均衡分配
+      // 【调用均衡分队算法】
       const allocation = allocateTeams(signupPlayers, count);
 
       // 算法返回了硬错误（如选手不足）
@@ -1398,9 +1442,9 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
       const event = await validateEvent(pool, eventId);
       if (!event) return res.status(404).json({ success: false, error: '赛事不存在' });
 
-      // 状态流转：仅分组锁定(3) → 对战中(4)
-      if (event.event_status !== 3) {
-        const msgs = { 0: '创建中', 1: '报名中', 2: '报名截止', 4: '对战中', 5: '已归档' };
+      // 状态流转：报名截止(2) 或 分组锁定(3) → 对战中(4)
+      if (event.event_status !== 2 && event.event_status !== 3) {
+        const msgs = { 0: '创建中', 1: '报名中', 5: '已归档' };
         const msg = msgs[event.event_status] || '当前状态';
         return res.status(400).json({
           success: false,
@@ -1844,7 +1888,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
 
       // 【执行判定】更新胜方 + 状态 + 操作留痕
       const judgeTime = Date.now();
-      const judgeId = req.query.openid || '';
+      const judgeId = req._openid || '';
 
       await pool.query(
         'UPDATE dota2_event_matches SET winner_id = ?, match_status = 2, judge_id = ?, judge_time = ? WHERE match_id = ? AND event_id = ?',
@@ -2004,7 +2048,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
       // 【第7轮修改】状态 4→5，不同时设置归档标记
       // 归档操作由独立的 /archive 接口完成，中间允许设置名次
       const now = Date.now();
-      const openid = req.query.openid || '';
+      const openid = req._openid || '';
       await pool.query(
         'UPDATE dota2_events SET event_status = 5, ended_by = ?, ended_at = ?, updated_at = ? WHERE event_id = ?',
         [openid, now, now, eventId]
@@ -2068,7 +2112,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
 
       // 【执行归档】设置 is_archived=1 + 记录操作人与时间
       const now = Date.now();
-      const openid = req.query.openid || '';
+      const openid = req._openid || '';
       await pool.query(
         'UPDATE dota2_events SET is_archived = 1, archived_by = ?, archived_at = ?, updated_at = ? WHERE event_id = ?',
         [openid, now, now, eventId]
@@ -2174,7 +2218,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
         rankNumSet.add(rn);
       }
 
-      const openid = req.query.openid || '';
+      const openid = req._openid || '';
       const now = Date.now();
 
       // 【事务操作】删除旧数据 + 批量插入新数据
@@ -2244,7 +2288,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
         const rankId = genId();
         await pool.query(
           'INSERT INTO dota2_event_ranks (rank_id, event_id, rank_num, team_id, operator_id, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-          [rankId, eventId, rankNum, teamId, req.query.openid || '', Date.now()]
+          [rankId, eventId, rankNum, teamId, req._openid || '', Date.now()]
         );
         res.json({ success: true, data: { rankId } });
       } catch (e) {
@@ -2288,7 +2332,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
 
       if (sets.length > 0) {
         sets.push('operator_id = ?');
-        values.push(req.query.openid || '', rankId, eventId);
+        values.push(req._openid || '', rankId, eventId);
         await pool.query(
           'UPDATE dota2_event_ranks SET ' + sets.join(', ') + ' WHERE rank_id = ? AND event_id = ?',
           values
@@ -2334,7 +2378,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
    */
   app.get('/api/rules', async (req, res) => {
     try {
-      const openid = req.query.openid || '';
+      const openid = req._openid || '';
       const role = await getCallerRole(openid);
       const isAdmin = role === 'admin' || role === 'super_admin';
 
@@ -2437,7 +2481,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
       const ruleId = genId();
       await pool.query(
         'INSERT INTO dota2_event_rules (rule_id, event_id, rule_title, rule_content, version, rule_status, creator_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)',
-        [ruleId, eventId || null, ruleTitle, ruleContent, version || 1, req.query.openid || '', Date.now(), Date.now()]
+        [ruleId, eventId || null, ruleTitle, ruleContent, version || 1, req._openid || '', Date.now(), Date.now()]
       );
 
       res.json({ success: true, data: { ruleId } });

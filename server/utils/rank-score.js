@@ -144,6 +144,14 @@ function getScore(player) {
   const rankSort = Number(player.calibrate_rank_sort) || 0;
   const star = Number(player.calibrate_rank_star) || 0;
 
+  // 未定段/无有效段位 → 0 分
+  if (rankSort <= 0) {
+    return {
+      score: 0,
+      source: 'unranked',
+    };
+  }
+
   // 冠绝一世（rank_sort=8）：无星级，固定 6000
   if (rankSort === 8) {
     return {
@@ -158,16 +166,17 @@ function getScore(player) {
     // 确保星级在有效范围内 [1, 5]
     const clampedStar = Math.max(1, Math.min(5, star || 1));
     const equivalentScore = rankCfg.baseScore + (clampedStar - 1) * rankCfg.stepPerStar;
+    // 有段位的最低 100 分
     return {
-      score: equivalentScore,
+      score: Math.max(equivalentScore, 100),
       source: 'rank_formula',
     };
   }
 
-  // 兜底：rankSort 无效，给保守默认分（中军中间水平，3000分），避免分组严重失衡
+  // 兜底：rankSort 不在 1-8 范围内 → 0 分（视为未定段）
   return {
-    score: 3000,
-    source: 'default_unknown',
+    score: 0,
+    source: 'unranked',
   };
 }
 

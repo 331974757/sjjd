@@ -23,6 +23,9 @@
     <view class="game-plus" bindtap="onGamePlusTap">
       <text class="plus-icon">+</text>
     </view>
+    <view class="game-refresh" bindtap="onRefreshTap">
+      <text class="refresh-icon">⟳</text>
+    </view>
   </view>
 
   <!-- ====== Dota2 区域 ====== -->
@@ -46,7 +49,7 @@
 
     <!-- 搜索栏 -->
     <view class="search-bar">
-      <input class="search-input" placeholder="搜索微信昵称 / Dota2 游戏昵称" value="{{_searchText}}" bindinput="onKeywordInput" bindconfirm="onSearchConfirm" />
+      <input class="search-input" type="text" placeholder="搜索微信昵称 / Dota2 游戏昵称" placeholder-style="color:#4a5568;font-size:26rpx;" value="{{_searchText}}" bindinput="onKeywordInput" bindconfirm="onSearchConfirm" cursor-spacing="100" adjust-position="{{true}}" />
       <view class="search-clear" wx:if="{{_searchText}}" bindtap="clearSearch">✕</view>
     </view>
 

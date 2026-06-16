@@ -13,7 +13,7 @@
  *   1. 分值预处理：调用 rank-score.getScore() 为每位选手计算最终分值
  *      （优先 calibrate_mmr > 0，否则按 rank_sort + rank_star 推算等效分）
  *   2. 强制规则：mustSameTeam → 打包虚拟选手；mustNotSameTeam → 冲突表
- *   3. 蛇形分配：按分值降序 → 蛇形分配 → 禁同队跳过冲突队伍
+ *   3. 轮选分配：按分值降序 → 轮选分配 → 禁同队跳过冲突队伍
  *   4. 位置补全：每队必须1-5号位齐全，缺失时跨队交换（MMR差值≤阈值）
  *   5. 输出：队伍结果 + 均衡度统计 + 警告
  *
@@ -145,7 +145,7 @@ function allocateTeams(playerList, teamCount, forceRules = {}, config = {}) {
     players, forceRules, playerMap, warnings
   );
 
-  // === 第3步：蛇形分配 ===
+  // === 第3步：轮选分配 ===
   let teams = snakeDraft(players, teamCount, forceGroups, antigroups, warnings);
 
   // === 第4步：位置补全微调（如果启用了位置强制校验） ===
@@ -180,7 +180,7 @@ function allocateTeams(playerList, teamCount, forceRules = {}, config = {}) {
  * 将 mustSameTeam / mustNotSameTeam 预处理为内部使用的分组结构
  *
  * - forceGroups：Map<groupId, Set<playerId>>
- *     同组选手打包成一个"虚拟分配单元"，按平均分参与蛇形排序
+ *     同组选手打包成一个"虚拟分配单元"，按平均分参与轮选排序
  * - antigroups：Set<"A|B">
  *     禁止同队的选手对，分配时跳过冲突队伍
  */
@@ -239,14 +239,14 @@ function buildForceConstraints(players, forceRules, playerMap, warnings) {
 
 
 // ============================================================
-// 第3步：蛇形分配（Serpentine Draft）
+// 第3步：轮选分配（Serpentine Draft，均衡分队核心）
 // ============================================================
 
 /**
- * 蛇形分配算法
+ * 轮选分配算法
  *
  * 【原理】
- *   所有选手/虚拟组按分值降序排列后，按蛇形方向逐一分配：
+ *   所有选手/虚拟组按分值降序排列后，按轮选方向逐一分配：
  *     第1轮：队1 → 队2 → ... → 队N（正序）
  *     第2轮：队N → 队N-1 → ... → 队1（逆序）
  *     循环往复
@@ -308,7 +308,7 @@ function snakeDraft(players, teamCount, forceGroups, antigroups, warnings) {
   // === 3.2 按分值降序排列 ===
   queue.sort((a, b) => b._score - a._score);
 
-  // === 3.3 蛇形分配 ===
+  // === 3.3 轮选分配 ===
   let direction = 1;   // 1=正序，-1=逆序
   let currentIdx = 0;
 
@@ -328,7 +328,7 @@ function snakeDraft(players, teamCount, forceGroups, antigroups, warnings) {
         }
         assigned = true;
 
-        // 移动到下一队（蛇形方向）
+        // 移动到下一队（轮选方向）
         currentIdx += direction;
         if (currentIdx >= teamCount) {
           currentIdx = teamCount - 1;
