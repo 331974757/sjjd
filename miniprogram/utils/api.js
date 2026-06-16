@@ -3,23 +3,27 @@ const API_BASE = 'https://congqin.online/api'
 
 // 缓存 openid 避免每次都调 getApp
 let _openidCache = null
+let _openidFetched = false  // 标记是否已完成首次获取（防止空串死循环）
 
 async function getOpenId() {
   if (_openidCache) return _openidCache
+  if (_openidFetched) return ''  // 已尝试过且结果为空的，不再重试
   try {
     const app = getApp()
     // 如果 globalData.openid 为空，等待 app.getOpenId() 完成
     if (!app.globalData.openid) {
       await app.getOpenId()
     }
-    _openidCache = app.globalData.openid || ''
+    const result = app.globalData.openid || ''
+    _openidCache = result
+    _openidFetched = true
+    return result
   } catch (e) { /* 静默降级 */ }
-  return _openidCache || ''
+  _openidFetched = true
+  return ''
 }
 
-async function request(options, retryCount) {
-  retryCount = retryCount || 0
-  const MAX_RETRIES = 1  // GET 请求最多重试1次
+async function request(options) {
   const openid = await getOpenId()
   let url = API_BASE + options.url
   const method = (options.method || 'GET').toUpperCase()
@@ -50,7 +54,7 @@ async function request(options, retryCount) {
       url: url,
       method: method,
       data: data,
-      timeout: 15000,
+      timeout: 8000,  // 8 秒超时，避免 App Service 层累计超时触发 SystemError
       header: { 'Content-Type': 'application/json' },
       success: (res) => {
         // 200~499 都 resolve，让调用方通过 res.success 判断业务成败
@@ -62,13 +66,7 @@ async function request(options, retryCount) {
         }
       },
       fail: (err) => {
-        if (method === 'GET' && retryCount < MAX_RETRIES) {
-          setTimeout(() => {
-            request(options, retryCount + 1).then(resolve).catch(reject)
-          }, 1000)
-        } else {
-          reject(err)
-        }
+        reject(err)
       }
     })
   })

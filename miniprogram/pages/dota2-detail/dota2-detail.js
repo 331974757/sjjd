@@ -176,9 +176,7 @@ Page({
       this.setData({ showRankModal: false, rankPickedIndex: -1, starPickedIndex: -1 })
       this.updateFields({
         calibrateRankName: '冠绝一世',
-        calibrateRankStar: 0,
-        calibrateRankLabel: R.calcRankLabel('冠绝一世', 0),
-        calibrateRankSort: R.calcRankSort('冠绝一世', 0)
+        calibrateRankStar: 0
       })
       return
     }
@@ -194,9 +192,7 @@ Page({
     this.setData({ showRankModal: false, rankPickedIndex: -1, starPickedIndex: -1 })
     this.updateFields({
       calibrateRankName: newTitle,
-      calibrateRankStar: star,
-      calibrateRankLabel: R.calcRankLabel(newTitle, star),
-      calibrateRankSort: R.calcRankSort(newTitle, star)
+      calibrateRankStar: star
     })
   },
 

@@ -123,19 +123,19 @@ function mapUser(row) {
 app.get('/api/players', async (req, res) => {
   try {
     const { rank, position, keyword, page, pageSize } = req.query;
-    let sql = 'SELECT * FROM dota2_players WHERE 1=1';
+    let where = ' WHERE 1=1';
     const params = [];
-    if (rank) { sql += ' AND calibrate_rank_name = ?'; params.push(rank); }
-    if (position) { sql += ' AND FIND_IN_SET(?, signup_position)'; params.push(String(position)); }
+    if (rank) { where += ' AND calibrate_rank_name = ?'; params.push(rank); }
+    if (position) { where += ' AND FIND_IN_SET(?, signup_position)'; params.push(String(position)); }
     if (keyword) {
-      sql += ' AND (wx_nickname LIKE ? OR steam_id LIKE ? OR game_id LIKE ?)';
+      where += ' AND (wx_nickname LIKE ? OR steam_id LIKE ? OR game_id LIKE ?)';
       const kw = '%' + keyword + '%'; params.push(kw, kw, kw);
     }
     const p = parseInt(page) || 1, ps = parseInt(pageSize) || 20;
-    sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
-    params.push(ps, (p - 1) * ps);
-    const [rows] = await pool.query(sql, params);
-    const [[{ total }]] = await pool.query('SELECT COUNT(*) as total FROM dota2_players');
+    const sql = 'SELECT * FROM dota2_players' + where + ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    const countSql = 'SELECT COUNT(*) as total FROM dota2_players' + where;
+    const [rows] = await pool.query(sql, [...params, ps, (p - 1) * ps]);
+    const [[{ total }]] = await pool.query(countSql, params);
     res.json({ success: true, data: rows.map(mapPlayer), total, page: p, pageSize: ps });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
@@ -278,37 +278,43 @@ app.post('/api/players/batch-delete', async (req, res) => {
 });
 
 app.post('/api/players/import', async (req, res) => {
+  const conn = await pool.getConnection();
   try {
-    if (!await assertAdmin(req, res)) return;
+    if (!await assertAdmin(req, res)) { conn.release(); return; }
     const { players } = req.body;
     let inserted = 0, updated = 0;
+    await conn.beginTransaction();
     for (const p of players) {
       const wxNickname = p.wxNickname || '';
       const igp = Array.isArray(p.goodAtPositions) ? p.goodAtPositions.join(',') : (p.goodAtPositions || '');
       const isp = Array.isArray(p.signupPosition) ? p.signupPosition.join(',') : (p.signupPosition || '');
-      const label = p.calibrateRankLabel || computeRankLabel(p.calibrateRankName, p.calibrateRankStar);
-      const sort = p.calibrateRankSort || computeRankSort(p.calibrateRankName, p.calibrateRankStar);
-      // 查找是否已存在同名选手
-      const [existing] = await pool.query('SELECT id FROM dota2_players WHERE wx_nickname = ?', [wxNickname]);
+      // 后端统一计算段位，不信任前端传值
+      const label = computeRankLabel(p.calibrateRankName, p.calibrateRankStar);
+      const sort = computeRankSort(p.calibrateRankName, p.calibrateRankStar);
+      const [existing] = await conn.query('SELECT id FROM dota2_players WHERE wx_nickname = ?', [wxNickname]);
       if (existing.length > 0) {
-        // 覆盖更新已有记录
-        await pool.query(
+        await conn.query(
           'UPDATE dota2_players SET steam_id=?, game_id=?, calibrate_rank_name=?, calibrate_rank_star=?, calibrate_rank_label=?, calibrate_rank_sort=?, good_at_positions=?, signup_position=?, avatar_url=?, updated_at=NOW() WHERE wx_nickname=?',
           [p.steamId || '', p.gameId || '', p.calibrateRankName || '', p.calibrateRankStar || 0, label, sort, igp, isp, p.avatarUrl || '', wxNickname]
         );
         updated++;
       } else {
-        // 新增记录
         const id = Date.now().toString(16) + Math.random().toString(16).slice(2, 10);
-        await pool.query(
+        await conn.query(
           'INSERT INTO dota2_players (id, wx_nickname, steam_id, game_id, calibrate_rank_name, calibrate_rank_star, calibrate_rank_label, calibrate_rank_sort, good_at_positions, signup_position, avatar_url, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW())',
           [id, wxNickname, p.steamId || '', p.gameId || '', p.calibrateRankName || '', p.calibrateRankStar || 0, label, sort, igp, isp, p.avatarUrl || '']
         );
         inserted++;
       }
     }
+    await conn.commit();
     res.json({ success: true, imported: inserted + updated, inserted, updated });
-  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+  } catch (e) {
+    await conn.rollback();
+    res.status(500).json({ success: false, error: e.message });
+  } finally {
+    conn.release();
+  }
 });
 
 // XLSX 文件导入（服务端解析）
@@ -334,9 +340,9 @@ app.post('/api/players/import/xlsx', uploadXlsx.single('file'), async (req, res)
       '比赛报名位置': 'signupPosition', 'signupPosition': 'signupPosition', 'signupposition': 'signupPosition',
     };
 
-    let imported = 0, updated = 0, failed = 0;
+    // 先做预校验，筛出不合格行
+    const validRows = [];
     const errors = [];
-
     for (let i = 0; i < rows.length; i++) {
       const rawRow = rows[i];
       const row = {};
@@ -344,37 +350,47 @@ app.post('/api/players/import/xlsx', uploadXlsx.single('file'), async (req, res)
         const mapped = colMap[key.trim()] || colMap[key.trim().toLowerCase()];
         if (mapped) row[mapped] = String(rawRow[key] || '').trim();
       }
+      if (!row.wxNickname) { errors.push({ row: i + 2, msg: '微信群昵称缺失' }); continue; }
+      if (!row.gameId) { errors.push({ row: i + 2, msg: 'Dota2游戏昵称缺失' }); continue; }
+      validRows.push({ row, index: i });
+    }
 
-      if (!row.wxNickname) { errors.push({ row: i + 2, msg: '微信群昵称缺失' }); failed++; continue; }
-      if (!row.gameId) { errors.push({ row: i + 2, msg: 'Dota2游戏昵称缺失' }); failed++; continue; }
-
-      try {
+    // 事务写入（全部有效行一次性提交）
+    let imported = 0, updated = 0;
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      for (const { row } of validRows) {
         const gpos = row.goodAtPositions || '';
         const spos = row.signupPosition || '';
         const rankName = row.calibrateRankName || '';
         const rankStar = parseInt(row.calibrateRankStar) || 0;
         const label = computeRankLabel(rankName, rankStar);
         const sort = computeRankSort(rankName, rankStar);
-        // 查找是否已存在同名选手
-        const [existing] = await pool.query('SELECT id FROM dota2_players WHERE wx_nickname = ?', [row.wxNickname]);
+        const [existing] = await conn.query('SELECT id FROM dota2_players WHERE wx_nickname = ?', [row.wxNickname]);
         if (existing.length > 0) {
-          // 覆盖更新已有记录
-          await pool.query(
+          await conn.query(
             'UPDATE dota2_players SET steam_id=?, game_id=?, calibrate_rank_name=?, calibrate_rank_star=?, calibrate_rank_label=?, calibrate_rank_sort=?, good_at_positions=?, signup_position=?, updated_at=NOW() WHERE wx_nickname=?',
             [row.steamId || '', row.gameId, rankName, rankStar, label, sort, gpos, spos, row.wxNickname]
           );
           updated++;
         } else {
-          // 新增记录
-          await pool.query(
+          await conn.query(
             'INSERT INTO dota2_players (id, wx_nickname, steam_id, game_id, calibrate_rank_name, calibrate_rank_star, calibrate_rank_label, calibrate_rank_sort, good_at_positions, signup_position, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,NOW(),NOW())',
             [Date.now().toString(16) + Math.random().toString(16).slice(2, 10), row.wxNickname, row.steamId || '', row.gameId, rankName, rankStar, label, sort, gpos, spos]
           );
           imported++;
         }
-      } catch (e) { errors.push({ row: i + 2, msg: e.message }); failed++; }
+      }
+      await conn.commit();
+    } catch (e) {
+      await conn.rollback();
+      errors.push({ row: 0, msg: '写入事务失败: ' + e.message });
+      imported = 0; updated = 0;
+    } finally {
+      conn.release();
     }
-    res.json({ success: true, imported, updated, failed, errors });
+    res.json({ success: true, imported, updated, failed: errors.length, errors });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 

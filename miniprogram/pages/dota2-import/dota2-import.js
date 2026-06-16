@@ -60,7 +60,7 @@ Page({
     const templateUrl = api.API_BASE + '/players/template/xlsx'
     wx.downloadFile({
       url: templateUrl,
-      timeout: 15000,
+      timeout: 10000,  // 与 wx.request 超时保持一致
       success: (res) => {
         wx.hideLoading()
         if (res.statusCode === 200 && res.tempFilePath) {

@@ -235,8 +235,6 @@ Page({
         gameId: gameId,
         calibrateRankName: rankTitle,
         calibrateRankStar: this.data.rankStars,
-        calibrateRankLabel: R.calcRankLabel(rankTitle, this.data.rankStars),
-        calibrateRankSort: R.calcRankSort(rankTitle, this.data.rankStars),
         goodAtPositions: goodAtPositions,
         signupPosition: signupPosition
       })
