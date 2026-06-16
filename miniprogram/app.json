@@ -4,7 +4,9 @@
     "pages/dota2-detail/dota2-detail",
     "pages/dota2-add/dota2-add",
     "pages/dota2-import/dota2-import",
-    "pages/admin/admin"
+    "pages/admin/admin",
+    "pages/event-detail/event-detail",
+    "pages/event-signup-manage/event-signup-manage"
   ],
   "window": {
     "backgroundTextStyle": "dark",

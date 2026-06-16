@@ -188,9 +188,37 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
   });
 
   /**
+   * 【状态流转校验工具】校验赛事状态流转合法性
+   * 合法流向：0(创建中)→1(报名中)→2(报名截止)→3(分组锁定)→4(对战中)→5(已归档)
+   * 仅允许正向顺序流转（不允许跳跃或回退）
+   * @param {number} currentStatus - 当前状态
+   * @param {number} targetStatus  - 目标状态
+   * @returns {{ valid: boolean, error: string }}
+   */
+  function validateStatusTransition(currentStatus, targetStatus) {
+    if (currentStatus === targetStatus) {
+      return { valid: false, error: '赛事已是该状态，无需重复操作' };
+    }
+    // 仅允许向后流转到下一个状态（严格顺序：0→1→2→3→4→5）
+    if (targetStatus === currentStatus + 1) {
+      return { valid: true, error: '' };
+    }
+    return { valid: false, error: '赛事状态流转不合法，仅允许按顺序依次推进（创建中→报名中→报名截止→分组锁定→对战中→已归档）' };
+  }
+
+  /**
+   * 获取赛事状态中文名称（用于提示信息）
+   */
+  function getStatusName(status) {
+    const map = { 0: '创建中', 1: '报名中', 2: '报名截止', 3: '分组锁定', 4: '对战中', 5: '已归档' };
+    return map[status] || '未知';
+  }
+
+  /**
    * 更新赛事状态（admin/super_admin）
    * PUT /api/events/:eventId/status
    * Body: { eventStatus }  - 0创建中/1报名中/2报名截止/3分组锁定/4对战中/5已归档
+   * - 增加状态流转合法性校验：仅允许正向顺序流转
    */
   app.put('/api/events/:eventId/status', async (req, res) => {
     try {
@@ -204,11 +232,25 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
         return res.status(400).json({ success: false, error: '无效的赛事状态，有效值0-5' });
       }
 
+      // 【状态流转校验】校验从当前状态流转到目标状态是否合法
+      const transition = validateStatusTransition(event.event_status, eventStatus);
+      if (!transition.valid) {
+        return res.status(400).json({ success: false, error: transition.error });
+      }
+
       await pool.query(
         'UPDATE dota2_events SET event_status = ?, updated_at = ? WHERE event_id = ?',
         [eventStatus, Date.now(), eventId]
       );
-      res.json({ success: true });
+      res.json({
+        success: true,
+        data: {
+          fromStatus: event.event_status,
+          fromStatusName: getStatusName(event.event_status),
+          toStatus: eventStatus,
+          toStatusName: getStatusName(eventStatus)
+        }
+      });
     } catch (e) {
       res.status(500).json({ success: false, error: e.message });
     }
@@ -238,12 +280,77 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
   // ════════════════════════════════════════════════════════════
   // 2. 报名管理模块（dota2_event_signup）
   // ════════════════════════════════════════════════════════════
+  //
+  // 【核心校验逻辑说明】
+  // - 自主报名：通过 openid → nick_name → wx_nickname 精确匹配选手档案
+  //   ① 唯一匹配 → 自动关联 player_id 创建报名记录
+  //   ② 多条匹配 → 返回错误「昵称匹配到多个选手档案，请联系管理员手动添加报名」
+  //   ③ 无匹配 → 返回错误「未找到对应选手档案，请先完善选手信息后再报名」
+  // - 管理员添加：无昵称校验，直接通过 player_id 或搜索后批量添加
+  // - 所有操作绑定 event_id 做数据隔离，禁止跨赛事操作
+  // - 所有管理员操作记录 operator_id，便于操作留痕
+
+  /**
+   * 【报名状态前置校验工具】
+   * 校验赛事当前状态是否允许报名操作
+   * @returns {{ valid: boolean, error: string, event: object|null }}
+   */
+  async function validateSignupEvent(pool, eventId) {
+    const event = await validateEvent(pool, eventId);
+    if (!event) return { valid: false, error: '赛事不存在', event: null };
+    if (event.event_status !== 1) {
+      // 根据不同状态给出具体提示
+      const statusMap = { 0: '赛事尚未开启报名', 2: '报名已截止', 3: '赛事已进入分组阶段', 4: '赛事对战中', 5: '赛事已归档' };
+      const msg = statusMap[event.event_status] || '当前赛事不在报名阶段';
+      return { valid: false, error: msg, event };
+    }
+    return { valid: true, error: '', event };
+  }
+
+  /**
+   * 【昵称匹配校验工具】通过用户 nick_name 精确匹配选手档案
+   * 用于自主报名时的身份校验
+   * @param {string} nickName - 用户设置的微信昵称（来自 dota2_users.nick_name）
+   * @returns {{ success: boolean, code: string, playerId: string|null, message: string }}
+   */
+  async function matchPlayerByNickname(pool, nickName) {
+    if (!nickName || !nickName.trim()) {
+      return { success: false, code: 'NICKNAME_EMPTY', playerId: null, message: '请先设置您的昵称后再报名' };
+    }
+
+    // 精确匹配 wx_nickname（区分大小写，保证身份唯一性）
+    const [rows] = await pool.query(
+      'SELECT id, wx_nickname, calibrate_rank_name, calibrate_rank_star FROM dota2_players WHERE wx_nickname = ?',
+      [nickName.trim()]
+    );
+
+    if (rows.length === 0) {
+      return {
+        success: false, code: 'PLAYER_NOT_FOUND', playerId: null,
+        message: '未找到对应选手档案，请先完善选手信息后再报名'
+      };
+    }
+
+    if (rows.length > 1) {
+      return {
+        success: false, code: 'MULTIPLE_MATCH', playerId: null,
+        message: '昵称匹配到多个选手档案，请联系管理员手动添加报名'
+      };
+    }
+
+    // 唯一匹配成功
+    return {
+      success: true, code: 'MATCH_OK', playerId: rows[0].id,
+      message: '',
+      playerInfo: { wxNickname: rows[0].wx_nickname, rankName: rows[0].calibrate_rank_name, rankStar: rows[0].calibrate_rank_star }
+    };
+  }
 
   /**
    * 获取某赛事的报名列表（含选手信息）
    * GET /api/events/:eventId/signups?status=1&page=1&pageSize=20
    * - 普通用户仅可查看有效报名(status=1)
-   * - 管理员可查看全部
+   * - 管理员可查看全部（含已取消）
    */
   app.get('/api/events/:eventId/signups', async (req, res) => {
     try {
@@ -271,7 +378,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
       const p = parseInt(page) || 1;
       const ps = parseInt(pageSize) || 50;
       const sql = `
-        SELECT s.*, p.wx_nickname, p.calibrate_rank_name, p.calibrate_rank_star, p.avatar_url
+        SELECT s.*, p.wx_nickname, p.calibrate_rank_name, p.calibrate_rank_star, p.avatar_url, p.calibrate_mmr
         FROM dota2_event_signup s
         LEFT JOIN dota2_players p ON s.player_id = p.id
         ${where} ORDER BY s.created_at DESC LIMIT ? OFFSET ?
@@ -288,41 +395,192 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
   });
 
   /**
-   * 选手自主报名（user 可操作）
-   * POST /api/events/:eventId/signups
-   * Body: { playerId }
-   * - 校验赛事状态必须为报名中(eventStatus=1)
-   * - 联合唯一索引兜底防重复
+   * 查询当前用户在指定赛事的报名状态
+   * GET /api/events/:eventId/my-signup
+   * - 通过 openid → nick_name → wx_nickname 匹配找到选手 → 查询报名记录
+   * - 返回：是否已报名、报名详情（已取消也返回历史记录）
    */
-  app.post('/api/events/:eventId/signups', async (req, res) => {
+  app.get('/api/events/:eventId/my-signup', async (req, res) => {
     try {
       const { eventId } = req.params;
       const event = await validateEvent(pool, eventId);
       if (!event) return res.status(404).json({ success: false, error: '赛事不存在' });
 
-      // 校验赛事状态：仅报名中(1)可报名
-      if (event.event_status !== 1) {
-        return res.status(400).json({ success: false, error: '当前赛事不在报名阶段' });
+      const openid = req.query.openid || '';
+      // 通过 openid 获取用户设置的 nick_name
+      const [userRows] = await pool.query('SELECT nick_name FROM dota2_users WHERE openid = ?', [openid]);
+      const userNick = (userRows.length && userRows[0].nick_name) ? userRows[0].nick_name : '';
+
+      if (!userNick) {
+        return res.json({ success: true, data: { signedUp: false, reason: '未设置昵称' } });
       }
 
+      // 精确匹配选手
+      const matchResult = await matchPlayerByNickname(pool, userNick);
+      if (!matchResult.success) {
+        return res.json({ success: true, data: { signedUp: false, reason: matchResult.message } });
+      }
+
+      // 查询报名记录（含已取消，取最新一条）
+      const [signups] = await pool.query(
+        'SELECT * FROM dota2_event_signup WHERE event_id = ? AND player_id = ? ORDER BY created_at DESC LIMIT 1',
+        [eventId, matchResult.playerId]
+      );
+
+      if (signups.length === 0) {
+        return res.json({ success: true, data: { signedUp: false, playerId: matchResult.playerId, playerInfo: matchResult.playerInfo } });
+      }
+
+      const signup = signups[0];
+      res.json({
+        success: true,
+        data: {
+          signedUp: signup.signup_status === 1,
+          signupId: signup.signup_id,
+          playerId: signup.player_id,
+          signupType: signup.signup_type === 1 ? 'admin_add' : 'self_signup',
+          signupStatus: signup.signup_status,
+          signupTime: signup.created_at,
+          playerInfo: matchResult.playerInfo,
+          // 如果之前取消过，返回提示
+          wasCancelled: signup.signup_status === 0
+        }
+      });
+    } catch (e) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  /**
+   * 【核心接口】选手自主报名（user 可操作，强制昵称匹配校验）
+   * POST /api/events/:eventId/signups
+   * - 不需要传 playerId，后端通过 openid → nick_name → wx_nickname 自动匹配
+   * - 三步校验链：赛事状态检查 → 昵称匹配选手 → 重复报名检查
+   * - 错误码对照：
+   *   EVENT_NOT_OPEN     赛事不在报名阶段
+   *   NICKNAME_EMPTY     用户未设置昵称
+   *   PLAYER_NOT_FOUND   未匹配到选手档案
+   *   MULTIPLE_MATCH     匹配到多条选手记录
+   *   ALREADY_SIGNED     已报名当前赛事
+   */
+  app.post('/api/events/:eventId/signups', async (req, res) => {
+    try {
+      const { eventId } = req.params;
+
+      // 【校验1】赛事状态：仅报名中(eventStatus=1)允许操作
+      const statusCheck = await validateSignupEvent(pool, eventId);
+      if (!statusCheck.valid) {
+        return res.status(400).json({ success: false, error: statusCheck.error, code: 'EVENT_NOT_OPEN' });
+      }
+
+      const openid = req.query.openid || '';
+
+      // 【校验2】昵称匹配：通过 openid 获取 nick_name，精确匹配选手档案
+      const [userRows] = await pool.query('SELECT nick_name FROM dota2_users WHERE openid = ?', [openid]);
+      const userNick = (userRows.length && userRows[0].nick_name) ? userRows[0].nick_name : '';
+      const matchResult = await matchPlayerByNickname(pool, userNick);
+
+      if (!matchResult.success) {
+        return res.status(400).json({
+          success: false,
+          error: matchResult.message,
+          code: matchResult.code
+        });
+      }
+
+      const playerId = matchResult.playerId;
+
+      // 【校验3】重复报名检查（同一赛事同一选手不可重复报名）
+      const [existing] = await pool.query(
+        'SELECT signup_id FROM dota2_event_signup WHERE event_id = ? AND player_id = ? AND signup_status = 1',
+        [eventId, playerId]
+      );
+      if (existing.length > 0) {
+        return res.status(400).json({
+          success: false,
+          error: '您已报名当前赛事',
+          code: 'ALREADY_SIGNED'
+        });
+      }
+
+      // 【执行报名】创建报名记录，signup_type=0(自主报名)，记录 operator_id
+      const signupId = genId();
+      const now = Date.now();
+      await pool.query(
+        'INSERT INTO dota2_event_signup (signup_id, event_id, player_id, signup_type, signup_status, operator_id, created_at) VALUES (?, ?, ?, 0, 1, ?, ?)',
+        [signupId, eventId, playerId, openid, now]
+      );
+
+      res.json({
+        success: true,
+        data: {
+          signupId,
+          playerId,
+          playerInfo: matchResult.playerInfo,
+          signupType: 'self_signup',
+          message: '报名成功'
+        }
+      });
+    } catch (e) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  /**
+   * 管理员添加报名（admin/super_admin，无需昵称匹配校验）
+   * POST /api/events/:eventId/signups/admin
+   * Body: { playerId }
+   * - signup_type=1 标记为管理员添加
+   * - 记录 operator_id 为当前操作管理员 openid
+   */
+  app.post('/api/events/:eventId/signups/admin', async (req, res) => {
+    try {
+      if (!await assertAdmin(req, res)) return;
+      const { eventId } = req.params;
+
+      // 校验赛事存在（管理员添加不严格要求报名中状态，可在任意阶段操作）
+      const event = await validateEvent(pool, eventId);
+      if (!event) return res.status(404).json({ success: false, error: '赛事不存在' });
+
+      const openid = req.query.openid || '';
       const { playerId } = req.body;
       if (!playerId) return res.status(400).json({ success: false, error: '选手ID不能为空' });
 
       // 校验选手是否存在
-      const [players] = await pool.query('SELECT id FROM dota2_players WHERE id = ?', [playerId]);
+      const [players] = await pool.query(
+        'SELECT id, wx_nickname, calibrate_rank_name, calibrate_rank_star FROM dota2_players WHERE id = ?',
+        [playerId]
+      );
       if (!players.length) return res.status(404).json({ success: false, error: '选手不存在' });
+
+      // 检查是否已报名
+      const [existing] = await pool.query(
+        'SELECT signup_id FROM dota2_event_signup WHERE event_id = ? AND player_id = ? AND signup_status = 1',
+        [eventId, playerId]
+      );
+      if (existing.length > 0) {
+        return res.status(400).json({ success: false, error: '该选手已报名本赛事', code: 'ALREADY_SIGNED' });
+      }
 
       try {
         const signupId = genId();
+        const now = Date.now();
         await pool.query(
-          'INSERT INTO dota2_event_signup (signup_id, event_id, player_id, signup_type, signup_status, created_at) VALUES (?, ?, ?, 0, 1, ?)',
-          [signupId, eventId, playerId, Date.now()]
+          'INSERT INTO dota2_event_signup (signup_id, event_id, player_id, signup_type, signup_status, operator_id, created_at) VALUES (?, ?, ?, 1, 1, ?, ?)',
+          [signupId, eventId, playerId, openid, now]
         );
-        res.json({ success: true, data: { signupId } });
+        res.json({
+          success: true,
+          data: {
+            signupId,
+            playerId,
+            playerInfo: { wxNickname: players[0].wx_nickname, rankName: players[0].calibrate_rank_name, rankStar: players[0].calibrate_rank_star },
+            signupType: 'admin_add'
+          }
+        });
       } catch (e) {
-        // 联合唯一索引冲突 → 重复报名
         if (e.code === 'ER_DUP_ENTRY') {
-          return res.status(400).json({ success: false, error: '该选手已报名本赛事' });
+          return res.status(400).json({ success: false, error: '该选手已报名本赛事', code: 'ALREADY_SIGNED' });
         }
         throw e;
       }
@@ -332,77 +590,131 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
   });
 
   /**
-   * 管理员添加报名（admin/super_admin）
-   * POST /api/events/:eventId/signups/admin
-   * Body: { playerId }
-   * - signup_type=1 标记为管理员添加
+   * 管理员批量添加报名（admin/super_admin）
+   * POST /api/events/:eventId/signups/batch
+   * Body: { playerIds: string[] }
+   * - 逐条创建报名记录，返回成功/失败明细
+   * - 记录 operator_id 为当前操作管理员 openid
    */
-  app.post('/api/events/:eventId/signups/admin', async (req, res) => {
+  app.post('/api/events/:eventId/signups/batch', async (req, res) => {
     try {
       if (!await assertAdmin(req, res)) return;
       const { eventId } = req.params;
       const event = await validateEvent(pool, eventId);
       if (!event) return res.status(404).json({ success: false, error: '赛事不存在' });
 
-      const { playerId } = req.body;
-      if (!playerId) return res.status(400).json({ success: false, error: '选手ID不能为空' });
-
-      try {
-        const signupId = genId();
-        await pool.query(
-          'INSERT INTO dota2_event_signup (signup_id, event_id, player_id, signup_type, signup_status, created_at) VALUES (?, ?, ?, 1, 1, ?)',
-          [signupId, eventId, playerId, Date.now()]
-        );
-        res.json({ success: true, data: { signupId } });
-      } catch (e) {
-        if (e.code === 'ER_DUP_ENTRY') {
-          return res.status(400).json({ success: false, error: '该选手已报名本赛事' });
-        }
-        throw e;
+      const openid = req.query.openid || '';
+      const { playerIds } = req.body;
+      if (!playerIds || !playerIds.length) {
+        return res.status(400).json({ success: false, error: '选手ID列表不能为空' });
       }
+
+      const results = { success: 0, skipped: 0, failed: 0, details: [] };
+      const now = Date.now();
+
+      for (const playerId of playerIds) {
+        try {
+          // 检查是否已报名
+          const [existing] = await pool.query(
+            'SELECT signup_id FROM dota2_event_signup WHERE event_id = ? AND player_id = ? AND signup_status = 1',
+            [eventId, playerId]
+          );
+          if (existing.length > 0) {
+            results.skipped++;
+            results.details.push({ playerId, status: 'skipped', reason: '已报名' });
+            continue;
+          }
+
+          const signupId = genId();
+          await pool.query(
+            'INSERT INTO dota2_event_signup (signup_id, event_id, player_id, signup_type, signup_status, operator_id, created_at) VALUES (?, ?, ?, 1, 1, ?, ?)',
+            [signupId, eventId, playerId, openid, now]
+          );
+          results.success++;
+          results.details.push({ playerId, status: 'success', signupId });
+        } catch (e) {
+          results.failed++;
+          results.details.push({ playerId, status: 'failed', reason: e.code === 'ER_DUP_ENTRY' ? '重复报名' : e.message });
+        }
+      }
+
+      res.json({ success: true, data: results });
     } catch (e) {
       res.status(500).json({ success: false, error: e.message });
     }
   });
 
   /**
-   * 取消报名（用户取消自己/管理员取消任意）
+   * 取消报名（用户取消自己 / 管理员取消任意）
    * DELETE /api/events/:eventId/signups/:signupId
-   * - 逻辑删除：signup_status 设为 0
-   * - 普通用户只能取消自己的报名
+   * - 软删除：signup_status 设为 0，不物理删除记录
+   * - 校验赛事状态为「报名中」(eventStatus=1)
+   * - 普通用户只能取消自己的报名（通过昵称匹配验证身份）
+   * - 管理员可取消任意报名
+   * - 记录操作人 operator_id
    */
   app.delete('/api/events/:eventId/signups/:signupId', async (req, res) => {
     try {
       const { eventId, signupId } = req.params;
-      const event = await validateEvent(pool, eventId);
-      if (!event) return res.status(404).json({ success: false, error: '赛事不存在' });
+
+      // 【校验1】赛事状态：取消报名仅允许在报名中阶段
+      const statusCheck = await validateSignupEvent(pool, eventId);
+      if (!statusCheck.valid) {
+        return res.status(400).json({ success: false, error: statusCheck.error, code: 'EVENT_NOT_OPEN' });
+      }
 
       const openid = req.query.openid || '';
       const role = await getCallerRole(openid);
       const isAdmin = role === 'admin' || role === 'super_admin';
 
+      // 查询报名记录
       const [signups] = await pool.query(
         'SELECT * FROM dota2_event_signup WHERE signup_id = ? AND event_id = ?',
         [signupId, eventId]
       );
       if (!signups.length) return res.status(404).json({ success: false, error: '报名记录不存在' });
+      if (signups[0].signup_status === 0) {
+        return res.status(400).json({ success: false, error: '该报名记录已取消' });
+      }
 
-      // 普通用户需验证是否是自己的报名（通过 player_id 关联 wx_nickname 匹配）
+      // 【校验2】普通用户需验证身份：通过 nick_name 匹配选手的 wx_nickname
       if (!isAdmin) {
         const [userRows] = await pool.query('SELECT nick_name FROM dota2_users WHERE openid = ?', [openid]);
         const userNick = (userRows.length && userRows[0].nick_name) ? userRows[0].nick_name : '';
         const [playerRows] = await pool.query('SELECT wx_nickname FROM dota2_players WHERE id = ?', [signups[0].player_id]);
         if (!playerRows.length || playerRows[0].wx_nickname !== userNick) {
-          return res.status(403).json({ success: false, error: '仅可取消自己的报名' });
+          return res.status(403).json({ success: false, error: '仅可取消自己的报名', code: 'NOT_OWNER' });
         }
       }
 
-      // 逻辑删除：设为无效
+      // 【执行取消】软删除：signup_status = 0，记录操作人
       await pool.query(
-        'UPDATE dota2_event_signup SET signup_status = 0 WHERE signup_id = ? AND event_id = ?',
-        [signupId, eventId]
+        'UPDATE dota2_event_signup SET signup_status = 0, operator_id = ? WHERE signup_id = ? AND event_id = ?',
+        [openid, signupId, eventId]
       );
-      res.json({ success: true });
+      res.json({ success: true, data: { signupId, message: '已取消报名' } });
+    } catch (e) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  /**
+   * 选手检索（通过昵称模糊搜索，供报名管理页面使用）
+   * GET /api/search/players?keyword=xxx&limit=20
+   * - 使用独立路由前缀避免与 /api/players/:id 冲突
+   * - 返回字段包含 id, wx_nickname, calibrate_rank_name, calibrate_rank_star, calibrate_mmr, avatar_url
+   */
+  app.get('/api/search/players', async (req, res) => {
+    try {
+      const { keyword, limit } = req.query;
+      if (!keyword) return res.json({ success: true, data: [] });
+
+      // 模糊搜索 wx_nickname
+      const [rows] = await pool.query(
+        'SELECT id, wx_nickname, game_id, calibrate_rank_name, calibrate_rank_star, calibrate_mmr, calibrate_rank_sort, avatar_url, good_at_positions FROM dota2_players WHERE wx_nickname LIKE ? ORDER BY calibrate_rank_sort DESC LIMIT ?',
+        ['%' + keyword + '%', parseInt(limit) || 20]
+      );
+      res.json({ success: true, data: rows });
     } catch (e) {
       res.status(500).json({ success: false, error: e.message });
     }

@@ -1,0 +1,135 @@
+<!--pages/event-signup-manage/event-signup-manage.wxml-->
+<!--【管理员报名人员管理页】左侧已报名列表 + 右侧选手检索 + 批量添加/单个剔除 -->
+<view class="page">
+
+  <!-- 加载中 -->
+  <view class="loading-state" wx:if="{{!loaded}}">
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <block wx:if="{{loaded}}">
+
+    <!-- ====== 顶部赛事信息 ====== -->
+    <view class="top-bar" wx:if="{{event}}">
+      <text class="top-event-name">{{event.event_name}}</text>
+      <text class="top-count">已报名 {{signupCount}} 人</text>
+    </view>
+
+    <!-- ====== 已报名人员列表（左侧区域） ====== -->
+    <view class="section signup-section">
+      <view class="section-title-row">
+        <text class="section-title">已报名人员</text>
+        <text class="section-refresh" bindtap="loadSignups">刷新</text>
+      </view>
+
+      <view class="signup-list" wx:if="{{signups.length > 0}}">
+        <view class="signup-item" wx:for="{{signups}}" wx:key="signup_id">
+          <image class="si-avatar" src="{{item.avatar_url || '/assets/default-avatar.png'}}" mode="aspectFill" />
+          <view class="si-info">
+            <view class="si-name-row">
+              <text class="si-name">{{item.wx_nickname || '未知选手'}}</text>
+              <view class="si-type-tag {{item._typeClass}}">
+                <text>{{item._typeLabel}}</text>
+              </view>
+            </view>
+            <view class="si-rank-row">
+              <text class="si-rank">{{item.calibrate_rank_name || '未定段'}}</text>
+              <text class="si-star" wx:if="{{item.calibrate_rank_star > 0}}">{{item.calibrate_rank_star}}★</text>
+              <text class="si-mmr" wx:if="{{item.calibrate_mmr > 0}}">MMR {{item.calibrate_mmr}}</text>
+            </view>
+          </view>
+          <!-- 剔除按钮 -->
+          <view class="si-remove" bindtap="showRemoveConfirm" data-signup-id="{{item.signup_id}}">
+            <text>✕</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 空状态 -->
+      <view class="empty-state" wx:if="{{signups.length === 0 && !loadingSignups}}">
+        <text class="empty-icon">👥</text>
+        <text class="empty-text">暂无报名人员</text>
+      </view>
+    </view>
+
+    <!-- ====== 选手检索区域（右侧区域） ====== -->
+    <view class="section search-section">
+      <view class="section-title-row">
+        <text class="section-title">选手检索</text>
+      </view>
+
+      <!-- 搜索栏 -->
+      <view class="search-bar">
+        <input
+          class="search-input"
+          placeholder="输入微信昵称搜索选手"
+          value="{{searchKeyword}}"
+          bindinput="onSearchInput"
+          bindconfirm="onSearchConfirm"
+        />
+        <button class="search-btn" bindtap="doSearch" loading="{{searching}}">搜索</button>
+      </view>
+
+      <!-- 搜索结果 -->
+      <view class="search-results" wx:if="{{searchResults.length > 0}}">
+        <view class="result-header">
+          <text class="result-count">找到 {{searchResults.length}} 名选手</text>
+          <button
+            class="result-add-btn {{selectedCount === 0 ? 'add-disabled' : ''}}"
+            bindtap="doBatchAdd"
+            loading="{{loading}}"
+          >添加选中 ({{selectedCount}})</button>
+        </view>
+
+        <view
+          class="result-item {{selectedPlayers[item.id] ? 'item-selected' : ''}} {{item._alreadySigned ? 'item-disabled' : ''}}"
+          wx:for="{{searchResults}}"
+          wx:key="id"
+          bindtap="toggleSelect"
+          data-id="{{item.id}}"
+        >
+          <view class="ri-check">
+            <text wx:if="{{item._alreadySigned}}">✓</text>
+            <text class="check-mark" wx:elif="{{selectedPlayers[item.id]}}">✓</text>
+            <text class="check-empty" wx:else>○</text>
+          </view>
+          <image class="ri-avatar" src="{{item.avatar_url || '/assets/default-avatar.png'}}" mode="aspectFill" />
+          <view class="ri-info">
+            <text class="ri-name">{{item.wx_nickname || '未知'}}</text>
+            <text class="ri-rank">{{item.calibrate_rank_name || '未定段'}}{{item.calibrate_rank_star > 0 ? ' ' + item.calibrate_rank_star + '★' : ''}}</text>
+          </view>
+          <view class="ri-status">
+            <text class="ri-signed" wx:if="{{item._alreadySigned}}">已报名</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 搜索空结果 -->
+      <view class="empty-state" wx:if="{{searched && searchResults.length === 0}}">
+        <text class="empty-icon">🔍</text>
+        <text class="empty-text">未找到匹配选手</text>
+        <text class="empty-sub">请尝试其他关键词</text>
+      </view>
+
+      <!-- 搜索前的提示 -->
+      <view class="search-hint" wx:if="{{!searched && searchResults.length === 0}}">
+        <text class="hint-icon">🔎</text>
+        <text class="hint-text">输入微信昵称搜索选手<br/>选择后批量添加至报名池</text>
+      </view>
+    </view>
+
+  </block>
+
+  <!-- ====== 剔除确认弹窗 ====== -->
+  <view class="modal-mask" wx:if="{{showRemoveConfirm}}" catchtouchmove="preventMove">
+    <view class="modal-box">
+      <text class="modal-title">剔除报名</text>
+      <text class="modal-content">确定将 <text class="modal-name">{{removeTarget.playerName}}</text> 从报名列表中移除吗？</text>
+      <view class="modal-btns">
+        <view class="modal-btn btn-secondary" bindtap="hideRemoveConfirm"><text>取消</text></view>
+        <view class="modal-btn btn-danger" bindtap="doRemoveSignup"><text>确认剔除</text></view>
+      </view>
+    </view>
+  </view>
+
+</view>

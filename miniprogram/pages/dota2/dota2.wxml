@@ -169,11 +169,35 @@
       <text class="ph-sub">内容筹备中，敬请期待</text>
     </view>
 
-    <!-- Dota2 历史赛事 -->
-    <view class="placeholder-page" wx:if="{{subTab === 'history'}}">
-      <text class="ph-icon">🏆</text>
-      <text class="ph-main">Dota2 历史赛事</text>
-      <text class="ph-sub">精彩回顾即将上线</text>
+    <!-- Dota2 历史赛事（第4轮：展示赛事列表） -->
+    <view class="event-list-page" wx:if="{{subTab === 'history'}}">
+      <!-- 加载中 -->
+      <view class="loading-state" wx:if="{{!eventsLoaded}}">
+        <text class="loading-text">加载赛事中...</text>
+      </view>
+
+      <!-- 赛事列表 -->
+      <view class="event-list" wx:if="{{eventsLoaded && eventList.length > 0}}">
+        <view class="event-card-item" wx:for="{{eventList}}" wx:key="event_id" bindtap="goEventDetail" data-event-id="{{item.event_id}}">
+          <view class="eci-left">
+            <text class="eci-name">{{item.event_name}}</text>
+            <text class="eci-time">{{item._timeLabel}}</text>
+          </view>
+          <view class="eci-right">
+            <view class="eci-status eci-s{{item.event_status}}">
+              <text>{{item._statusName}}</text>
+            </view>
+            <text class="eci-arrow">›</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 空状态 -->
+      <view class="empty-state" wx:if="{{eventsLoaded && eventList.length === 0}}">
+        <text class="empty-icon">🏆</text>
+        <text class="empty-text">暂无赛事记录</text>
+        <text class="empty-sub">精彩赛事即将开启</text>
+      </view>
     </view>
 
   </block>

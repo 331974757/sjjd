@@ -47,6 +47,11 @@ Page({
     selectedCount: 0,
     statusBarHeight: 44,
     _searchText: '',
+    // 【第4轮新增】历史赛事列表
+    eventsLoaded: false,
+    eventsLoading: false,
+    eventList: [],
+    eventStatusMap: { 0: '创建中', 1: '报名中', 2: '报名截止', 3: '分组锁定', 4: '对战中', 5: '已归档' },
   },
 
   onLoad() {
@@ -407,6 +412,45 @@ Page({
     const tab = e.currentTarget.dataset.tab
     if (tab === this.data.subTab) return
     this.setData({ subTab: tab })
+    // 【第4轮】切换到历史赛事时加载赛事列表
+    if (tab === 'history' && !this.data.eventsLoaded) {
+      this.loadEvents()
+    }
+  },
+
+  // 【第4轮新增】加载赛事列表（历史赛事Tab使用）
+  async loadEvents() {
+    if (this.data.eventsLoading) return
+    this.setData({ eventsLoading: true })
+    try {
+      const res = await api.get('/events', { pageSize: 50 })
+      if (res.success) {
+        const list = (res.data || []).map(e => ({
+          ...e,
+          _statusName: this.data.eventStatusMap[e.event_status] || '未知',
+          _timeLabel: this.formatEventTime(e.start_time)
+        }))
+        this.setData({ eventList: list, eventsLoaded: true })
+      }
+    } catch (e) {
+      console.error('[历史赛事] 加载失败', e)
+    } finally {
+      this.setData({ eventsLoading: false })
+    }
+  },
+
+  // 格式化赛事时间
+  formatEventTime(ts) {
+    if (!ts) return '待定'
+    const d = new Date(parseInt(ts))
+    return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0')
+  },
+
+  // 【第4轮新增】跳转赛事详情页
+  goEventDetail(e) {
+    const eventId = e.currentTarget.dataset.eventId
+    if (!eventId) return
+    wx.navigateTo({ url: '/pages/event-detail/event-detail?eventId=' + eventId })
   },
 
 
