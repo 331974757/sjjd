@@ -75,10 +75,13 @@
         <view class="ftag {{rankFilter === 'immortal' ? 'ftag-on' : ''}}" bindtap="onRankFilter" data-rank="immortal">冠绝一世</view>
       </scroll-view>
     </view>
-    <!-- 第三行：操作按钮（左排序 / 右功能） -->
+    <!-- 第三行：操作按钮（左排序+重置 / 右功能） -->
     <view class="action-row">
-      <view class="tbtn-sort {{sortFilter === 'rank-desc' ? 'sort-desc' : 'sort-asc'}}" bindtap="onSortToggle">
-        <text>段位</text><text class="sort-arrow">{{sortFilter === 'rank-desc' ? '↓' : '↑'}}</text>
+      <view class="action-left">
+        <view class="tbtn-sort {{sortFilter === 'rank-desc' ? 'sort-desc' : 'sort-asc'}}" bindtap="onSortToggle">
+          <text>段位</text><text class="sort-arrow">{{sortFilter === 'rank-desc' ? '↓' : '↑'}}</text>
+        </view>
+        <view class="tbtn-reset" bindtap="resetFilters">↻</view>
       </view>
       <view class="action-right">
         <view class="tbtn-icon chart-btn {{showChart ? 'chart-active' : ''}}" bindtap="toggleChart">◔</view>
@@ -162,23 +165,25 @@
 
     </block>
 
-    <!-- Dota2 赛事章程 -->
-    <view class="placeholder-page" wx:if="{{subTab === 'rules'}}">
-      <text class="ph-icon">📋</text>
-      <text class="ph-main">Dota2 赛事章程</text>
-      <text class="ph-sub">内容筹备中，敬请期待</text>
-    </view>
+    <!-- Dota2 赛事章程（进行中赛事） -->
+    <view class="event-list-page" wx:if="{{subTab === 'rules'}}">
+      <!-- 标题栏 + 新建按钮（仅管理员可见） -->
+      <view class="rules-header">
+        <text class="rules-header-title">赛事章程</text>
+        <view class="rules-create-btn" wx:if="{{isAdmin}}" bindtap="showCreateEventModal">
+          <text class="rules-create-icon">+</text>
+          <text class="rules-create-text">新建赛事</text>
+        </view>
+      </view>
 
-    <!-- Dota2 历史赛事（第4轮：展示赛事列表） -->
-    <view class="event-list-page" wx:if="{{subTab === 'history'}}">
       <!-- 加载中 -->
-      <view class="loading-state" wx:if="{{!eventsLoaded}}">
+      <view class="loading-state" wx:if="{{!rulesLoaded}}">
         <text class="loading-text">加载赛事中...</text>
       </view>
 
       <!-- 赛事列表 -->
-      <view class="event-list" wx:if="{{eventsLoaded && eventList.length > 0}}">
-        <view class="event-card-item" wx:for="{{eventList}}" wx:key="event_id" bindtap="goEventDetail" data-event-id="{{item.event_id}}">
+      <view class="event-list" wx:if="{{rulesLoaded && ruleEventList.length > 0}}">
+        <view class="event-card-item" wx:for="{{ruleEventList}}" wx:key="event_id" bindtap="goEventDetail" data-event-id="{{item.event_id}}">
           <view class="eci-left">
             <text class="eci-name">{{item.event_name}}</text>
             <text class="eci-time">{{item._timeLabel}}</text>
@@ -192,11 +197,112 @@
         </view>
       </view>
 
+      <!-- 空状态（管理员提示可直接新建） -->
+      <view class="empty-state" wx:if="{{rulesLoaded && ruleEventList.length === 0}}">
+        <text class="empty-icon">📋</text>
+        <text class="empty-text">暂无进行中的赛事</text>
+        <text class="empty-sub" wx:if="{{isAdmin}}">点击上方「+ 新建赛事」创建第一场赛事</text>
+        <text class="empty-sub" wx:elif="{{true}}">请联系管理员创建赛事</text>
+      </view>
+    </view>
+
+    <!-- Dota2 历史赛事（第8轮：完整增强版，支持搜索+前三名展示+分页加载） -->
+    <view class="event-list-page" wx:if="{{subTab === 'history'}}">
+      <!-- 搜索栏 -->
+      <view class="history-search-bar">
+        <input
+          class="history-search-input"
+          placeholder="搜索历史赛事名称"
+          value="{{historySearchText}}"
+          bindinput="onHistorySearchInput"
+          bindconfirm="onHistorySearchConfirm"
+        />
+        <view class="history-search-clear" wx:if="{{historySearchText}}" bindtap="clearHistorySearch">✕</view>
+      </view>
+
+      <!-- 加载中 -->
+      <view class="loading-state" wx:if="{{!eventsLoaded}}">
+        <text class="loading-text">加载赛事中...</text>
+      </view>
+
+      <!-- 赛事列表（增强卡片） -->
+      <view class="event-list" wx:if="{{eventsLoaded && eventList.length > 0}}">
+        <view
+          class="history-card"
+          wx:for="{{eventList}}"
+          wx:key="event_id"
+          bindtap="goEventDetail"
+          data-event-id="{{item.event_id}}"
+        >
+          <!-- 卡片头部：赛事名称 + 状态 -->
+          <view class="hcard-header">
+            <text class="hcard-name">{{item.event_name}}</text>
+            <view class="hcard-status">
+              <text>已归档</text>
+            </view>
+          </view>
+
+          <!-- 赛事基本信息行 -->
+          <view class="hcard-meta">
+            <view class="hcard-meta-item">
+              <text class="hmeta-icon">📅</text>
+              <text class="hmeta-text">{{item._timeLabel}}</text>
+            </view>
+            <view class="hcard-meta-item">
+              <text class="hmeta-icon">👥</text>
+              <text class="hmeta-text">{{item._signupCount || 0}} 人参赛</text>
+            </view>
+          </view>
+
+          <!-- 前三名展示（领奖台） -->
+          <view class="hcard-podium" wx:if="{{item._topRanks.length > 0}}">
+            <view
+              class="hpodium-item {{rank.rankNum === 1 ? 'hp-gold' : rank.rankNum === 2 ? 'hp-silver' : 'hp-bronze'}}"
+              wx:for="{{item._topRanks}}"
+              wx:key="rankNum"
+              wx:for-item="rank"
+            >
+              <text class="hp-medal">
+                {{rank.rankNum === 1 ? '🥇' : rank.rankNum === 2 ? '🥈' : '🥉'}}
+              </text>
+              <text class="hp-team-name">{{rank.teamName}}</text>
+            </view>
+          </view>
+
+          <!-- 无排名提示 -->
+          <view class="hcard-no-ranks" wx:if="{{item._topRanks.length === 0}}">
+            <text class="hnr-text">未记录名次</text>
+          </view>
+
+          <!-- 查看详情箭头 -->
+          <view class="hcard-footer">
+            <text class="hcard-detail-link">查看详情 ›</text>
+          </view>
+        </view>
+
+        <!-- 加载更多 -->
+        <view class="history-load-more" wx:if="{{eventHasMore}}">
+          <view class="hlm-btn" wx:if="{{!eventLoadingMore}}" bindtap="loadMoreEvents">
+            <text>加载更多</text>
+          </view>
+          <view class="hlm-loading" wx:if="{{eventLoadingMore}}">
+            <text>加载中...</text>
+          </view>
+        </view>
+
+        <!-- 已加载全部 -->
+        <view class="history-all-loaded" wx:if="{{!eventHasMore && eventList.length > 0}}">
+          <text class="hal-text">已显示全部 {{eventTotal}} 届历史赛事</text>
+        </view>
+      </view>
+
       <!-- 空状态 -->
       <view class="empty-state" wx:if="{{eventsLoaded && eventList.length === 0}}">
         <text class="empty-icon">🏆</text>
-        <text class="empty-text">暂无赛事记录</text>
-        <text class="empty-sub">精彩赛事即将开启</text>
+        <text class="empty-text" wx:if="{{!historySearchText}}">暂无历史赛事</text>
+        <text class="empty-text" wx:if="{{historySearchText}}">未找到匹配的赛事</text>
+        <text class="empty-sub" wx:if="{{!historySearchText}}">赛事归档后将显示在这里</text>
+        <text class="empty-sub" wx:if="{{historySearchText}}">请尝试其他关键词</text>
       </view>
     </view>
 
@@ -242,6 +348,63 @@
       <view class="nick-btn-row">
         <view class="nick-btn nick-btn-cancel" bindtap="closeNickModal"><text>取消</text></view>
         <view class="nick-btn nick-btn-save {{!unlimitedNick && nickChangeCount >= nickChangeLimit ? 'nick-btn-disabled' : ''}}" bindtap="saveNickFromModal"><text>保存</text></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 【赛事创建】新建赛事弹窗 -->
+  <view class="event-create-mask" wx:if="{{showCreateModal}}" catchtouchmove="preventMove">
+    <view class="event-create-modal" catchtap="">
+      <!-- 关闭按钮 -->
+      <view class="ecm-close" bindtap="closeCreateEventModal">
+        <text class="ecm-close-icon">✕</text>
+      </view>
+      <text class="ecm-title">新建赛事</text>
+
+      <!-- 赛事名称（必填） -->
+      <view class="ecm-field">
+        <text class="ecm-label">赛事名称 <text class="ecm-required">*</text></text>
+        <input
+          class="ecm-input"
+          placeholder="请输入赛事名称（2-50字）"
+          value="{{createEventName}}"
+          bindinput="onCreateEventNameInput"
+          maxlength="50"
+          focus="{{showCreateModal}}"
+        />
+      </view>
+
+      <!-- 开始时间（可选） -->
+      <view class="ecm-field">
+        <text class="ecm-label">开始时间</text>
+        <picker class="ecm-picker" mode="date" value="{{createEventDate}}" bindchange="onCreateEventDateChange">
+          <view class="ecm-picker-display">
+            <text class="{{createEventDate ? '' : 'ecm-placeholder'}}">{{createEventDate || '请选择开始日期（可选）'}}</text>
+          </view>
+        </picker>
+      </view>
+
+      <!-- 赛事简介（可选） -->
+      <view class="ecm-field">
+        <text class="ecm-label">赛事简介</text>
+        <textarea
+          class="ecm-textarea"
+          placeholder="请输入赛事简介（可选）"
+          value="{{createEventDesc}}"
+          bindinput="onCreateEventDescInput"
+          maxlength="200"
+          auto-height
+        />
+      </view>
+
+      <!-- 按钮行 -->
+      <view class="ecm-btn-row">
+        <view class="ecm-btn ecm-btn-cancel" bindtap="closeCreateEventModal">
+          <text>取消</text>
+        </view>
+        <view class="ecm-btn ecm-btn-confirm" bindtap="submitCreateEvent">
+          <text>确认创建</text>
+        </view>
       </view>
     </view>
   </view>

@@ -1,6 +1,7 @@
 // pages/event-detail/event-detail.js
-// 【赛事详情页】展示赛事信息 + 报名区域 + 报名人员列表
+// 【赛事详情页】展示赛事信息 + 报名区域 + 报名人员列表 + 对战管理 + 名次设定 + 赛事归档
 // 权限规则：admin/super_admin 拥有完整赛事管理权限，user 仅可查看和自助报名
+// 【第8轮新增】支持 readonly=1 参数，从历史赛事Tab进入时强制纯只读模式
 const api = require('../../utils/api.js')
 const perm = require('../../utils/permission.js')
 
@@ -11,6 +12,9 @@ Page({
     loaded: false,              // 数据是否加载完成
     userRole: '',               // 当前用户角色
     isAdmin: false,             // 是否管理员
+    // 【第8轮新增】纯只读模式标记（从历史赛事Tab进入时为true）
+    readonly: false,            // true=纯只读，无论角色，隐藏所有编辑入口
+    fromHistory: false,         // 来源是否为历史赛事
     // 报名状态（针对当前用户）
     mySignup: null,             // { signedUp, signupId, playerId, signupType, ... }
     // 已报名人员列表
@@ -22,6 +26,37 @@ Page({
     showStatusConfirm: false,   // 状态变更二次确认弹窗
     targetStatus: -1,           // 目标状态
     targetStatusName: '',       // 目标状态中文名
+
+    // ===== 第6轮：对战管理 =====
+    battleTab: 'matches',       // 对战区域标签：matches | rounds
+    rounds: [],                 // 轮次汇总 [{roundNum, matchCount, completedCount, allDone}]
+    currentRound: 0,            // 当前查看的轮次
+    matches: [],                // 当前轮次对战列表
+    totalRounds: 0,             // 总轮次数
+    roundAllDone: false,        // 本轮是否全部完成
+    allBattlesDone: false,      // 所有轮次是否全部完成
+
+    // 胜负判定弹窗
+    showJudgeModal: false,
+    judgeMatch: null,           // 当前判定的对战对象
+    judgeStep: 0,               // 0=选择胜方, 1=二次确认
+    judgeWinnerId: '',          // 选择的胜方ID
+
+    // 下一轮/结束比赛确认弹窗
+    showBattleActionModal: false,
+    battleActionType: '',       // 'next-round' | 'end-battle'
+    battleActionSubmitting: false,
+
+    // ===== 第7轮：名次设定 + 赛事归档 =====
+    isArchived: false,          // 是否已归档（is_archived=1，此时全数据只读）
+    ranks: [],                  // 已有名次列表 [{rank_id, rank_num, team_id, team_name, total_mmr}]
+    rankEditSlots: [],          // 名次编辑槽位 [{rankNum: 1, teamId: '', index: 0}, ...] 默认3个
+    teamsForRank: [],           // 赛事队伍列表（供下拉选择）
+    ranksEditing: false,        // 是否正在编辑名次
+    ranksSaving: false,         // 名次保存中
+    // 归档弹窗
+    showArchiveConfirm: false,
+    archiveSubmitting: false,
   },
 
   onLoad(options) {
@@ -31,39 +66,113 @@ Page({
       setTimeout(() => wx.navigateBack(), 1500)
       return
     }
-    this.setData({ eventId })
+    // 【第8轮新增】读取 readonly 参数：从历史赛事进入时强制纯只读
+    const readonly = options.readonly === '1' || options.readonly === 'true'
+    const fromHistory = options.fromHistory === '1' || options.fromHistory === 'true'
+    this.setData({ eventId, readonly, fromHistory })
+    // 纯只读模式下更新导航栏标题
+    if (readonly) {
+      wx.setNavigationBarTitle({ title: '历史赛事详情' })
+    }
     this.initPage()
   },
 
   onShow() {
-    // 每次显示页面时刷新报名数据（可能从报名管理页返回）
+    // 每次显示页面时刷新数据（可能从报名管理页或对阵编排页返回）
     if (this.data.eventId && this.data.loaded) {
+      // 重新加载赛事状态（状态可能已变更），并刷新权限判断
+      this.loadEvent().then(() => {
+        if (this.data.event) this.updateActionPermissions()
+      })
       this.loadSignups()
       this.loadMySignup()
+      // 如果赛事处于对战中/已归档，刷新对战数据
+      if (this.data.event && this.data.event.event_status >= 4) {
+        this.loadBattleData(this.data.currentRound || 0)
+      }
+      // 【第7轮】赛事已结束，刷新名次数据
+      if (this.data.event && this.data.event.event_status === 5) {
+        this.loadRanks()
+      }
     }
   },
 
   // ====== 页面初始化 ======
   async initPage() {
     try {
-      // 并行拉取：用户角色 + 赛事详情
-      const role = await perm.getRole()
-      const isAdmin = role === 'admin' || role === 'super_admin'
-      this.setData({ userRole: role, isAdmin })
+      // 【第8轮】纯只读模式：跳过权限校验，但仍获取角色用于展示
+      if (this.data.readonly) {
+        const role = await perm.getRole()
+        this.setData({ userRole: role, isAdmin: false }) // 强制 isAdmin=false 隐藏所有编辑入口
+      } else {
+        const role = await perm.getRole()
+        const isAdmin = role === 'admin' || role === 'super_admin'
+        this.setData({ userRole: role, isAdmin })
+      }
 
       await this.loadEvent()
       if (this.data.event) {
+        // 【统一权限】基于 checkAction() 生成按钮状态，保证前后端规则完全一致
+        this.updateActionPermissions()
         // 赛事加载完成后，并行拉取报名信息
-        await Promise.all([
-          this.loadSignups(),
-          this.loadMySignup()
-        ])
+        const tasks = [this.loadSignups(), this.loadMySignup()]
+        // 对战中/已归档：额外加载对战数据
+        if (this.data.event.event_status >= 4) {
+          tasks.push(this.loadBattleData(0))
+        }
+        // 【第7轮】赛事已结束(status=5)：加载名次数据
+        if (this.data.event.event_status === 5) {
+          tasks.push(this.loadRanks())
+        }
+        await Promise.all(tasks)
       }
       this.setData({ loaded: true })
     } catch (e) {
       console.error('[赛事详情] 初始化失败', e)
       this.setData({ loaded: true })
     }
+  },
+
+  // 【统一权限】基于 checkAction() 生成所有按钮的状态对象，保证前后端规则一致
+  updateActionPermissions() {
+    const event = this.data.event
+    if (!event) return
+    const opts = {
+      eventStatus: event.event_status,
+      isArchived: event.is_archived || 0,
+      userRole: this.data.userRole
+    }
+    // 只读模式：所有写操作均禁止
+    if (this.data.readonly) {
+      const empty = { allowed: false, disabled: true, reason: '历史赛事只读' }
+      this.setData({
+        actions: {
+          signup: empty, cancel_signup: empty, edit_event: empty,
+          change_status: empty, manage_signups: empty, manage_teams: empty,
+          lock_teams: empty, manage_matches: empty, manage_ranks: empty,
+          archive_event: empty
+        },
+        signupBtn: empty,
+        cancelSignupBtn: empty,
+        signupDisabledReason: '历史赛事只读'
+      })
+      return
+    }
+    const actions = {}
+    const actionKeys = [
+      'signup', 'cancel_signup', 'edit_event', 'change_status',
+      'manage_signups', 'manage_teams', 'lock_teams',
+      'manage_matches', 'manage_ranks', 'archive_event'
+    ]
+    actionKeys.forEach(key => {
+      actions[key] = perm.checkAction(key, opts)
+    })
+    this.setData({
+      actions,
+      signupBtn: actions.signup,
+      cancelSignupBtn: actions.cancel_signup,
+      signupDisabledReason: actions.signup.reason
+    })
   },
 
   // ====== 加载赛事详情 ======
@@ -76,7 +185,12 @@ Page({
         event._statusName = this.getStatusName(event.event_status)
         event._statusClass = this.getStatusClass(event.event_status)
         event._timeLabel = this.formatTime(event.start_time)
-        this.setData({ event })
+        // 【SEVERE-1修复】同步设置 isArchived，不依赖 loadRanks()
+        this.setData({
+          event,
+          isArchived: event.is_archived === 1,
+          _archiveTimeText: event.archived_at ? '归档时间：' + this.formatTime(event.archived_at) : ''
+        })
       } else {
         wx.showToast({ title: res.error || '赛事不存在', icon: 'none' })
         setTimeout(() => wx.navigateBack(), 1500)
@@ -313,6 +427,447 @@ Page({
     })
   },
 
+  // 【第5轮新增】跳转队伍编组页
+  goTeamEdit() {
+    wx.navigateTo({
+      url: '/pages/event-team-edit/event-team-edit?eventId=' + this.data.eventId
+    })
+  },
+
+  // ============================================================
+  // 【第6轮新增】对战管理
+  // ============================================================
+
+  /** 跳转对战编排页 */
+  goMatchEdit() {
+    wx.navigateTo({
+      url: '/pages/event-match-edit/event-match-edit?eventId=' + this.data.eventId
+    })
+  },
+
+  /** 加载轮次+对战数据 */
+  async loadBattleData(round) {
+    try {
+      // 并行拉取：轮次汇总 + 指定轮次对战详情
+      const [roundsRes, matchesRes] = await Promise.all([
+        api.get('/events/' + this.data.eventId + '/matches/rounds'),
+        api.get('/events/' + this.data.eventId + '/matches', {
+          round: round || this.data.currentRound || 0
+        })
+      ])
+
+      if (roundsRes.success) {
+        const { rounds, currentRound: serverRound, totalRounds } = roundsRes.data
+        const allDone = rounds.length > 0 && rounds.every(r => r.allDone)
+        // 仅首次加载（round=0 或未传）时使用服务端 currentRound，否则保留用户手动切换的轮次
+        const keepRound = !round || round === 0 ? serverRound : round
+        this.setData({
+          rounds,
+          currentRound: keepRound,
+          totalRounds,
+          allBattlesDone: allDone,
+        })
+      }
+
+      if (matchesRes.success) {
+        const matches = matchesRes.data || []
+        // 判断本轮是否全部完成
+        const roundAllDone = matches.length > 0 && matches.every(m => m._isDone)
+        this.setData({ matches, roundAllDone })
+      }
+    } catch (e) {
+      console.error('[对战数据] 加载失败', e)
+    }
+  },
+
+  /** 切换轮次 */
+  switchRound(e) {
+    const round = e.currentTarget.dataset.round
+    this.setData({ currentRound: round })
+    this.loadBattleData(round)
+  },
+
+  /** 切换对战区域标签 */
+  switchBattleTab(e) {
+    const tab = e.currentTarget.dataset.tab
+    this.setData({ battleTab: tab })
+    if (tab === 'matches') {
+      this.loadBattleData(this.data.currentRound || 0)
+    }
+  },
+
+  // ----- 胜负判定 -----
+
+  /** 打开胜负判定弹窗（管理员点击对战卡片） */
+  openJudgeModal(e) {
+    if (!this.data.isAdmin) return
+    // 【第7轮】已归档赛事不可判定
+    if (this.data.isArchived) {
+      wx.showToast({ title: '赛事已归档，不可修改', icon: 'none' })
+      return
+    }
+    const matchId = e.currentTarget.dataset.matchId
+    const match = this.data.matches.find(m => m.match_id === matchId)
+    if (!match) return
+    if (match._isDone) {
+      wx.showToast({ title: '该对战已判定', icon: 'none' })
+      return
+    }
+    this.setData({
+      showJudgeModal: true,
+      judgeMatch: match,
+      judgeStep: 0,
+      judgeWinnerId: '',
+    })
+  },
+
+  /** 选择胜方 */
+  selectWinner(e) {
+    this.setData({
+      judgeWinnerId: e.currentTarget.dataset.teamId,
+      judgeStep: 1, // 进入二次确认
+    })
+  },
+
+  /** 返回重新选择胜方 */
+  backToSelect() {
+    this.setData({ judgeStep: 0, judgeWinnerId: '' })
+  },
+
+  /** 确认判定（二次确认后提交） */
+  async confirmJudge() {
+    const { judgeMatch, judgeWinnerId, eventId } = this.data
+    if (!judgeMatch || !judgeWinnerId) return
+
+    this.setData({ loading: true })
+    try {
+      const res = await api.put(
+        `/events/${eventId}/matches/${judgeMatch.match_id}/judge`,
+        { winnerId: judgeWinnerId, confirmed: true }
+      )
+      this.setData({ loading: false })
+
+      if (res.success) {
+        wx.showToast({ title: '胜负已判定', icon: 'success' })
+        this.setData({
+          showJudgeModal: false,
+          judgeMatch: null,
+          judgeWinnerId: '',
+          judgeStep: 0,
+        })
+        // 刷新对战数据
+        await this.loadBattleData(this.data.currentRound)
+      } else {
+        wx.showToast({ title: res.error || '判定失败', icon: 'none' })
+      }
+    } catch (e) {
+      this.setData({ loading: false })
+      wx.showToast({ title: '判定失败，请重试', icon: 'none' })
+    }
+  },
+
+  /** 关闭胜负判定弹窗 */
+  closeJudgeModal() {
+    this.setData({
+      showJudgeModal: false,
+      judgeMatch: null,
+      judgeWinnerId: '',
+      judgeStep: 0,
+    })
+  },
+
+  // ----- 下一轮 / 结束比赛 -----
+
+  /** 打开对战操作确认弹窗 */
+  showBattleAction(e) {
+    const actionType = e.currentTarget.dataset.action
+    let title = '', content = ''
+
+    if (actionType === 'next-round') {
+      title = '进入下一轮'
+      content = `确认进入第${this.data.currentRound + 1}轮对战？\n\n所有原始队伍将保留，管理员需重新选择参赛队伍并编排对阵。`
+    } else if (actionType === 'end-battle') {
+      title = '结束比赛'
+      content = `确认结束当前赛事？\n\n比赛结束后可设定队伍名次，设定完成后需点击「归档比赛」正式归档。`
+    }
+
+    this.setData({
+      showBattleActionModal: true,
+      battleActionType: actionType,
+      _battleActionTitle: title,
+      _battleActionContent: content,
+    })
+  },
+
+  /** 隐藏对战操作弹窗 */
+  hideBattleActionModal() {
+    this.setData({ showBattleActionModal: false })
+  },
+
+  /** 执行对战操作 */
+  async doBattleAction() {
+    const { battleActionType } = this.data
+    this.setData({ battleActionSubmitting: true })
+
+    const url = battleActionType === 'next-round'
+      ? `/events/${this.data.eventId}/next-round`
+      : `/events/${this.data.eventId}/end-battle`
+
+    try {
+      const res = await api.post(url, {})
+      this.setData({ battleActionSubmitting: false, showBattleActionModal: false })
+
+      if (res.success) {
+        wx.showToast({ title: res.data.message || '操作成功', icon: 'success' })
+
+        if (battleActionType === 'end-battle') {
+          // 【第7轮修改】赛事已结束(status=5)，刷新全部数据+名次
+          await this.loadEvent()
+          await Promise.all([this.loadMySignup(), this.loadSignups(), this.loadBattleData(0), this.loadRanks()])
+        } else {
+          // 进入下一轮，刷新对战数据
+          await this.loadBattleData(this.data.currentRound + 1)
+        }
+      } else {
+        wx.showToast({ title: res.error || '操作失败', icon: 'none' })
+      }
+    } catch (e) {
+      this.setData({ battleActionSubmitting: false, showBattleActionModal: false })
+      wx.showToast({ title: '操作失败，请重试', icon: 'none' })
+    }
+  },
+
+  // ============================================================
+  // 【第7轮新增】名次设定 + 赛事归档
+  // ============================================================
+
+  /** 加载名次数据 */
+  async loadRanks() {
+    try {
+      const res = await api.get('/events/' + this.data.eventId + '/ranks')
+      if (res.success) {
+        const ranks = res.data || []
+        this.setData({ ranks })
+      }
+    } catch (e) {
+      console.error('[名次] 加载失败', e)
+    }
+  },
+
+  /** 加载队伍列表（供名次下拉选择） */
+  async loadTeamsForRank() {
+    try {
+      const res = await api.get('/events/' + this.data.eventId + '/teams')
+      if (res.success) {
+        const teams = res.data && res.data.teams ? res.data.teams : []
+        this.setData({ teamsForRank: teams })
+      }
+    } catch (e) {
+      console.error('[名次] 加载队伍列表失败', e)
+    }
+  },
+
+  /** 进入名次编辑模式（管理员） */
+  async startEditRanks() {
+    if (!this.data.isAdmin) return
+
+    // 先加载队伍列表
+    await this.loadTeamsForRank()
+
+    // 构建编辑槽位：已有名次填充 + 默认3个空槽位
+    const existingRanks = this.data.ranks || []
+    const defaultSlots = [
+      { rankNum: 1, teamId: '', label: '第1名（冠军）' },
+      { rankNum: 2, teamId: '', label: '第2名（亚军）' },
+      { rankNum: 3, teamId: '', label: '第3名（季军）' }
+    ]
+
+    // 用已有数据填充默认槽位
+    const slots = defaultSlots.map(slot => {
+      const existing = existingRanks.find(r => r.rank_num === slot.rankNum)
+      const teamId = existing ? existing.team_id : ''
+      return {
+        rankNum: slot.rankNum,
+        teamId: teamId,
+        label: slot.label,
+        _displayName: this._resolveTeamName(teamId) // 【修复】预计算显示名，避免WXML箭头函数编译错误
+      }
+    })
+
+    this.setData({
+      ranksEditing: true,
+      rankEditSlots: slots
+    })
+  },
+
+  /** 取消编辑 */
+  cancelEditRanks() {
+    this.setData({
+      ranksEditing: false,
+      rankEditSlots: []
+    })
+  },
+
+  /** 【修复】根据 teamId 从 teamsForRank 查找队伍名称，避免 WXML 中使用箭头函数导致编译错误 */
+  _resolveTeamName(teamId) {
+    if (!teamId) return ''
+    const teams = this.data.teamsForRank || []
+    const found = teams.find(t => t.team_id === teamId)
+    return found ? (found.team_name || '未知') : ''
+  },
+
+  /** 名次下拉选择变更 */
+  onRankTeamChange(e) {
+    const index = e.currentTarget.dataset.index
+    const teamId = this.data.teamsForRank[e.detail.value]
+      ? this.data.teamsForRank[e.detail.value].team_id
+      : ''
+    const slots = [...this.data.rankEditSlots]
+    slots[index].teamId = teamId
+    slots[index]._displayName = this._resolveTeamName(teamId)
+    this.setData({ rankEditSlots: slots })
+  },
+
+  /** 添加更多名次 */
+  addMoreRankSlots() {
+    const slots = [...this.data.rankEditSlots]
+    const nextRankNum = slots.length + 1
+    slots.push({
+      rankNum: nextRankNum,
+      teamId: '',
+      label: '第' + nextRankNum + '名',
+      _displayName: '' // 【修复】预计算显示名
+    })
+    this.setData({ rankEditSlots: slots })
+  },
+
+  /** 移除指定名次槽位（仅限前3名之后） */
+  removeRankSlot(e) {
+    const index = e.currentTarget.dataset.index
+    if (index < 3) {
+      wx.showToast({ title: '前3名为默认保留位', icon: 'none' })
+      return
+    }
+    const slots = [...this.data.rankEditSlots]
+    slots.splice(index, 1)
+    // 重新编号 rankNum
+    slots.forEach((s, i) => {
+      s.rankNum = i + 1
+      s.label = i < 3
+        ? ['第1名（冠军）', '第2名（亚军）', '第3名（季军）'][i]
+        : '第' + (i + 1) + '名'
+    })
+    this.setData({ rankEditSlots: slots })
+  },
+
+  /** 保存名次（批量提交） */
+  async saveRanks() {
+    const { rankEditSlots, eventId } = this.data
+
+    // 构建提交数据
+    const ranks = rankEditSlots.map(slot => ({
+      rankNum: slot.rankNum,
+      teamId: slot.teamId || ''
+    }))
+
+    // 过滤掉有实质内容的项
+    const hasContent = ranks.some(r => r.teamId !== '')
+    if (!hasContent) {
+      // 全部为空，执行清空名次（提交空数组会触发删除所有名次）
+      wx.showModal({
+        title: '清空名次',
+        content: '当前所有名次均为空，提交将清空所有已有名次记录。确定继续？',
+        success: (modalRes) => {
+          if (modalRes.confirm) {
+            this.doBatchSaveRanks(ranks)
+          }
+        }
+      })
+      return
+    }
+
+    await this.doBatchSaveRanks(ranks)
+  },
+
+  /** 执行批量保存名次 */
+  async doBatchSaveRanks(ranksData) {
+    this.setData({ ranksSaving: true })
+    try {
+      const res = await api.post('/events/' + this.data.eventId + '/ranks/batch', {
+        ranks: ranksData
+      })
+      this.setData({ ranksSaving: false })
+
+      if (res.success) {
+        wx.showToast({ title: '名次已保存', icon: 'success' })
+        this.setData({ ranksEditing: false })
+        // 刷新名次显示
+        await this.loadRanks()
+      } else {
+        wx.showToast({ title: res.error || '保存失败', icon: 'none' })
+      }
+    } catch (e) {
+      this.setData({ ranksSaving: false })
+      wx.showToast({ title: '保存失败，请重试', icon: 'none' })
+      console.error('[名次] 保存失败', e)
+    }
+  },
+
+  // ----- 赛事归档 -----
+
+  /** 显示归档确认弹窗 */
+  showArchiveConfirm() {
+    this.setData({ showArchiveConfirm: true })
+  },
+
+  /** 隐藏归档确认弹窗 */
+  hideArchiveConfirm() {
+    this.setData({ showArchiveConfirm: false })
+  },
+
+  /** 执行归档操作 */
+  async doArchive() {
+    this.setData({ archiveSubmitting: true })
+    try {
+      const res = await api.post('/events/' + this.data.eventId + '/archive', {})
+      this.setData({ archiveSubmitting: false, showArchiveConfirm: false })
+
+      if (res.success) {
+        wx.showToast({ title: '赛事已归档', icon: 'success', duration: 2000 })
+        // 刷新赛事详情（is_archived 变为 1）
+        await this.loadEvent()
+        // 进入只读模式
+        this.setData({
+          isArchived: true,
+          ranksEditing: false
+        })
+        await this.loadRanks()
+      } else {
+        wx.showToast({ title: res.error || '归档失败', icon: 'none' })
+      }
+    } catch (e) {
+      this.setData({ archiveSubmitting: false, showArchiveConfirm: false })
+      wx.showToast({ title: '归档失败，请重试', icon: 'none' })
+      console.error('[归档] 失败', e)
+    }
+  },
+
+  /** 获取队伍名称（用于显示名次） */
+  getTeamName(teamId) {
+    const ranks = this.data.ranks || []
+    const rank = ranks.find(r => r.team_id === teamId)
+    return rank ? rank.team_name : '未知队伍'
+  },
+
+  /** 格式化归档时间（WXML 模板函数） */
+  getFormattedTime(ts) {
+    if (!ts) return ''
+    const d = new Date(parseInt(ts))
+    const pad = n => String(n).padStart(2, '0')
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+      ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes())
+  },
+
   // ====== 分享 ======
   onShareAppMessage() {
     const event = this.data.event
@@ -327,11 +882,15 @@ Page({
 
   // 下拉刷新
   onPullDownRefresh() {
-    Promise.all([
+    const tasks = [
       this.loadEvent(),
       this.loadSignups(),
       this.loadMySignup()
-    ]).then(() => wx.stopPullDownRefresh())
+    ]
+    if (this.data.event && this.data.event.event_status === 5) {
+      tasks.push(this.loadRanks())
+    }
+    Promise.all(tasks).then(() => wx.stopPullDownRefresh())
       .catch(() => wx.stopPullDownRefresh())
   }
 })

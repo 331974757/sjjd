@@ -340,7 +340,8 @@ Page({
   // 通知首页下次 onShow 时刷新数据
   _notifyHomeRefresh() {
     const pages = getCurrentPages()
-    const homePage = pages[pages.length - 2]
+    // 【BUG-P4修复】遍历导航栈查找首页，而不是硬编码 pages.length-2
+    const homePage = pages.find(p => p.route && p.route.indexOf('pages/dota2/dota2') !== -1)
     if (homePage && homePage.loadAllPlayers) {
       homePage._needsReload = true
     }

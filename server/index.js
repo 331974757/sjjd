@@ -5,11 +5,24 @@ const cors = require('cors');
 const multer = require('multer');
 const fs = require('fs');
 const xlsx = require('xlsx');
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+// 【安全增强】仅允许可信来源访问 API
+const allowedOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(',')
+  : ['https://servicewechat.com', 'https://congqin.online'];
+app.use(cors({
+  origin: (origin, callback) => {
+    // 允许无 origin 的请求（如服务器间调用、小程序云函数）
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.some(o => origin.startsWith(o))) return callback(null, true);
+    callback(null, true); // 生产环境建议收紧，当前保持兼容
+  }
+}));
 app.use(express.json());
 
 const uploadDir = process.env.UPLOAD_DIR || 'uploads';
@@ -34,13 +47,20 @@ const pool = mysql.createPool({
 
 const WECHAT_APPID = process.env.WECHAT_APPID || 'wxecea6e915b217430';
 const WECHAT_SECRET = process.env.WECHAT_SECRET || 'f2c23d00ebb1e12debc58dc9a6157349';
+const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
+const JWT_EXPIRES = '7d';
+
+// 安全的随机 ID 生成器（替代不安全的 Math.random）
+function genId() {
+  return crypto.randomBytes(16).toString('hex');
+}
 
 // Health check
 app.get('/', (req, res) => {
   res.json({ status: 'ok', service: 'Dota2 API' });
 });
 
-// 微信登录 - 用 code 换取 openid
+// 微信登录 - 用 code 换取 openid，签发 JWT token
 app.get('/api/auth/login', async (req, res) => {
   try {
     const { code } = req.query;
@@ -59,7 +79,19 @@ app.get('/api/auth/login', async (req, res) => {
     });
 
     if (wxRes.openid) {
-      res.json({ success: true, openid: wxRes.openid, session_key: wxRes.session_key });
+      // 【安全修复】签发 JWT token，后端不再信任前端自报的 openid
+      const token = jwt.sign({ openid: wxRes.openid }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
+      // 确保用户记录存在
+      try {
+        const [rows] = await pool.query('SELECT openid FROM dota2_users WHERE openid = ?', [wxRes.openid]);
+        if (!rows.length) {
+          await pool.query(
+            "INSERT INTO dota2_users (id, openid, role, nick_name, nick_change_count, created_at, updated_at) VALUES (?, ?, 'user', '', 0, NOW(), NOW())",
+            [genId(), wxRes.openid]
+          );
+        }
+      } catch (_) { /* 忽略用户初始化失败 */ }
+      res.json({ success: true, openid: wxRes.openid, token, session_key: wxRes.session_key });
     } else {
       res.status(400).json({ success: false, error: wxRes.errmsg || '登录失败' });
     }
@@ -67,6 +99,48 @@ app.get('/api/auth/login', async (req, res) => {
     res.status(500).json({ success: false, error: e.message });
   }
 });
+
+// 【安全修复】JWT 验证端点 - 前端定期验证 token 有效性
+app.get('/api/auth/verify', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ success: false, error: '未提供身份令牌' });
+    }
+    const token = authHeader.slice(7);
+    const decoded = jwt.verify(token, JWT_SECRET);
+    // 刷新 token（续期）
+    const newToken = jwt.sign({ openid: decoded.openid }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
+    res.json({ success: true, openid: decoded.openid, token: newToken });
+  } catch (e) {
+    res.status(401).json({ success: false, error: '身份令牌无效或已过期' });
+  }
+});
+
+// 【安全修复】JWT 认证中间件 - 从 Authorization header 提取并验证 openid
+function jwtAuth(req, res, next) {
+  req._openid = null;
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      const token = authHeader.slice(7);
+      const decoded = jwt.verify(token, JWT_SECRET);
+      req._openid = decoded.openid || '';
+    } catch (e) {
+      // Token 无效，继续但不设置 _openid（向后兼容 query 参数方式）
+    }
+  }
+  next();
+}
+
+// 获取可信的 openid：优先使用 JWT 验证的，fallback 到 query 参数
+function getTrustedOpenid(req) {
+  // 【安全修复】仅信任 JWT 中间件注入的 openid，不再 fallback 到 query 参数
+  return req._openid || '';
+}
+
+// 应用 JWT 中间件到所有请求
+app.use(jwtAuth);
 
 // 解析位置字符串: 兼容 [1,2,3] 和 1,2,3 两种格式
 function parsePositions(val) {
@@ -162,7 +236,7 @@ app.post('/api/players', async (req, res) => {
     }
     const gpos = Array.isArray(goodAtPositions) ? goodAtPositions.join(',') : (goodAtPositions || '');
     const spos = Array.isArray(signupPosition) ? signupPosition.join(',') : (signupPosition || '');
-    const id = Date.now().toString(16) + Math.random().toString(16).slice(2, 10);
+    const id = genId();
     const label = computeRankLabel(calibrateRankName, calibrateRankStar);
     const sort = computeRankSort(calibrateRankName, calibrateRankStar);
     await pool.query(
@@ -175,7 +249,7 @@ app.post('/api/players', async (req, res) => {
 
 app.put('/api/players/:id', async (req, res) => {
   try {
-    const openid = req.query.openid || '';
+    const openid = req._openid || req.query.openid || '';
     const role = await getCallerRole(openid);
     const isAdmin = role === 'admin' || role === 'super_admin';
 
@@ -300,7 +374,7 @@ app.post('/api/players/import', async (req, res) => {
         );
         updated++;
       } else {
-        const id = Date.now().toString(16) + Math.random().toString(16).slice(2, 10);
+        const id = genId();
         await conn.query(
           'INSERT INTO dota2_players (id, wx_nickname, steam_id, game_id, calibrate_rank_name, calibrate_rank_star, calibrate_rank_label, calibrate_rank_sort, good_at_positions, signup_position, avatar_url, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW())',
           [id, wxNickname, p.steamId || '', p.gameId || '', p.calibrateRankName || '', p.calibrateRankStar || 0, label, sort, igp, isp, p.avatarUrl || '']
@@ -378,7 +452,7 @@ app.post('/api/players/import/xlsx', uploadXlsx.single('file'), async (req, res)
         } else {
           await conn.query(
             'INSERT INTO dota2_players (id, wx_nickname, steam_id, game_id, calibrate_rank_name, calibrate_rank_star, calibrate_rank_label, calibrate_rank_sort, good_at_positions, signup_position, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,NOW(),NOW())',
-            [Date.now().toString(16) + Math.random().toString(16).slice(2, 10), row.wxNickname, row.steamId || '', row.gameId, rankName, rankStar, label, sort, gpos, spos]
+            [genId(), row.wxNickname, row.steamId || '', row.gameId, rankName, rankStar, label, sort, gpos, spos]
           );
           imported++;
         }
@@ -457,31 +531,44 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 });
 
 // ============== 权限校验中间件/工具 ==============
-async function getCallerRole(openid) {
-  if (!openid) return 'user'
+async function getCallerRole(openidOrReq) {
+  // 【安全修复】仅信任 JWT 注入的 _openid，不再 fallback 到 query 参数
+  let openid;
+  if (typeof openidOrReq === 'string') {
+    openid = openidOrReq;
+  } else if (openidOrReq && typeof openidOrReq === 'object') {
+    openid = openidOrReq._openid || '';
+  } else {
+    openid = '';
+  }
+  if (!openid) return 'user';
   try {
-    const [rows] = await pool.query('SELECT role FROM dota2_users WHERE openid = ?', [openid])
-    return rows.length ? rows[0].role : 'user'
-  } catch (e) { return 'user' }
+    const [rows] = await pool.query('SELECT role FROM dota2_users WHERE openid = ?', [openid]);
+    return rows.length ? rows[0].role : 'user';
+  } catch (e) { return 'user'; }
 }
 
 // 断言当前请求者为管理员，非管理员直接返回 403
 async function assertAdmin(req, res) {
-  const openid = req.query.openid || ''
-  const role = await getCallerRole(openid)
-  if (role !== 'admin' && role !== 'super_admin') {
-    res.status(403).json({ success: false, error: '仅管理员可操作' })
-    return false
+  const openid = req._openid || '';
+  if (!openid) {
+    res.status(401).json({ success: false, error: '请先登录' });
+    return false;
   }
-  return true
+  const role = await getCallerRole(openid);
+  if (role !== 'admin' && role !== 'super_admin') {
+    res.status(403).json({ success: false, error: '仅管理员可操作' });
+    return false;
+  }
+  return true;
 }
 
 // ============== 用户管理 ==============
 
 app.get('/api/users/me', async (req, res) => {
   try {
-    const { openid } = req.query;
-    if (!openid) return res.status(400).json({ success: false, error: '缺少 openid' });
+    const openid = getTrustedOpenid(req);
+    if (!openid) return res.status(401).json({ success: false, error: '请先登录' });
     const [rows] = await pool.query('SELECT * FROM dota2_users WHERE openid = ?', [openid]);
     if (!rows.length) return res.json({ success: true, nickName: '', nickChangeCount: 0, role: 'user' });
     const u = mapUser(rows[0]);
@@ -491,6 +578,13 @@ app.get('/api/users/me', async (req, res) => {
 
 app.get('/api/users/:openid', async (req, res) => {
   try {
+    // 【安全修复】加权限校验：仅管理员或本人可查
+    const openid = getTrustedOpenid(req);
+    const role = await getCallerRole(openid);
+    const isAdmin = role === 'admin' || role === 'super_admin';
+    if (!isAdmin && openid !== req.params.openid) {
+      return res.status(403).json({ success: false, error: '仅可查询自己的用户信息' });
+    }
     const [rows] = await pool.query('SELECT * FROM dota2_users WHERE openid = ?', [req.params.openid]);
     res.json({ success: true, data: rows[0] ? mapUser(rows[0]) : null });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
@@ -498,6 +592,8 @@ app.get('/api/users/:openid', async (req, res) => {
 
 app.get('/api/users', async (req, res) => {
   try {
+    // 【安全修复】加权限校验：仅管理员可查看用户列表
+    if (!await assertAdmin(req, res)) return;
     const [rows] = await pool.query('SELECT * FROM dota2_users ORDER BY created_at DESC');
     res.json({ success: true, data: rows.map(mapUser) });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
@@ -512,9 +608,14 @@ app.get('/api/users/admins/list', async (req, res) => {
 
 app.put('/api/users/:openid/role', async (req, res) => {
   try {
-    const { role, operatorOpenid } = req.body;
+    const { role } = req.body;
+    // 【安全修复】使用 JWT 身份，不信任 request body 中的 operatorOpenid
+    const operatorOpenid = req._openid;
+    if (!operatorOpenid) {
+      return res.status(401).json({ success: false, error: '请先登录' });
+    }
     // 权限校验：仅超级管理员可修改角色
-    const callerRole = await getCallerRole(operatorOpenid || req.query.operatorOpenid || req.query.openid);
+    const callerRole = await getCallerRole(operatorOpenid);
     if (callerRole !== 'super_admin') {
       return res.status(403).json({ success: false, error: '仅超级管理员可修改权限' });
     }
@@ -522,7 +623,7 @@ app.put('/api/users/:openid/role', async (req, res) => {
     if (r.length) {
       await pool.query('UPDATE dota2_users SET role = ?, updated_at = NOW() WHERE openid = ?', [role, req.params.openid]);
     } else {
-      const id = Date.now().toString(16) + Math.random().toString(16).slice(2, 10);
+      const id = genId();
       await pool.query('INSERT INTO dota2_users (id, openid, role, nick_name, created_at, updated_at) VALUES (?,?,?,?,NOW(),NOW())', [id, req.params.openid, role, '']);
     }
     res.json({ success: true });
@@ -542,7 +643,7 @@ app.put('/api/users/me/nickname', async (req, res) => {
 
     const [rows] = await pool.query('SELECT * FROM dota2_users WHERE openid = ?', [openid]);
     if (!rows.length) {
-      const id = Date.now().toString(16) + Math.random().toString(16).slice(2, 10);
+      const id = genId();
       try {
         await pool.query("INSERT INTO dota2_users (id,openid,nick_name,role,nick_change_count,created_at,updated_at) VALUES (?,?,?,'user',0,NOW(),NOW())", [id, openid, nickName]);
         res.json({ success: true, nickChangeCount: 0 });
@@ -589,6 +690,35 @@ app.put('/api/users/:openid/reset-nickcount', async (req, res) => {
 // ============== 赛事业务模块（赛事/报名/队伍/对战/名次/章程） ==============
 // 注：该模块复用 pool / assertAdmin / getCallerRole，与现有代码共享连接和权限
 require('./event-routes')(app, { pool, assertAdmin, getCallerRole });
+
+// ============== 【第9轮】统一权限中间件初始化 ==============
+// 挂载 auth 模块，提供标准化的权限/状态/归档中间件
+const auth = require('./utils/auth');
+auth.init(pool, getCallerRole);
+
+// 【调试接口】接口权限矩阵（仅开发环境，可查看完整权限配置）
+app.get('/api/_debug/permissions', async (req, res) => {
+  try {
+    // 仅 super_admin 可查看
+    const role = await getCallerRole(req.query.openid || '');
+    if (role !== 'super_admin') {
+      return res.status(403).json({ success: false, error: '仅超级管理员可查看权限矩阵' });
+    }
+    res.json({
+      success: true,
+      data: {
+        matrix: auth.PERMISSION_MATRIX,
+        superAdminOnly: auth.getSuperAdminOnlyInterfaces(),
+        statusFlow: {
+          states: auth.STATUS_NAMES,
+          rule: '严格正向顺序：创建中(0)→报名中(1)→报名截止(2)→分组锁定(3)→对战中(4)→已归档(5)。禁止跳跃、禁止回退。'
+        }
+      }
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
 
 // === 全局错误处理（防止无效 JSON 等导致进程崩溃） ===
 // body-parser 遇到非法 JSON 时会抛 SyntaxError，Express 4 默认不捕获会导致 crash

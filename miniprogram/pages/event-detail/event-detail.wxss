@@ -129,6 +129,13 @@
 }
 .btn-manage::after { border: none; }
 
+/* 【第5轮新增】队伍编组按钮 */
+.btn-team-edit {
+  background: rgba(210,153,34,0.15);
+  color: #d29922;
+}
+.btn-team-edit::after { border: none; }
+
 .btn-disabled {
   opacity: 0.4 !important;
   pointer-events: none;
@@ -428,4 +435,585 @@
 .btn-primary-confirm {
   background: #238636;
   color: #ffffff;
+}
+
+/* ===== 【第6轮新增】对战编排按钮 ===== */
+.btn-match-edit {
+  background: rgba(31,111,235,0.15);
+  color: #58a6ff;
+}
+.btn-match-edit::after { border: none; }
+
+/* ===== 【第6轮新增】对战列表区域 ===== */
+.battle-section {
+  margin: 0 24rpx 40rpx;
+}
+
+/* 轮次切换标签 */
+.round-tabs {
+  display: flex;
+  flex-direction: row;
+  white-space: nowrap;
+  margin-bottom: 20rpx;
+  padding-bottom: 8rpx;
+}
+.round-tab {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 120rpx;
+  padding: 14rpx 20rpx;
+  margin-right: 12rpx;
+  background: rgba(255,255,255,0.04);
+  border-radius: 12rpx;
+  border: 2rpx solid transparent;
+  transition: all 0.15s;
+}
+.rt-active {
+  background: rgba(31,111,235,0.12);
+  border-color: rgba(88,166,255,0.3);
+}
+.rt-done {
+  opacity: 0.6;
+}
+.rt-label {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #c9d1d9;
+}
+.rt-active .rt-label {
+  color: #58a6ff;
+}
+.rt-progress {
+  font-size: 20rpx;
+  color: #8b949e;
+  margin-top: 4rpx;
+}
+.rt-check {
+  font-size: 20rpx;
+  color: #3fb950;
+  margin-top: 2rpx;
+}
+
+/* 对战卡片列表 */
+.match-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+.match-card {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 20rpx 16rpx;
+  border-radius: 14rpx;
+  border: 1rpx solid rgba(255,255,255,0.05);
+  background: rgba(255,255,255,0.03);
+  position: relative;
+  flex-wrap: wrap;
+}
+.mc-clickable {
+  border-color: rgba(88,166,255,0.2);
+}
+.mc-done {
+  opacity: 0.85;
+}
+
+/* 队伍列 */
+.mc-team {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4rpx;
+  min-width: 0;
+  padding: 8rpx 4rpx;
+  border-radius: 10rpx;
+}
+.mc-winner {
+  background: rgba(210,153,34,0.1);
+  border: 1rpx solid rgba(210,153,34,0.2);
+}
+.mct-name {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #e6edf3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180rpx;
+}
+.mct-mmr {
+  font-size: 20rpx;
+  color: #8b949e;
+}
+.mct-win-badge {
+  font-size: 32rpx;
+}
+
+/* 中间分隔 */
+.mc-center {
+  flex-shrink: 0;
+  width: 120rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6rpx;
+}
+.mc-vs {
+  font-size: 30rpx;
+  font-weight: 900;
+  color: rgba(248,81,73,0.4);
+}
+.mc-status {
+  font-size: 20rpx;
+  padding: 2rpx 12rpx;
+  border-radius: 8rpx;
+}
+.s-done {
+  color: #3fb950;
+  background: rgba(63,185,80,0.1);
+}
+.s-pending {
+  color: #d29922;
+  background: rgba(210,153,34,0.1);
+}
+.mc-time {
+  font-size: 22rpx;
+  color: #58a6ff;
+  font-weight: 600;
+}
+
+/* 管理员操作提示 */
+.mc-admin-hint {
+  width: 100%;
+  text-align: center;
+  margin-top: 10rpx;
+  padding-top: 10rpx;
+  border-top: 1rpx solid rgba(255,255,255,0.04);
+}
+.mc-admin-hint text {
+  font-size: 22rpx;
+  color: #58a6ff;
+}
+
+/* 底部操作按钮（下一轮/结束比赛） */
+.battle-actions {
+  margin-top: 24rpx;
+}
+.ba-row {
+  display: flex;
+  gap: 16rpx;
+}
+.ba-btn {
+  flex: 1;
+  height: 76rpx;
+  line-height: 76rpx;
+  text-align: center;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+  font-weight: 700;
+  border: none;
+  padding: 0;
+}
+.ba-btn::after { border: none; }
+.ba-btn-next {
+  background: #1f6feb;
+  color: #ffffff;
+}
+.ba-btn-end {
+  background: #da3633;
+  color: #ffffff;
+}
+
+/* ===== 【第6轮】胜负判定弹窗 ===== */
+.judge-modal {
+  width: 620rpx;
+}
+.modal-subtitle {
+  display: block;
+  font-size: 24rpx;
+  color: #58a6ff;
+  margin-bottom: 20rpx;
+  text-align: center;
+}
+.judge-prompt {
+  display: block;
+  font-size: 26rpx;
+  color: #c9d1d9;
+  margin-bottom: 16rpx;
+}
+.judge-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+  margin-bottom: 20rpx;
+}
+.judge-option {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22rpx 24rpx;
+  background: rgba(31,111,235,0.08);
+  border: 2rpx solid rgba(88,166,255,0.2);
+  border-radius: 12rpx;
+}
+.judge-option:active {
+  background: rgba(31,111,235,0.18);
+  border-color: #58a6ff;
+}
+.jo-name {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #e6edf3;
+}
+.jo-mmr {
+  font-size: 24rpx;
+  color: #d29922;
+  font-weight: 600;
+}
+
+/* ===== 【第7轮新增】已归档只读提示条 ===== */
+.archived-banner {
+  margin: 0 24rpx 16rpx;
+  padding: 16rpx 24rpx;
+  background: rgba(88,166,255,0.08);
+  border: 1rpx solid rgba(88,166,255,0.15);
+  border-radius: 12rpx;
+  text-align: center;
+}
+.ab-text {
+  font-size: 24rpx;
+  color: #58a6ff;
+}
+
+/* ===== 【第7轮新增】名次排行区域 ===== */
+.rank-section {
+  margin: 0 24rpx 40rpx;
+}
+
+.rank-section-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.rank-section-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #e6edf3;
+}
+
+.rank-edit-btn {
+  background: rgba(31,111,235,0.12);
+  color: #58a6ff;
+  font-size: 24rpx;
+  font-weight: 600;
+  border: none;
+  padding: 8rpx 24rpx;
+  border-radius: 8rpx;
+  height: 52rpx;
+  line-height: 52rpx;
+}
+.rank-edit-btn::after { border: none; }
+
+.rank-cancel-btn {
+  background: rgba(255,255,255,0.06);
+  color: #8b949e;
+  font-size: 24rpx;
+  font-weight: 600;
+  border: none;
+  padding: 8rpx 24rpx;
+  border-radius: 8rpx;
+  height: 52rpx;
+  line-height: 52rpx;
+}
+.rank-cancel-btn::after { border: none; }
+
+/* 名次编辑区 */
+.rank-edit-area {
+  background: rgba(255,255,255,0.03);
+  border: 1rpx solid rgba(255,255,255,0.06);
+  border-radius: 16rpx;
+  padding: 24rpx;
+}
+
+.rank-slot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.rank-slot {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.rank-slot-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8rpx;
+  width: 180rpx;
+  flex-shrink: 0;
+}
+
+.rank-slot-label {
+  font-size: 26rpx;
+  color: #c9d1d9;
+  font-weight: 600;
+}
+
+.rank-slot-remove {
+  font-size: 28rpx;
+  color: #f85149;
+  padding: 4rpx 10rpx;
+  background: rgba(248,81,73,0.1);
+  border-radius: 6rpx;
+}
+
+.rank-picker {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18rpx 20rpx;
+  background: rgba(255,255,255,0.04);
+  border: 1rpx solid rgba(255,255,255,0.08);
+  border-radius: 10rpx;
+  font-size: 26rpx;
+  margin-left: 16rpx;
+}
+
+.rank-picker-empty {
+  color: #484f58;
+}
+
+.rank-picker-filled {
+  color: #58a6ff;
+  border-color: rgba(88,166,255,0.25);
+}
+
+.rank-picker-arrow {
+  font-size: 20rpx;
+  color: #8b949e;
+  margin-left: 12rpx;
+}
+
+/* 添加更多名次 */
+.rank-add-more {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  margin-top: 20rpx;
+  padding: 16rpx 0;
+  background: rgba(31,111,235,0.04);
+  border: 1rpx dashed rgba(88,166,255,0.15);
+  border-radius: 10rpx;
+  gap: 8rpx;
+}
+
+.ram-icon {
+  font-size: 32rpx;
+  color: #58a6ff;
+  font-weight: 700;
+}
+
+.ram-text {
+  font-size: 24rpx;
+  color: #58a6ff;
+}
+
+/* 保存行 */
+.rank-save-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 24rpx;
+  gap: 10rpx;
+}
+
+.rank-save-btn {
+  width: 100%;
+  height: 80rpx;
+  line-height: 80rpx;
+  background: #238636;
+  color: #ffffff;
+  font-size: 30rpx;
+  font-weight: 700;
+  border-radius: 12rpx;
+  border: none;
+  text-align: center;
+  padding: 0;
+}
+.rank-save-btn::after { border: none; }
+
+.rank-hint {
+  font-size: 22rpx;
+  color: #484f58;
+}
+
+/* 名次展示（查看模式） */
+.rank-display {
+  margin-top: 0;
+}
+
+.rank-podium {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.rank-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 18rpx 20rpx;
+  background: rgba(255,255,255,0.03);
+  border-radius: 14rpx;
+  border: 1rpx solid rgba(255,255,255,0.05);
+  gap: 16rpx;
+}
+
+/* 金银铜特殊高亮 */
+.rank-gold {
+  background: linear-gradient(135deg, rgba(210,153,34,0.08), rgba(210,153,34,0.03));
+  border-color: rgba(210,153,34,0.2);
+}
+
+.rank-silver {
+  background: linear-gradient(135deg, rgba(139,148,158,0.08), rgba(139,148,158,0.03));
+  border-color: rgba(139,148,158,0.2);
+}
+
+.rank-bronze {
+  background: linear-gradient(135deg, rgba(205,127,50,0.08), rgba(205,127,50,0.03));
+  border-color: rgba(205,127,50,0.2);
+}
+
+.rank-badge {
+  width: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.rank-badge-medal {
+  font-size: 40rpx;
+}
+
+.rank-badge-num {
+  font-size: 30rpx;
+  font-weight: 800;
+  color: #58a6ff;
+  background: rgba(31,111,235,0.12);
+  width: 56rpx;
+  height: 56rpx;
+  line-height: 56rpx;
+  text-align: center;
+  border-radius: 50%;
+}
+
+.rank-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+  flex: 1;
+}
+
+.rank-team-name {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #e6edf3;
+}
+
+.rank-gold .rank-team-name { color: #d29922; }
+.rank-silver .rank-team-name { color: #a0a0a0; }
+.rank-bronze .rank-team-name { color: #cd853f; }
+
+.rank-team-mmr {
+  font-size: 22rpx;
+  color: #8b949e;
+}
+
+/* 名次空状态 */
+.rank-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40rpx 0;
+}
+
+.rank-empty-icon {
+  font-size: 56rpx;
+  margin-bottom: 12rpx;
+}
+
+.rank-empty-text {
+  font-size: 26rpx;
+  color: #8b949e;
+}
+
+.rank-empty-sub {
+  font-size: 22rpx;
+  color: #484f58;
+  margin-top: 6rpx;
+}
+
+/* 归档按钮区域 */
+.archive-btn-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 32rpx;
+  padding-top: 24rpx;
+  border-top: 1rpx solid rgba(255,255,255,0.06);
+  gap: 12rpx;
+}
+
+.archive-btn {
+  width: 100%;
+  height: 80rpx;
+  line-height: 80rpx;
+  background: linear-gradient(135deg, #da3633, #b62324);
+  color: #ffffff;
+  font-size: 30rpx;
+  font-weight: 700;
+  border-radius: 12rpx;
+  border: none;
+  text-align: center;
+  padding: 0;
+  box-shadow: 0 4rpx 16rpx rgba(218,54,51,0.25);
+}
+.archive-btn::after { border: none; }
+
+.archive-btn-hint {
+  font-size: 22rpx;
+  color: #f85149;
+  opacity: 0.7;
+}
+
+/* 已归档完成提示 */
+.archive-done-tip {
+  margin-top: 24rpx;
+  padding: 16rpx 20rpx;
+  background: rgba(88,166,255,0.06);
+  border: 1rpx solid rgba(88,166,255,0.1);
+  border-radius: 10rpx;
+  text-align: center;
+}
+
+.ad-text {
+  font-size: 22rpx;
+  color: #58a6ff;
 }

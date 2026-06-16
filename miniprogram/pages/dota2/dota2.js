@@ -47,11 +47,26 @@ Page({
     selectedCount: 0,
     statusBarHeight: 44,
     _searchText: '',
-    // 【第4轮新增】历史赛事列表
+    // 【第4轮新增】赛事章程 + 历史赛事列表
+    rulesLoaded: false,
+    rulesLoading: false,
+    ruleEventList: [],           // 赛事章程：进行中赛事（archived=0）
+    // 【第8轮增强】历史赛事：已归档赛事（archived=1）+ 搜索 + 分页
     eventsLoaded: false,
     eventsLoading: false,
-    eventList: [],
+    eventList: [],               // 历史赛事列表（当前页）
+    eventTotal: 0,               // 历史赛事总数
+    eventPage: 1,                // 当前页码
+    eventHasMore: false,         // 是否有更多
+    eventLoadingMore: false,     // 加载更多中
+    historySearchText: '',       // 历史赛事搜索关键词
+    historySearchTimer: null,    // 搜索防抖定时器
     eventStatusMap: { 0: '创建中', 1: '报名中', 2: '报名截止', 3: '分组锁定', 4: '对战中', 5: '已归档' },
+    // 【赛事创建】弹窗相关数据
+    showCreateModal: false,       // 是否显示新建赛事弹窗
+    createEventName: '',          // 赛事名称输入
+    createEventDate: '',          // 开始日期（YYYY-MM-DD）
+    createEventDesc: '',          // 赛事简介输入
   },
 
   onLoad() {
@@ -75,6 +90,12 @@ Page({
     if (this._nickMayBeChanged) {
       this._nickMayBeChanged = false
       this.fetchNicknameInfo()
+    }
+    // 当前在赛事章程/历史赛事Tab时，刷新对应列表
+    if (this.data.subTab === 'rules') {
+      this.loadRuleEvents()
+    } else if (this.data.subTab === 'history') {
+      this.loadEvents()
     }
   },
 
@@ -305,7 +326,11 @@ Page({
 
   // 滚到底部加载更多
   onReachBottom() {
-    this.loadMore()
+    if (this.data.subTab === 'profile') {
+      this.loadMore()
+    } else if (this.data.subTab === 'history') {
+      this.loadMoreEvents()
+    }
   },
 
   // ====== 数据加载（一次性拉取全部数据） ======
@@ -396,6 +421,18 @@ Page({
     this.filterAndDisplay()
   },
 
+  // 重置所有筛选条件
+  resetFilters() {
+    this._searchText = ''
+    this.setData({
+      _searchText: '',
+      positionFilter: 'all',
+      rankFilter: 'all',
+      sortFilter: 'rank-desc'
+    })
+    this.filterAndDisplay()
+  },
+
   switchGame(e) {
     const game = e.currentTarget.dataset.game
     if (game === this.data.currentGame) return
@@ -412,30 +449,123 @@ Page({
     const tab = e.currentTarget.dataset.tab
     if (tab === this.data.subTab) return
     this.setData({ subTab: tab })
-    // 【第4轮】切换到历史赛事时加载赛事列表
-    if (tab === 'history' && !this.data.eventsLoaded) {
+    // 切换到赛事章程时加载进行中赛事
+    if (tab === 'rules') {
+      this.loadRuleEvents()
+    }
+    // 切换到历史赛事时加载已归档赛事
+    if (tab === 'history') {
       this.loadEvents()
     }
   },
 
-  // 【第4轮新增】加载赛事列表（历史赛事Tab使用）
-  async loadEvents() {
-    if (this.data.eventsLoading) return
-    this.setData({ eventsLoading: true })
+  // 【修复】加载赛事章程列表（进行中赛事：archived=0）
+  async loadRuleEvents() {
+    if (this.data.rulesLoading) return
+    this.setData({ rulesLoading: true })
     try {
-      const res = await api.get('/events', { pageSize: 50 })
+      const res = await api.get('/events', { archived: 0, pageSize: 50 })
       if (res.success) {
         const list = (res.data || []).map(e => ({
           ...e,
           _statusName: this.data.eventStatusMap[e.event_status] || '未知',
           _timeLabel: this.formatEventTime(e.start_time)
         }))
-        this.setData({ eventList: list, eventsLoaded: true })
+        this.setData({ ruleEventList: list, rulesLoaded: true })
+      }
+    } catch (e) {
+      console.error('[赛事章程] 加载失败', e)
+      // 【OPT-P1修复】失败后也标记已尝试，允许后续切换tab时重试
+      this.setData({ rulesLoaded: false })
+    } finally {
+      this.setData({ rulesLoading: false })
+    }
+  },
+
+  // 【第8轮增强】加载历史赛事列表（已归档赛事，使用增强接口含参赛人数+前三名）
+  async loadEvents(reset = true) {
+    if (this.data.eventsLoading) return
+    // 重置时清空列表
+    if (reset) {
+      this.setData({ eventPage: 1, eventList: [], eventTotal: 0, eventHasMore: false })
+    }
+    this.setData({ eventsLoading: true })
+    try {
+      const params = {
+        page: this.data.eventPage || 1,
+        pageSize: 10
+      }
+      const kw = this.data.historySearchText ? this.data.historySearchText.trim() : ''
+      if (kw) params.keyword = kw
+
+      // 【第8轮】使用专用已归档赛事接口，返回参赛人数和前三名
+      const res = await api.get('/events/archived', params)
+      if (res.success) {
+        const list = (res.data || []).map(e => ({
+          ...e,
+          _statusName: '已归档',
+          _timeLabel: this.formatEventTime(e.start_time),
+          // 计算参赛总人数
+          _signupCount: e.signupCount || 0,
+          // 前三名队伍（topRanks 由接口直接返回）
+          _topRanks: e.topRanks || []
+        }))
+        if (reset) {
+          this.setData({ eventList: list })
+        } else {
+          this.setData({ eventList: [...this.data.eventList, ...list] })
+        }
+        this.setData({
+          eventsLoaded: true,
+          eventTotal: res.total || list.length,
+          eventHasMore: (res.page * res.pageSize) < (res.total || 0)
+        })
       }
     } catch (e) {
       console.error('[历史赛事] 加载失败', e)
+      // 【OPT-P1修复】失败后不标记为loaded，允许后续切换tab时重试
+      if (reset) this.setData({ eventsLoaded: false })
     } finally {
       this.setData({ eventsLoading: false })
+    }
+  },
+
+  // 【第8轮新增】加载更多历史赛事
+  async loadMoreEvents() {
+    if (this.data.eventLoadingMore || !this.data.eventHasMore) return
+    this.setData({ eventLoadingMore: true, eventPage: this.data.eventPage + 1 })
+    try {
+      await this.loadEvents(false) // 追加模式
+    } finally {
+      this.setData({ eventLoadingMore: false })
+    }
+  },
+
+  // 【第8轮新增】历史赛事搜索输入（防抖300ms）
+  onHistorySearchInput(e) {
+    const val = e.detail.value || ''
+    this.setData({ historySearchText: val })
+    if (this._historySearchTimer) clearTimeout(this._historySearchTimer)
+    this._historySearchTimer = setTimeout(() => {
+      this.loadEvents(true)
+    }, 300)
+  },
+
+  // 【第8轮新增】历史赛事搜索确认
+  onHistorySearchConfirm(e) {
+    if (this._historySearchTimer) clearTimeout(this._historySearchTimer)
+    const val = e.detail.value || ''
+    this.setData({ historySearchText: val })
+    this.loadEvents(true)
+  },
+
+  // 【第8轮新增】清除历史赛事搜索
+  clearHistorySearch() {
+    // 【OPT-P2修复】如果当前已经是空搜索，不重复触发API请求
+    const currentEmpty = !this.data.historySearchText || !this.data.historySearchText.trim()
+    this.setData({ historySearchText: '' })
+    if (!currentEmpty) {
+      this.loadEvents(true)
     }
   },
 
@@ -447,10 +577,14 @@ Page({
   },
 
   // 【第4轮新增】跳转赛事详情页
+  // 【第8轮增强】从历史赛事Tab跳转时携带 readonly=1 参数，强制纯只读模式
   goEventDetail(e) {
     const eventId = e.currentTarget.dataset.eventId
     if (!eventId) return
-    wx.navigateTo({ url: '/pages/event-detail/event-detail?eventId=' + eventId })
+    // 如果是历史赛事Tab，添加 readonly 标记
+    const isHistory = this.data.subTab === 'history'
+    const extra = isHistory ? '&readonly=1&fromHistory=1' : ''
+    wx.navigateTo({ url: '/pages/event-detail/event-detail?eventId=' + eventId + extra })
   },
 
 
@@ -712,6 +846,128 @@ Page({
     return {
       title: '蜀国争霸系统 - 看看大家的Dota2段位！',
       path: '/pages/dota2/dota2'
+    }
+  },
+
+  // ====== 【赛事创建】新建赛事弹窗逻辑 ======
+
+  /**
+   * 打开「新建赛事」弹窗
+   * 仅管理员端可见调用入口，普通用户不会触发
+   */
+  showCreateEventModal() {
+    this.setData({
+      showCreateModal: true,
+      createEventName: '',
+      createEventDate: '',
+      createEventDesc: ''
+    })
+  },
+
+  /**
+   * 关闭「新建赛事」弹窗，重置表单
+   */
+  closeCreateEventModal() {
+    this.setData({
+      showCreateModal: false,
+      createEventName: '',
+      createEventDate: '',
+      createEventDesc: ''
+    })
+  },
+
+  /**
+   * 赛事名称输入绑定
+   */
+  onCreateEventNameInput(e) {
+    this.setData({ createEventName: e.detail.value })
+  },
+
+  /**
+   * 开始日期选择绑定（mode="date" 返回 "YYYY-MM-DD" 字符串）
+   */
+  onCreateEventDateChange(e) {
+    this.setData({ createEventDate: e.detail.value })
+  },
+
+  /**
+   * 赛事简介输入绑定（多行文本）
+   */
+  onCreateEventDescInput(e) {
+    this.setData({ createEventDesc: e.detail.value })
+  },
+
+  /**
+   * 【核心】提交创建赛事
+   * 1. 前端校验：赛事名称必填、长度 2-50 字符
+   * 2. 调用 POST /api/events/create
+   * 3. 成功 → 提示 + 刷新列表 + 跳转详情页
+   */
+  async submitCreateEvent() {
+    // ── 【校验1】赛事名称非空 ──
+    var name = (this.data.createEventName || '').trim()
+    if (!name) {
+      wx.showToast({ title: '请输入赛事名称', icon: 'none' })
+      return
+    }
+
+    // ── 【校验2】长度 2-50 字符 ──
+    if (name.length < 2) {
+      wx.showToast({ title: '赛事名称至少需要2个字符', icon: 'none' })
+      return
+    }
+    if (name.length > 50) {
+      wx.showToast({ title: '赛事名称不能超过50个字符', icon: 'none' })
+      return
+    }
+
+    // ── 【构造请求参数】日期 → 毫秒时间戳 ──
+    var startTime = null
+    var dateStr = this.data.createEventDate
+    if (dateStr) {
+      // 将 YYYY-MM-DD 转为当天 00:00:00 的时间戳
+      startTime = new Date(dateStr.replace(/-/g, '/') + ' 00:00:00').getTime()
+      if (isNaN(startTime)) startTime = null
+    }
+
+    var desc = (this.data.createEventDesc || '').trim()
+
+    wx.showLoading({ title: '创建中...', mask: true })
+
+    try {
+      // ── 【调用后端创建接口】 ──
+      var res = await api.post('/events/create', {
+        event_name: name,
+        start_time: startTime,
+        event_desc: desc || undefined
+      })
+
+      wx.hideLoading()
+
+      if (res.success) {
+        // 创建成功：关闭弹窗
+        this.setData({ showCreateModal: false })
+
+        wx.showToast({ title: '赛事创建成功', icon: 'success', duration: 1500 })
+
+        // 刷新赛事章程列表
+        this.loadRuleEvents()
+
+        // 延迟跳转到新赛事详情页
+        var eventId = res.data.eventId
+        setTimeout(function () {
+          wx.navigateTo({
+            url: '/pages/event-detail/event-detail?eventId=' + eventId
+          })
+        }, 800)
+      } else {
+        // 后端返回的业务错误
+        wx.showToast({ title: res.error || '创建失败', icon: 'none', duration: 2000 })
+      }
+    } catch (err) {
+      wx.hideLoading()
+      console.error('[赛事创建] 失败', err)
+      wx.showToast({ title: '网络错误，请重试', icon: 'none' })
     }
   },
 

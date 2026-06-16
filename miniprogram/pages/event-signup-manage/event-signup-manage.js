@@ -49,7 +49,26 @@ Page({
         return
       }
 
+      // 加载赛事并校验状态
       await this.loadEvent()
+      const event = this.data.event
+      if (!event) {
+        wx.showToast({ title: '赛事不存在', icon: 'none' })
+        setTimeout(() => wx.navigateBack(), 1500)
+        return
+      }
+      // 【BUG-P2修复】已归档或对战中/已结束的赛事禁止报名管理操作
+      if (event.is_archived === 1) {
+        wx.showToast({ title: '赛事已归档，不可管理报名', icon: 'none' })
+        setTimeout(() => wx.navigateBack(), 1500)
+        return
+      }
+      if (event.event_status >= 4) {
+        wx.showToast({ title: '赛事已进入对战/结束阶段，不可管理报名', icon: 'none' })
+        setTimeout(() => wx.navigateBack(), 1500)
+        return
+      }
+
       await this.loadSignups()
       this.setData({ loaded: true })
     } catch (e) {

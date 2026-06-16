@@ -1,0 +1,156 @@
+<!--
+  ============================================================
+  第6轮：对战编排页
+  - 队伍列表支持勾选
+  - 手动配对 / 自动匹配（按MMR）
+  - 生成确认弹窗
+  ============================================================
+-->
+<view class="page">
+
+  <!-- 加载状态 -->
+  <view class="loading-wrap" wx:if="{{loading}}">
+    <text class="loading-text">加载队伍数据中...</text>
+  </view>
+
+  <view class="content" wx:if="{{!loading}}">
+
+    <!-- ========== 顶部信息栏 ========== -->
+    <view class="info-bar">
+      <view class="info-left">
+        <text class="info-event">{{eventName}}</text>
+        <text class="info-round">编排第 {{nextRound}} 轮对战</text>
+      </view>
+      <view class="info-right">
+        <text class="info-team-count">{{teams.length}} 队</text>
+      </view>
+    </view>
+
+    <!-- ========== 快捷操作栏 ========== -->
+    <view class="quick-bar">
+      <view class="quick-btn btn-select-all" bindtap="toggleSelectAll">
+        <text>{{selectedTeamIds.length === teams.length ? '取消全选' : '全选队伍'}}</text>
+      </view>
+      <view class="quick-btn btn-auto-match" bindtap="autoMatch">
+        <text>🤖 自动匹配</text>
+      </view>
+      <view class="quick-btn btn-auto-gen" bindtap="autoGenerate" wx:if="{{teams.length >= 2}}">
+        <text>⚡ 一键生成</text>
+      </view>
+    </view>
+
+    <!-- ========== 队伍勾选列表 ========== -->
+    <view class="section">
+      <view class="section-header">
+        <text class="section-title">参赛队伍</text>
+        <text class="section-hint">勾选参赛队伍，未勾选的队伍本轮轮空</text>
+      </view>
+
+      <view class="team-select-list">
+        <view
+          class="team-select-item {{selectedTeamIds.indexOf(item.teamId) >= 0 ? 'selected' : ''}}"
+          wx:for="{{teams}}"
+          wx:key="teamId"
+          bindtap="toggleTeam"
+          data-team-id="{{item.teamId}}"
+        >
+          <view class="tsi-checkbox">
+            <view class="checkbox-inner {{selectedTeamIds.indexOf(item.teamId) >= 0 ? 'checked' : ''}}">
+              <text wx:if="{{selectedTeamIds.indexOf(item.teamId) >= 0}}">✓</text>
+            </view>
+          </view>
+          <view class="tsi-info">
+            <text class="tsi-name">{{item.teamName}}</text>
+            <text class="tsi-meta">{{item.playerCount}}人 · {{item.totalMmr}}分 · 队长{{item.captainName}}</text>
+          </view>
+          <text class="tsi-mmr">{{item.totalMmr}}</text>
+        </view>
+      </view>
+
+      <!-- 空状态 -->
+      <view class="empty-state" wx:if="{{teams.length === 0}}">
+        <text class="empty-text">暂无队伍数据</text>
+      </view>
+    </view>
+
+    <!-- ========== 已配对列表 ========== -->
+    <view class="section" wx:if="{{pairs.length > 0}}">
+      <view class="section-header">
+        <text class="section-title">对战配对</text>
+        <text class="section-count">{{pairs.length}} 组</text>
+      </view>
+
+      <view class="pair-list">
+        <view class="pair-card" wx:for="{{pairs}}" wx:key="index">
+          <view class="pair-vs-line">
+            <!-- A队 -->
+            <view class="pair-team pair-team-a">
+              <text class="pt-name">{{item.teamA.teamName}}</text>
+              <text class="pt-mmr">{{item.teamA.totalMmr}}分</text>
+              <text class="pt-count">{{item.teamA.playerCount}}人</text>
+            </view>
+            <!-- VS -->
+            <view class="pair-vs">
+              <text class="vs-text">VS</text>
+            </view>
+            <!-- B队 -->
+            <view class="pair-team pair-team-b">
+              <text class="pt-name">{{item.teamB.teamName}}</text>
+              <text class="pt-mmr">{{item.teamB.totalMmr}}分</text>
+              <text class="pt-count">{{item.teamB.playerCount}}人</text>
+            </view>
+          </view>
+          <!-- 取消配对按钮 -->
+          <view class="pair-remove" bindtap="removePair" data-index="{{index}}">
+            <text>取消配对</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- ========== 轮空队伍提示 ========== -->
+    <view class="bye-hint" wx:if="{{teams.length > 0 && selectedTeamIds.length < teams.length && selectedTeamIds.length > 0}}">
+      <text class="bye-label">本轮轮空：</text>
+      <block wx:for="{{teams}}" wx:key="teamId">
+        <text class="bye-team" wx:if="{{selectedTeamIds.indexOf(item.teamId) < 0}}">{{item.teamName}} </text>
+      </block>
+    </view>
+
+    <!-- ========== 底部操作栏 ========== -->
+    <view class="bottom-bar">
+      <view class="bottom-btn btn-gray" bindtap="goViewMatches">
+        <text>取消</text>
+      </view>
+      <button
+        class="bottom-btn btn-primary"
+        bindtap="showGenerateConfirm"
+        loading="{{generating}}"
+        disabled="{{pairs.length === 0}}"
+        wx:if="{{pairs.length > 0}}"
+      >
+        生成第{{nextRound}}轮对战（{{pairs.length}}组）
+      </button>
+      <view class="bottom-btn btn-disabled" wx:if="{{pairs.length === 0}}">
+        <text>请先配对队伍</text>
+      </view>
+    </view>
+
+  </view>
+
+  <!-- ========== 生成确认弹窗 ========== -->
+  <view class="modal-mask" wx:if="{{showConfirmModal}}" catchtouchmove="preventMove">
+    <view class="modal-box">
+      <text class="modal-title">确认生成对战</text>
+      <text class="modal-content">{{_confirmContent}}</text>
+      <view class="modal-btns">
+        <view class="modal-btn btn-secondary" bindtap="hideConfirmModal">
+          <text>取消</text>
+        </view>
+        <view class="modal-btn btn-danger" bindtap="doGenerate">
+          <text>确认生成</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+</view>

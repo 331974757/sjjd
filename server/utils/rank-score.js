@@ -164,10 +164,10 @@ function getScore(player) {
     };
   }
 
-  // 兜底：rankSort 无效，返回 -1 标记为未知
+  // 兜底：rankSort 无效，给保守默认分（中军中间水平，3000分），避免分组严重失衡
   return {
-    score: -1,
-    source: 'unknown',
+    score: 3000,
+    source: 'default_unknown',
   };
 }
 

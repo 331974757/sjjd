@@ -6,7 +6,9 @@
     "pages/dota2-import/dota2-import",
     "pages/admin/admin",
     "pages/event-detail/event-detail",
-    "pages/event-signup-manage/event-signup-manage"
+    "pages/event-signup-manage/event-signup-manage",
+    "pages/event-team-edit/event-team-edit",
+    "pages/event-match-edit/event-match-edit"
   ],
   "window": {
     "backgroundTextStyle": "dark",
@@ -15,6 +17,5 @@
     "navigationBarTextStyle": "white"
   },
   "style": "v2",
-  "sitemapLocation": "sitemap.json",
-  "lazyCodeLoading": "requiredComponents"
+  "sitemapLocation": "sitemap.json"
 }

@@ -115,9 +115,11 @@ function allocateTeams(playerList, teamCount, forceRules = {}, config = {}) {
   const minPlayersNeeded = teamCount * CORE_SIZE;
 
   if (totalPlayers < minPlayersNeeded) {
-    warnings.push(
-      `选手总数(${totalPlayers})不足：${teamCount}支队伍×每队${CORE_SIZE}人=最少需要${minPlayersNeeded}人`
-    );
+    return {
+      teams: [],
+      balanceInfo: null,
+      error: `选手总数(${totalPlayers})不足：${teamCount}支队伍×每队${CORE_SIZE}人=最少需要${minPlayersNeeded}人，当前仅${totalPlayers}人，请增加选手或减少队伍数量`
+    };
   }
 
   // === 第1步：数据预处理（分值计算 + 位置解析） ===

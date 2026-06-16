@@ -77,6 +77,13 @@ Page({
     }, 300)
   },
 
+  // 清除搜索关键词
+  onClearKeyword() {
+    if (this._searchTimer) clearTimeout(this._searchTimer)
+    this.setData({ keyword: '', displayCount: PAGE_SIZE })
+    this.filterUsers()
+  },
+
   // 公共筛选方法
   _getFiltered() {
     let list = this.data.allUsers.slice()

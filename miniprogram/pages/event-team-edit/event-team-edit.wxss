@@ -1,0 +1,453 @@
+/**
+ * ============================================================
+ * 第5轮：队伍拖拽编组页面样式
+ * 设计语言：暗色电竞风，与现有 dota2 页面保持一致
+ * ============================================================
+ */
+
+.page {
+  min-height: 100vh;
+  background: #0d1117;
+  padding-bottom: 40rpx;
+}
+
+/* ===== 加载状态 ===== */
+.loading-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+.loading-text {
+  font-size: 28rpx;
+  color: #8b949e;
+}
+
+/* ===== 顶部操作提示 ===== */
+.action-hint {
+  display: flex;
+  align-items: center;
+  margin: 20rpx 24rpx 8rpx;
+  padding: 16rpx 20rpx;
+  background: rgba(31,111,235,0.08);
+  border-radius: 12rpx;
+  border: 1rpx solid rgba(31,111,235,0.15);
+}
+.hint-icon { font-size: 32rpx; margin-right: 12rpx; }
+.hint-text { font-size: 24rpx; color: #58a6ff; flex: 1; }
+
+/* ===== 分区容器 ===== */
+.zone-section {
+  margin: 20rpx 20rpx 0;
+}
+.zone-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 8rpx 14rpx;
+}
+.zone-title {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #e6edf3;
+}
+.zone-count {
+  font-size: 24rpx;
+  color: #8b949e;
+}
+
+/* ===== 空状态 ===== */
+.zone-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40rpx 0 50rpx;
+}
+.empty-icon { font-size: 48rpx; margin-bottom: 12rpx; }
+.empty-text { font-size: 26rpx; color: #8b949e; }
+.empty-sub { font-size: 22rpx; color: #484f58; margin-top: 8rpx; }
+
+/* ===== 自由选手网格 ===== */
+.player-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14rpx;
+}
+
+/* 选手小卡片 */
+.player-chip {
+  display: flex;
+  align-items: center;
+  background: linear-gradient(135deg, #161b22, #1c2333);
+  border: 2rpx solid rgba(255,255,255,0.06);
+  border-radius: 14rpx;
+  padding: 14rpx 18rpx;
+  min-width: 0;
+  flex: 0 0 calc(50% - 7rpx);
+  box-sizing: border-box;
+  position: relative;
+  transition: all 0.15s;
+}
+.player-chip:active {
+  background: rgba(31,111,235,0.06);
+  border-color: rgba(31,111,235,0.2);
+}
+
+/* 选中态 */
+.chip-selected {
+  border-color: #f0883e !important;
+  background: rgba(240,136,62,0.08) !important;
+  box-shadow: 0 0 12rpx rgba(240,136,62,0.15);
+  transform: scale(1.02);
+}
+
+.chip-avatar {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 12rpx;
+  flex-shrink: 0;
+  background: #1c2333;
+}
+.chip-info {
+  flex: 1;
+  min-width: 0;
+  margin-left: 14rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+.chip-name {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #e6edf3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chip-rank {
+  font-size: 20rpx;
+  color: #8b949e;
+}
+.chip-mmr {
+  font-size: 20rpx;
+  color: #d29922;
+  font-weight: 600;
+  margin-left: 10rpx;
+  flex-shrink: 0;
+  width: 60rpx;
+  text-align: right;
+}
+
+/* 选中勾号 */
+.chip-check {
+  position: absolute;
+  top: -6rpx;
+  right: -6rpx;
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 50%;
+  background: #f0883e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.chip-check text {
+  font-size: 22rpx;
+  color: #fff;
+  font-weight: 700;
+}
+
+/* ===== 队伍卡片 ===== */
+.team-card {
+  background: linear-gradient(135deg, #161b22, #1c2333);
+  border: 2rpx solid rgba(255,255,255,0.06);
+  border-radius: 18rpx;
+  padding: 22rpx;
+  margin-bottom: 18rpx;
+  position: relative;
+  transition: all 0.15s;
+}
+
+/* 可放入态（有选中选手时） */
+.card-droppable {
+  border-color: rgba(31,111,235,0.25) !important;
+  border-style: dashed !important;
+}
+.card-droppable:active {
+  background: rgba(31,111,235,0.08);
+  border-color: #58a6ff !important;
+}
+
+/* 队伍标题栏 */
+.team-title-bar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 14rpx;
+}
+.team-name-row {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+.team-name {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #e6edf3;
+}
+.team-count {
+  font-size: 22rpx;
+  color: #8b949e;
+  margin-left: 14rpx;
+  background: rgba(255,255,255,0.05);
+  padding: 2rpx 14rpx;
+  border-radius: 10rpx;
+}
+.team-mmr {
+  font-size: 22rpx;
+  color: #d29922;
+  font-weight: 600;
+  margin-right: 16rpx;
+  flex-shrink: 0;
+}
+
+/* 删除队伍按钮 */
+.team-del-btn {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 50%;
+  background: rgba(248,81,73,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.team-del-btn text {
+  font-size: 32rpx;
+  color: #f85149;
+  font-weight: 300;
+}
+.team-del-btn:active {
+  background: rgba(248,81,73,0.2);
+}
+
+/* 队长行 */
+.captain-row {
+  display: flex;
+  align-items: center;
+  padding: 8rpx 14rpx;
+  background: rgba(210,153,34,0.08);
+  border-radius: 10rpx;
+  margin-bottom: 14rpx;
+}
+.captain-icon { font-size: 28rpx; margin-right: 10rpx; }
+.captain-name { font-size: 24rpx; color: #d29922; font-weight: 600; }
+
+/* 未指定队长提示 */
+.no-captain-row {
+  padding: 8rpx 14rpx;
+  background: rgba(248,81,73,0.06);
+  border-radius: 10rpx;
+  margin-bottom: 14rpx;
+}
+.no-captain-text { font-size: 22rpx; color: #f85149; }
+
+/* 队伍成员区 */
+.team-players {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+/* 队伍成员小卡片 */
+.team-player-chip {
+  display: flex;
+  align-items: center;
+  background: rgba(255,255,255,0.04);
+  border-radius: 12rpx;
+  padding: 10rpx 14rpx;
+  flex: 0 0 calc(50% - 6rpx);
+  box-sizing: border-box;
+  border: 2rpx solid rgba(255,255,255,0.04);
+  position: relative;
+  transition: all 0.15s;
+}
+.team-player-chip:active {
+  background: rgba(31,111,235,0.06);
+}
+
+/* 队长标识 */
+.player-captain {
+  border-color: rgba(210,153,34,0.4) !important;
+  background: rgba(210,153,34,0.08) !important;
+}
+
+.tpc-avatar {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 10rpx;
+  flex-shrink: 0;
+  background: #1c2333;
+}
+.tpc-info {
+  flex: 1;
+  min-width: 0;
+  margin-left: 10rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 2rpx;
+}
+.tpc-name {
+  font-size: 24rpx;
+  color: #e6edf3;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tpc-rank {
+  font-size: 18rpx;
+  color: #8b949e;
+}
+
+/* 队员操作按钮 */
+.tpc-actions {
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
+  margin-left: 6rpx;
+  flex-shrink: 0;
+}
+.tpc-set-captain {
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(210,153,34,0.1);
+}
+.tpc-set-captain text { font-size: 24rpx; }
+.tpc-is-captain {
+  background: rgba(210,153,34,0.2);
+}
+.tpc-remove {
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(248,81,73,0.1);
+}
+.tpc-remove text {
+  font-size: 26rpx;
+  color: #f85149;
+  font-weight: 300;
+}
+.tpc-remove:active {
+  background: rgba(248,81,73,0.2);
+}
+
+/* 空队提示 */
+.team-empty-hint {
+  padding: 24rpx 0;
+  display: flex;
+  justify-content: center;
+}
+.team-empty-hint .hint-text {
+  font-size: 24rpx;
+  color: #484f58;
+}
+
+/* 放入提示 */
+.drop-hint {
+  text-align: center;
+  padding: 10rpx 0 4rpx;
+}
+.drop-hint text {
+  font-size: 22rpx;
+  color: #58a6ff;
+}
+
+/* ===== 操作按钮区 ===== */
+.action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  padding: 30rpx 20rpx 20rpx;
+}
+
+.btn {
+  flex: 1;
+  min-width: 180rpx;
+  height: 80rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  transition: all 0.15s;
+}
+.btn:active {
+  opacity: 0.8;
+  transform: scale(0.97);
+}
+
+/* 新建队伍 */
+.btn-outline {
+  background: transparent;
+  border: 2rpx dashed rgba(255,255,255,0.15);
+  color: #8b949e;
+}
+.btn-outline:active {
+  border-color: #58a6ff;
+  color: #58a6ff;
+}
+
+/* 自动分队 */
+.btn-auto {
+  background: linear-gradient(135deg, rgba(139,148,158,0.15), rgba(139,148,158,0.08));
+  border: 1rpx solid rgba(255,255,255,0.08);
+  color: #e6edf3;
+}
+.btn-auto:active {
+  background: rgba(31,111,235,0.12);
+  border-color: rgba(31,111,235,0.2);
+}
+
+/* 保存编组 */
+.btn-primary {
+  background: linear-gradient(135deg, #1f6feb, #388bfd);
+  color: #fff;
+  border: none;
+  box-shadow: 0 4rpx 14rpx rgba(31,111,235,0.3);
+}
+
+/* 开始比赛（红色警示） */
+.btn-danger {
+  background: linear-gradient(135deg, #da3633, #f85149);
+  color: #fff;
+  border: none;
+  box-shadow: 0 4rpx 14rpx rgba(248,81,73,0.3);
+  flex: 0 0 100%;
+  height: 88rpx;
+  font-size: 30rpx;
+}
+
+/* ===== 只读提示 ===== */
+.readonly-bar {
+  display: flex;
+  justify-content: center;
+  padding: 30rpx 20rpx;
+  margin-top: 20rpx;
+}
+.readonly-bar text {
+  font-size: 26rpx;
+  color: #6e7681;
+  padding: 14rpx 40rpx;
+  background: rgba(255,255,255,0.03);
+  border-radius: 12rpx;
+}

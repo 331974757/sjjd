@@ -1,0 +1,186 @@
+<!--
+  ============================================================
+  第5轮：队伍拖拽编组 + 指定队长
+  - 自由选手区（点击选择 → 点击队伍加入）
+  - 队伍卡片区（含队长标识、总分、删除按钮）
+  - 操作按钮区（自动分队 / 保存编组 / 开始比赛）
+  - 权限控制：普通用户只读，管理员可编辑
+  ============================================================
+-->
+
+<view class="page">
+  <!-- 加载状态 -->
+  <view class="loading-wrap" wx:if="{{loading}}">
+    <text class="loading-text">加载编组数据中...</text>
+  </view>
+
+  <view class="content" wx:if="{{!loading}}">
+
+    <!-- ========== 顶部操作提示 ========== -->
+    <view class="action-hint" wx:if="{{isAdmin && canEdit}}">
+      <text class="hint-icon">👆</text>
+      <text class="hint-text">点击下方选手选择，再点击队伍卡片放入</text>
+    </view>
+
+    <!-- ========== 自由选手区 ========== -->
+    <view class="zone-section">
+      <view class="zone-header">
+        <text class="zone-title">自由选手区</text>
+        <text class="zone-count">未入队 {{freePlayers.length}} 人</text>
+      </view>
+
+      <!-- 空状态 -->
+      <view class="zone-empty" wx:if="{{freePlayers.length === 0}}">
+        <text class="empty-icon">✅</text>
+        <text class="empty-text">所有选手已入队</text>
+      </view>
+
+      <!-- 选手列表（可点击选择） -->
+      <view class="player-grid" wx:if="{{freePlayers.length > 0}}">
+        <view
+          class="player-chip {{selectedPlayerId === item.id ? 'chip-selected' : ''}}"
+          wx:for="{{freePlayers}}"
+          wx:key="id"
+          bindtap="{{canEdit ? 'selectPlayer' : ''}}"
+          data-player-id="{{item.id}}"
+        >
+          <image class="chip-avatar" src="{{item.avatar_url || '/images/default-avatar.png'}}" mode="aspectFill" />
+          <view class="chip-info">
+            <text class="chip-name">{{item.wx_nickname || '未知'}}</text>
+            <text class="chip-rank">{{item.calibrate_rank_name || '无段位'}} {{item.calibrate_rank_star ? item.calibrate_rank_star + '★' : ''}}</text>
+          </view>
+          <text class="chip-mmr">{{item.calibrate_mmr || 0}}</text>
+          <view class="chip-check" wx:if="{{selectedPlayerId === item.id}}">
+            <text>✓</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- ========== 队伍卡片区 ========== -->
+    <view class="zone-section">
+      <view class="zone-header">
+        <text class="zone-title">队伍列表</text>
+        <text class="zone-count">{{teams.length}} 支队伍</text>
+      </view>
+
+      <!-- 空状态 -->
+      <view class="zone-empty" wx:if="{{teams.length === 0}}">
+        <text class="empty-icon">🏴</text>
+        <text class="empty-text">暂无队伍</text>
+        <text class="empty-sub" wx:if="{{canEdit}}">点击「新建队伍」或「自动分队」开始编组</text>
+      </view>
+
+      <!-- 队伍卡片（可点击放入选手） -->
+      <view
+        class="team-card {{selectedPlayerId && canEdit ? 'card-droppable' : ''}}"
+        wx:for="{{teams}}"
+        wx:key="teamId"
+        id="team-{{item.teamId}}"
+        bindtap="{{selectedPlayerId && canEdit ? 'dropToTeam' : ''}}"
+        data-team-id="{{item.teamId}}"
+      >
+        <!-- 队伍标题栏 -->
+        <view class="team-title-bar">
+          <view class="team-name-row">
+            <text class="team-name">{{item.teamName}}</text>
+            <text class="team-count">{{item.players.length}}人</text>
+          </view>
+          <!-- 总分 -->
+          <text class="team-mmr" wx:if="{{item.totalMmr > 0}}">总{{item.totalMmr}}分</text>
+          <!-- 删除按钮（非只读） -->
+          <view class="team-del-btn" wx:if="{{canEdit}}" catchtap="deleteTeam" data-team-id="{{item.teamId}}">
+            <text>×</text>
+          </view>
+        </view>
+
+        <!-- 队长标识 -->
+        <view class="captain-row" wx:if="{{item.captain}}">
+          <text class="captain-icon">👑</text>
+          <text class="captain-name">队长：{{item.captain.wx_nickname || '未知'}}</text>
+        </view>
+        <view class="no-captain-row" wx:elif="{{canEdit && item.players.length > 0}}">
+          <text class="no-captain-text">⚠ 未指定队长（长按队员设置）</text>
+        </view>
+
+        <!-- 队伍成员 -->
+        <view class="team-players">
+          <view
+            class="team-player-chip {{item.captain && player.id === item.captain.id ? 'player-captain' : ''}}"
+            wx:for="{{item.players}}"
+            wx:for-item="player"
+            wx:for-index="pi"
+            wx:key="id"
+          >
+            <image class="tpc-avatar" src="{{player.avatar_url || '/images/default-avatar.png'}}" mode="aspectFill" />
+            <view class="tpc-info">
+              <text class="tpc-name">{{player.wx_nickname || '未知'}}</text>
+              <text class="tpc-rank">{{player.calibrate_rank_name || ''}}</text>
+            </view>
+            <!-- 队长已设置时显示皇冠，否则可点击 -->
+            <view class="tpc-actions" wx:if="{{canEdit}}">
+              <view
+                class="tpc-set-captain {{item.captain && player.id === item.captain.id ? 'tpc-is-captain' : ''}}"
+                catchtap="setTeamCaptain"
+                data-team-id="{{item.teamId}}"
+                data-player-id="{{player.id}}"
+              >
+                <text>{{item.captain && player.id === item.captain.id ? '👑' : '♔'}}</text>
+              </view>
+              <!-- 移出队伍 -->
+              <view
+                class="tpc-remove"
+                catchtap="removeFromTeam"
+                data-team-id="{{item.teamId}}"
+                data-player-id="{{player.id}}"
+              >
+                <text>×</text>
+              </view>
+            </view>
+          </view>
+
+          <!-- 空队提示（可点击放入选手） -->
+          <view class="team-empty-hint" wx:if="{{item.players.length === 0 && canEdit}}">
+            <text class="hint-text">点击此处放入选手</text>
+          </view>
+        </view>
+
+        <!-- 选中的选手即将放入某队时的高亮提示 -->
+        <view class="drop-hint" wx:if="{{selectedPlayerId && canEdit}}">
+          <text>📥 点击放入</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- ========== 操作按钮区（仅管理员+可编辑状态下显示） ========== -->
+    <view class="action-bar" wx:if="{{isAdmin && canEdit}}">
+      <!-- 新建队伍 -->
+      <view class="btn btn-outline" bindtap="addTeam">
+        <text>+ 新建队伍</text>
+      </view>
+
+      <!-- 自动分队（仅当无队伍时推荐使用） -->
+      <view class="btn btn-auto" bindtap="autoAllocate">
+        <text>🤖 自动分队</text>
+      </view>
+
+      <!-- 保存编组 -->
+      <view class="btn btn-primary" bindtap="saveTeams" wx:if="{{teams.length > 0}}">
+        <text>💾 保存编组</text>
+      </view>
+
+      <!-- 开始比赛（需赛事状态=分组锁定 且 队伍数据完整） -->
+      <view class="btn btn-danger" bindtap="startMatch" wx:if="{{eventStatus === 3 && teams.length >= 2}}">
+        <text>⚔️ 开始比赛</text>
+      </view>
+    </view>
+
+    <!-- ========== 只读提示（普通用户/已锁定） ========== -->
+    <view class="readonly-bar" wx:if="{{!canEdit}}">
+      <text wx:if="{{eventStatus >= 4}}">🔒 队伍已锁定，比赛进行中</text>
+      <text wx:elif="{{eventStatus === 5}}">📦 赛事已归档</text>
+      <text wx:else>👁 只读模式</text>
+    </view>
+
+  </view>
+</view>

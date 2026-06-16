@@ -11,6 +11,9 @@
     <!-- 搜索栏 -->
     <view class="search-bar">
       <input class="search-input" placeholder="搜索昵称" value="{{keyword}}" bindinput="onKeywordInput" />
+      <view class="search-clear" wx:if="{{keyword}}" bindtap="onClearKeyword">
+        <text>✕</text>
+      </view>
     </view>
 
     <text class="subtitle" wx:if="{{isSuperAdmin}}">点击用户即可调整权限（管理员/超级管理员）</text>

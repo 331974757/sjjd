@@ -1,9 +1,0 @@
-[
-  {"_id":"80689ed36a2b7197000c4eb164969467","createdAt":1781232023738,"nickName":"PaPier","openid":"oVVY63YrQmLp5WEvdNXWkoAKmxeI","role":"super_admin","updatedAt":1781232499808},
-  {"_id":"c229c8746a2bf2db001650c038d37945","createdAt":1781265115731,"nickChangeCount":3,"nickName":"从青不争","openid":"oVVY63Qo1uB7efURFC3Ce_Rj1AaM","role":"super_admin","updatedAt":1781273149900},
-  {"_id":"1e41bf4c6a2c061b0017fdfe14239840","createdAt":1781270043578,"nickChangeCount":3,"nickName":"测试账号","openid":"oVVY63W1KH4Vp_sVSJQXS8-J_Ros","role":"admin","updatedAt":1781273421738},
-  {"_id":"c229c8746a2c0b580017bdf96b83335b","createdAt":1781271384544,"nickName":"","openid":"oVVY63bWvWi-Bgzsfr9zBsgemPCQ","role":"user"},
-  {"_id":"1e41bf4c6a2c0b58001861b44c2e8438","createdAt":1781271384816,"nickName":"","openid":"oVVY63cKlp2Jh_2aZRRG5B3u_tpU","role":"user"},
-  {"_id":"c229c8746a2c0b5a0017be0d3cbc2b07","createdAt":1781271386151,"nickName":"","openid":"oVVY63WMS_RVJ7-QpwDFjXZteUWU","role":"user"},
-  {"_id":"1e41bf4c6a2c0ddd001888f3154b32e1","createdAt":1781272029698,"nickName":"","openid":"oVVY63bha-ECAYFrPEGWnQOWeEN8","role":"user"}
-]

@@ -32,62 +32,76 @@
     <!-- ====== 报名操作区域 ====== -->
     <view class="signup-area">
 
-      <!-- 管理员操作按钮组 -->
-      <view class="admin-actions" wx:if="{{isAdmin}}">
+      <!-- 管理员操作按钮组（使用 checkAction 统一权限判断，已归档或历史只读模式时隐藏所有编辑按钮） -->
+      <view class="admin-actions" wx:if="{{actions.change_status.allowed || actions.manage_signups.allowed || actions.manage_teams.allowed || actions.manage_matches.allowed}}">
         <view class="admin-btn-row">
           <!-- 开启报名/截止报名按钮（根据当前状态动态展示） -->
           <button
-            class="admin-btn btn-status {{event.event_status >= 2 ? 'btn-disabled' : ''}}"
-            wx:if="{{event.event_status === 0}}"
+            class="admin-btn btn-status {{actions.change_status.allowed ? '' : 'btn-disabled'}}"
+            wx:if="{{event.event_status === 0 || event.event_status === 1}}"
             bindtap="showStatusConfirm"
             loading="{{loading}}"
-          >开启报名</button>
-          <button
-            class="admin-btn btn-status btn-danger {{event.event_status >= 2 ? 'btn-disabled' : ''}}"
-            wx:if="{{event.event_status === 1}}"
-            bindtap="showStatusConfirm"
-            loading="{{loading}}"
-          >截止报名</button>
+          >{{event.event_status === 0 ? '开启报名' : '截止报名'}}</button>
           <!-- 报名人员管理按钮 -->
           <button
-            class="admin-btn btn-manage"
+            class="admin-btn btn-manage {{actions.manage_signups.allowed ? '' : 'btn-disabled'}}"
             bindtap="goSignupManage"
+            disabled="{{!actions.manage_signups.allowed}}"
           >报名人员管理</button>
+          <!-- 【第5轮】队伍编组按钮 -->
+          <button
+            class="admin-btn btn-team-edit {{actions.manage_teams.allowed ? '' : 'btn-disabled'}}"
+            wx:if="{{event.event_status === 2 || event.event_status === 3}}"
+            bindtap="goTeamEdit"
+            disabled="{{!actions.manage_teams.allowed}}"
+          >队伍编组</button>
+          <!-- 【第6轮】对战编排按钮 -->
+          <button
+            class="admin-btn btn-match-edit"
+            wx:if="{{actions.manage_matches.allowed}}"
+            bindtap="goMatchEdit"
+          >对战编排</button>
         </view>
       </view>
 
-      <!-- 普通用户报名字段 -->
-      <view class="user-signup">
+      <!-- 【第7轮】已归档只读提示 + 【第8轮】历史赛事查看提示 -->
+      <view class="archived-banner" wx:if="{{isArchived}}">
+        <text class="ab-text" wx:if="{{!readonly}}">🔒 赛事已归档，所有数据为只读状态</text>
+        <text class="ab-text" wx:if="{{readonly}}">📋 历史赛事 · 纯只读查看 · 所有数据已归档固化</text>
+      </view>
+
+      <!-- 普通用户报名字段（使用 checkAction 统一权限判断） -->
+      <view class="user-signup" wx:if="{{!readonly}}">
         <!-- 状态：报名中 + 未报名 → 显示报名按钮 -->
         <button
           class="signup-btn btn-primary"
-          wx:if="{{event.event_status === 1 && (!mySignup || !mySignup.signedUp)}}"
+          wx:if="{{signupBtn.allowed && (!mySignup || !mySignup.signedUp)}}"
           bindtap="doSignup"
           loading="{{loading}}"
         >立即报名</button>
 
         <!-- 状态：报名中 + 已报名 → 显示已报名状态 + 取消按钮 -->
-        <view class="signup-done" wx:if="{{event.event_status === 1 && mySignup && mySignup.signedUp}}">
+        <view class="signup-done" wx:if="{{signupBtn.allowed && mySignup && mySignup.signedUp}}">
           <view class="signup-done-left">
             <text class="done-icon">✓</text>
             <text class="done-text">已报名</text>
             <text class="done-type" wx:if="{{mySignup.signupType === 'admin_add'}}">（管理员添加）</text>
           </view>
-          <button class="signup-btn btn-cancel" bindtap="showCancelConfirm">取消报名</button>
+          <button class="signup-btn btn-cancel" wx:if="{{cancelSignupBtn.allowed}}" bindtap="showCancelConfirm">取消报名</button>
         </view>
 
         <!-- 状态：非报名中 + 未报名 → 灰化按钮 + 提示原因 -->
         <button
           class="signup-btn btn-disabled"
-          wx:if="{{event.event_status !== 1 && (!mySignup || !mySignup.signedUp)}}"
+          wx:if="{{!signupBtn.allowed && (!mySignup || !mySignup.signedUp)}}"
           disabled
         >立即报名</button>
-        <view class="signup-hint" wx:if="{{event.event_status !== 1 && (!mySignup || !mySignup.signedUp)}}">
-          <text>{{getBtnDisabledReason()}}</text>
+        <view class="signup-hint" wx:if="{{!signupBtn.allowed && (!mySignup || !mySignup.signedUp)}}">
+          <text>{{signupDisabledReason}}</text>
         </view>
 
         <!-- 状态：非报名中 + 已报名（如已截止后）→ 仅展示已报名状态 -->
-        <view class="signup-done" wx:if="{{event.event_status !== 1 && mySignup && mySignup.signedUp}}">
+        <view class="signup-done" wx:if="{{!signupBtn.allowed && mySignup && mySignup.signedUp}}">
           <view class="signup-done-left">
             <text class="done-icon">✓</text>
             <text class="done-text">已报名</text>
@@ -136,6 +150,201 @@
       </view>
     </view>
 
+    <!-- ====== 【第6轮】对战列表区域（对战中/已归档 时展示） ====== -->
+    <view class="battle-section" wx:if="{{event.event_status >= 4 && rounds.length > 0}}">
+
+      <!-- 轮次切换标签 -->
+      <scroll-view class="round-tabs" scroll-x="true" enable-flex>
+        <view
+          class="round-tab {{currentRound === item.roundNum ? 'rt-active' : ''}} {{item.allDone ? 'rt-done' : ''}}"
+          wx:for="{{rounds}}"
+          wx:key="roundNum"
+          bindtap="switchRound"
+          data-round="{{item.roundNum}}"
+        >
+          <text class="rt-label">第{{item.roundNum}}轮</text>
+          <text class="rt-progress">{{item.completedCount}}/{{item.matchCount}}</text>
+          <text class="rt-check" wx:if="{{item.allDone}}">✓</text>
+        </view>
+      </scroll-view>
+
+      <!-- 对战卡片列表 -->
+      <view class="match-list" wx:if="{{matches.length > 0}}">
+        <view
+          class="match-card {{item._isDone ? 'mc-done' : 'mc-pending'}} {{isAdmin && !item._isDone ? 'mc-clickable' : ''}}"
+          wx:for="{{matches}}"
+          wx:key="match_id"
+          bindtap="{{isAdmin && !item._isDone ? 'openJudgeModal' : ''}}"
+          data-match-id="{{item.match_id}}"
+        >
+          <!-- A队 -->
+          <view class="mc-team mc-team-a {{item.winner_id === item.team_a_id ? 'mc-winner' : ''}}">
+            <text class="mct-name">{{item.team_a_name || '未知队伍'}}</text>
+            <text class="mct-mmr">{{item.team_a_mmr || 0}}分</text>
+            <text class="mct-win-badge" wx:if="{{item.winner_id === item.team_a_id}}">🏆</text>
+          </view>
+
+          <!-- 中间分隔 -->
+          <view class="mc-center">
+            <text class="mc-vs">VS</text>
+            <text class="mc-status {{item._isDone ? 's-done' : 's-pending'}}">
+              {{item._isDone ? '已结束' : '待判定'}}
+            </text>
+            <text class="mc-time" wx:if="{{item._isDone && item.judge_time}}">{{item._winnerLabel}}</text>
+          </view>
+
+          <!-- B队 -->
+          <view class="mc-team mc-team-b {{item.winner_id === item.team_b_id ? 'mc-winner' : ''}}">
+            <text class="mct-name">{{item.team_b_name || '未知队伍'}}</text>
+            <text class="mct-mmr">{{item.team_b_mmr || 0}}分</text>
+            <text class="mct-win-badge" wx:if="{{item.winner_id === item.team_b_id}}">🏆</text>
+          </view>
+
+          <!-- 管理员操作提示（使用 checkAction 统一权限判断） -->
+          <view class="mc-admin-hint" wx:if="{{actions.manage_matches.allowed && !item._isDone}}">
+            <text>点击判定胜负</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 无对战数据 -->
+      <view class="empty-state" wx:if="{{matches.length === 0}}">
+        <text class="empty-icon">⚔️</text>
+        <text class="empty-text">暂无对战数据</text>
+        <text class="empty-sub">点击「对战编排」开始第1轮</text>
+      </view>
+
+      <!-- 本轮全部完成 → 显示操作按钮（使用 checkAction 统一权限判断） -->
+      <view class="battle-actions" wx:if="{{actions.manage_matches.allowed && roundAllDone && matches.length > 0}}">
+        <view class="ba-row">
+          <button
+            class="ba-btn ba-btn-next"
+            wx:if="{{!allBattlesDone}}"
+            bindtap="showBattleAction"
+            data-action="next-round"
+          >下一轮</button>
+          <button
+            class="ba-btn ba-btn-end"
+            bindtap="showBattleAction"
+            data-action="end-battle"
+          >结束比赛</button>
+        </view>
+      </view>
+
+    </view>
+
+    <!-- ====== 【第7轮】名次排行展示（赛事已结束/已归档时显示） ====== -->
+    <view class="rank-section" wx:if="{{event.event_status === 5}}">
+
+      <view class="rank-section-header">
+        <text class="rank-section-title">🏆 最终排名</text>
+        <!-- 管理员：未归档时可编辑（使用 checkAction 统一权限判断） -->
+        <button
+          class="rank-edit-btn"
+          wx:if="{{actions.manage_ranks.allowed && !ranksEditing}}"
+          bindtap="startEditRanks"
+          size="mini"
+        >编辑名次</button>
+        <button
+          class="rank-cancel-btn"
+          wx:if="{{isAdmin && ranksEditing}}"
+          bindtap="cancelEditRanks"
+          size="mini"
+        >取消编辑</button>
+      </view>
+
+      <!-- ===== 编辑模式：管理员设定名次（使用 checkAction 统一权限判断） ===== -->
+      <view class="rank-edit-area" wx:if="{{actions.manage_ranks.allowed && ranksEditing}}">
+
+        <!-- 名次编辑槽位列表 -->
+        <view class="rank-slot-list">
+          <view class="rank-slot" wx:for="{{rankEditSlots}}" wx:key="rankNum">
+            <view class="rank-slot-header">
+              <text class="rank-slot-label">{{item.label}}</text>
+              <text
+                class="rank-slot-remove"
+                wx:if="{{index >= 3}}"
+                bindtap="removeRankSlot"
+                data-index="{{index}}"
+              >✕</text>
+            </view>
+            <picker
+              mode="selector"
+              range="{{teamsForRank}}"
+              range-key="team_name"
+              value="{{null}}"
+              bindchange="onRankTeamChange"
+              data-index="{{index}}"
+            >
+              <view class="rank-picker {{item.teamId ? 'rank-picker-filled' : 'rank-picker-empty'}}">
+                <text wx:if="{{item.teamId}}">{{item._displayName || '未知'}}</text>
+                <text wx:else>请选择队伍</text>
+                <text class="rank-picker-arrow">▼</text>
+              </view>
+            </picker>
+          </view>
+        </view>
+
+        <!-- 添加更多名次 -->
+        <view class="rank-add-more" bindtap="addMoreRankSlots">
+          <text class="ram-icon">+</text>
+          <text class="ram-text">添加更多名次（第{{rankEditSlots.length + 1}}名）</text>
+        </view>
+
+        <!-- 保存按钮 -->
+        <view class="rank-save-row">
+          <button
+            class="rank-save-btn"
+            bindtap="saveRanks"
+            loading="{{ranksSaving}}"
+          >保存名次</button>
+          <text class="rank-hint">名次非必填，留空项将不做记录</text>
+        </view>
+      </view>
+
+      <!-- ===== 查看模式：展示已设定的名次 ===== -->
+      <view class="rank-display" wx:if="{{!ranksEditing}}">
+        <!-- 有名次数据 -->
+        <view class="rank-podium" wx:if="{{ranks.length > 0}}">
+          <view class="rank-item {{item.rank_num === 1 ? 'rank-gold' : item.rank_num === 2 ? 'rank-silver' : item.rank_num === 3 ? 'rank-bronze' : ''}}" wx:for="{{ranks}}" wx:key="rank_id">
+            <view class="rank-badge">
+              <text class="rank-badge-num" wx:if="{{item.rank_num > 3}}">{{item.rank_num}}</text>
+              <text class="rank-badge-medal" wx:if="{{item.rank_num === 1}}">🥇</text>
+              <text class="rank-badge-medal" wx:if="{{item.rank_num === 2}}">🥈</text>
+              <text class="rank-badge-medal" wx:if="{{item.rank_num === 3}}">🥉</text>
+            </view>
+            <view class="rank-info">
+              <text class="rank-team-name">{{item.team_name || '未知队伍'}}</text>
+              <text class="rank-team-mmr">{{item.total_mmr || 0}} 分</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 无名次数据 -->
+        <view class="rank-empty" wx:if="{{ranks.length === 0}}">
+          <text class="rank-empty-icon">🏆</text>
+          <text class="rank-empty-text" wx:if="{{!isArchived}}">尚未设定名次</text>
+          <text class="rank-empty-text" wx:if="{{isArchived}}">未记录名次</text>
+          <text class="rank-empty-sub" wx:if="{{actions.manage_ranks.allowed}}">点击「编辑名次」手动设定</text>
+        </view>
+      </view>
+
+      <!-- ===== 归档按钮（使用 checkAction 统一权限判断） ===== -->
+      <view class="archive-btn-area" wx:if="{{actions.archive_event.allowed}}">
+        <button
+          class="archive-btn"
+          bindtap="showArchiveConfirm"
+        >🏁 归档比赛</button>
+        <text class="archive-btn-hint">归档后所有数据将固化为只读，不可再修改</text>
+      </view>
+
+      <!-- 已归档提示 -->
+      <view class="archive-done-tip" wx:if="{{isArchived}}">
+        <text class="ad-text">📋 本届赛事数据已归档 · {{_archiveTimeText}}</text>
+      </view>
+
+    </view>
+
   </block>
 
   <!-- 赛事不存在 -->
@@ -164,6 +373,86 @@
       <view class="modal-btns">
         <view class="modal-btn btn-secondary" bindtap="hideStatusConfirm"><text>取消</text></view>
         <view class="modal-btn btn-primary-confirm" bindtap="doChangeStatus"><text>确认</text></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- ====== 【第6轮】胜负判定弹窗 ====== -->
+  <view class="modal-mask" wx:if="{{showJudgeModal}}" catchtouchmove="preventMove">
+    <view class="modal-box judge-modal">
+      <text class="modal-title">判定胜负</text>
+
+      <!-- 步骤0：选择胜方 -->
+      <block wx:if="{{judgeStep === 0}}">
+        <text class="modal-subtitle">第{{currentRound}}轮 · {{judgeMatch.team_a_name}} VS {{judgeMatch.team_b_name}}</text>
+        <text class="judge-prompt">请选择胜方队伍：</text>
+        <view class="judge-options">
+          <view
+            class="judge-option"
+            bindtap="selectWinner"
+            data-team-id="{{judgeMatch.team_a_id}}"
+          >
+            <text class="jo-name">{{judgeMatch.team_a_name || '队伍A'}}</text>
+            <text class="jo-mmr">{{judgeMatch.team_a_mmr || 0}} 分</text>
+          </view>
+          <view
+            class="judge-option"
+            bindtap="selectWinner"
+            data-team-id="{{judgeMatch.team_b_id}}"
+          >
+            <text class="jo-name">{{judgeMatch.team_b_name || '队伍B'}}</text>
+            <text class="jo-mmr">{{judgeMatch.team_b_mmr || 0}} 分</text>
+          </view>
+        </view>
+        <view class="modal-btns">
+          <view class="modal-btn btn-secondary" bindtap="closeJudgeModal"><text>取消</text></view>
+        </view>
+      </block>
+
+      <!-- 步骤1：二次确认 -->
+      <block wx:if="{{judgeStep === 1}}">
+        <text class="modal-content">
+          确认 {{judgeWinnerId === judgeMatch.team_a_id ? (judgeMatch.team_a_name || '队伍A') : (judgeMatch.team_b_name || '队伍B')}} 为胜方？
+          \n\n⚠ 判定后不可修改，请仔细确认。
+        </text>
+        <view class="modal-btns">
+          <view class="modal-btn btn-secondary" bindtap="backToSelect"><text>重新选择</text></view>
+          <view class="modal-btn btn-danger" bindtap="confirmJudge" loading="{{loading}}"><text>确认判定</text></view>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <!-- ====== 【第6轮】下一轮/结束比赛确认弹窗 ====== -->
+  <view class="modal-mask" wx:if="{{showBattleActionModal}}" catchtouchmove="preventMove">
+    <view class="modal-box">
+      <text class="modal-title">{{_battleActionTitle}}</text>
+      <text class="modal-content">{{_battleActionContent}}</text>
+      <view class="modal-btns">
+        <view class="modal-btn btn-secondary" bindtap="hideBattleActionModal"><text>取消</text></view>
+        <view class="modal-btn {{battleActionType === 'end-battle' ? 'btn-danger' : 'btn-primary-confirm'}}" bindtap="doBattleAction">
+          <text>{{battleActionType === 'end-battle' ? '确认结束' : '确认进入'}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- ====== 【第7轮】赛事归档确认弹窗 ====== -->
+  <view class="modal-mask" wx:if="{{showArchiveConfirm}}" catchtouchmove="preventMove">
+    <view class="modal-box">
+      <text class="modal-title">确认归档</text>
+      <text class="modal-content">
+        ⚠ 确认将本届赛事归档？
+        \n\n归档后所有数据将固化为只读状态：
+        \n· 报名数据不可修改
+        \n· 队伍信息不可变更
+        \n· 对战结果不可改动
+        \n· 名次记录不可调整
+        \n\n确认后无法撤销，请仔细确认。
+      </text>
+      <view class="modal-btns">
+        <view class="modal-btn btn-secondary" bindtap="hideArchiveConfirm"><text>取消</text></view>
+        <view class="modal-btn btn-danger" bindtap="doArchive" loading="{{archiveSubmitting}}"><text>确认归档</text></view>
       </view>
     </view>
   </view>

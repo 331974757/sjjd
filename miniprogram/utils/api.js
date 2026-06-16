@@ -23,8 +23,20 @@ async function getOpenId() {
   return ''
 }
 
+/** 获取 JWT token（优先读缓存） */
+function getToken() {
+  try {
+    const app = getApp()
+    if (app && typeof app.getToken === 'function') {
+      return app.getToken()
+    }
+  } catch (_) {}
+  return ''
+}
+
 async function request(options) {
   const openid = await getOpenId()
+  const token = getToken()
   let url = API_BASE + options.url
   const method = (options.method || 'GET').toUpperCase()
 
@@ -38,7 +50,7 @@ async function request(options) {
   // 必须显式 JSON.stringify，微信 wx.request 传对象时可能不按 Content-Type 序列化
   const data = method === 'GET' ? undefined : JSON.stringify(options.data || {})
 
-  // openid 通过 query 传递
+  // openid 通过 query 传递（向后兼容尚未迁移 JWT 的路由）
   if (openid) {
     const sep = url.indexOf('?') >= 0 ? '&' : '?'
     url += sep + 'openid=' + openid
@@ -49,13 +61,19 @@ async function request(options) {
     url += (url.indexOf('?') >= 0 ? '&' : '?') + '_t=' + Date.now()
   }
 
+  // 构建请求头：JWT token 作为身份认证
+  const headers = { 'Content-Type': 'application/json' }
+  if (token) {
+    headers['Authorization'] = 'Bearer ' + token
+  }
+
   return new Promise((resolve, reject) => {
     wx.request({
       url: url,
       method: method,
       data: data,
       timeout: 8000,  // 8 秒超时，避免 App Service 层累计超时触发 SystemError
-      header: { 'Content-Type': 'application/json' },
+      header: headers,
       success: (res) => {
         // 200~499 都 resolve，让调用方通过 res.success 判断业务成败
         // 否则 400 校验错误（如昵称重复）会走 reject 导致看不到具体错误消息
