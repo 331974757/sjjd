@@ -84,7 +84,7 @@
         <view class="tbtn-sort {{sortFilter === 'rank-desc' ? 'sort-desc' : 'sort-asc'}}" bindtap="onSortToggle">
           <text>段位</text><text class="sort-arrow">{{sortFilter === 'rank-desc' ? '↓' : '↑'}}</text>
         </view>
-        <view class="tbtn-reset" bindtap="resetFilters">↻</view>
+        <view class="tbtn-reset" bindtap="resetFilters">✕</view>
       </view>
       <view class="action-right">
         <view class="tbtn-icon chart-btn {{showChart ? 'chart-active' : ''}}" bindtap="toggleChart">◔</view>
@@ -241,7 +241,7 @@
           <view class="hcard-header">
             <text class="hcard-name">{{item.event_name}}</text>
             <view class="hcard-status">
-              <text>已归档</text>
+              <text>名次归档</text>
             </view>
           </view>
 
@@ -380,9 +380,9 @@
       <!-- 开始时间（可选） -->
       <view class="ecm-field">
         <text class="ecm-label">开始时间</text>
-        <picker class="ecm-picker" mode="date" value="{{createEventDate}}" bindchange="onCreateEventDateChange">
+        <picker class="ecm-picker" mode="multiSelector" range="{{createDateTimeRange}}" value="{{createDateTimeIndex}}" bindchange="onCreateDateTimeChange" bindcolumnchange="onCreateDateTimeColumnChange">
           <view class="ecm-picker-display">
-            <text class="{{createEventDate ? '' : 'ecm-placeholder'}}">{{createEventDate || '请选择开始日期（可选）'}}</text>
+            <text class="{{createDateTimeText ? '' : 'ecm-placeholder'}}">{{createDateTimeText || '请选择开始时间（可选）'}}</text>
           </view>
         </picker>
       </view>

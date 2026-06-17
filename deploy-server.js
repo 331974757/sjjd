@@ -10,7 +10,7 @@ const path = require('path');
 
 // ======== 服务器配置 ========
 const SERVER = {
-  host: process.env.SERVER_HOST || '121.41.191.80',
+  host: process.env.SERVER_HOST || 'localhost',
   port: 22,
   username: process.env.SERVER_USER || 'root',
   // 优先使用 SSH 密钥，没有则用环境变量密码

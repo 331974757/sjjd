@@ -60,6 +60,29 @@ Page({
     this.init()
   },
 
+  /** 手动刷新按钮 */
+  async onRefreshTap() {
+    wx.showLoading({ title: '刷新中...', mask: true })
+    try {
+      await Promise.all([
+        this.loadEventInfo(),
+        this.loadTeams(),
+        this.loadRoundInfo()
+      ])
+      // 清空之前的勾选和配对状态
+      this.setData({
+        selectedTeamIds: [],
+        pairs: [],
+        unpairedTeamIds: []
+      })
+      wx.showToast({ title: '已刷新', icon: 'success', duration: 1200 })
+    } catch (e) {
+      wx.showToast({ title: '刷新失败', icon: 'none' })
+    } finally {
+      wx.hideLoading()
+    }
+  },
+
   async init() {
     try {
       const role = await perm.getRole()
@@ -100,7 +123,7 @@ Page({
         })
         // 非对战中状态提示
         if (res.data.event_status !== 4) {
-          const map = { 0: '创建中', 1: '报名中', 2: '报名截止', 3: '分组锁定', 5: '已归档' }
+          const map = { 0: '创建中', 1: '报名中', 2: '分组编队', 3: '分组锁定', 5: '名次归档' }
           wx.showModal({
             title: '无法操作',
             content: `赛事当前状态为「${map[res.data.event_status] || '未知'}」，仅对战中可编排对阵`,

@@ -1,8 +1,12 @@
 // app.js
 const api = require('./utils/api.js')
+const perm = require('./utils/permission.js')
 
 App({
   onLaunch() {
+    // 每次冷启动时清理所有业务缓存，避免旧缓存导致加载问题
+    this._clearBusinessCaches()
+    
     // 先从本地缓存恢复 token 和 openid（快速恢复会话）
     try {
       const cachedToken = wx.getStorageSync('jwt_token')
@@ -15,6 +19,48 @@ App({
     setTimeout(() => {
       this.getOpenId()
     }, 100)
+  },
+
+  /**
+   * 小程序从后台切回前台时触发
+   * 清理过期缓存，确保数据刷新
+   */
+  onShow(options) {
+    // 检查最近一次离开时长，超过一定时间则做轻量清理
+    const now = Date.now()
+    if (this.globalData._lastHideTime && (now - this.globalData._lastHideTime) > 30000) {
+      // 离开超过 30 秒，清理 API 缓存避免拿到过期 openid
+      try { api.clearCache() } catch (_) {}
+      // 清理权限缓存（下次自动重新获取）
+      try { perm.clearCache() } catch (_) {}
+    }
+    // 标记当前活跃时间
+    this.globalData._lastShowTime = now
+  },
+
+  /**
+   * 小程序进入后台时记录时间
+   */
+  onHide() {
+    this.globalData._lastHideTime = Date.now()
+  },
+
+  /**
+   * 清理所有与业务数据相关的本地缓存
+   * 保留 jwt_token 和 openid（登录态缓存不清理）
+   */
+  _clearBusinessCaches() {
+    try { api.clearCache() } catch (_) {}
+    try { perm.clearCache() } catch (_) {}
+    // 清理可能过期的业务缓存
+    const preserveKeys = ['jwt_token', 'openid', 'user_nickname']
+    try {
+      const info = wx.getStorageInfoSync()
+      const keysToRemove = (info.keys || []).filter(k => !preserveKeys.includes(k))
+      keysToRemove.forEach(k => {
+        try { wx.removeStorageSync(k) } catch (_) {}
+      })
+    } catch (_) {}
   },
 
   /**
@@ -56,6 +102,7 @@ App({
     this.globalData.openid = null
     this.globalData.token = null
     this.globalData._openIdPromise = null
+    try { api.clearCache(); } catch (_) {}
     try {
       wx.removeStorageSync('openid')
       wx.removeStorageSync('jwt_token')
@@ -125,6 +172,10 @@ App({
     })()
 
     this.globalData._openIdPromise = promise
+    // 【兜底】如果 promise 因未捕获异常而 reject，清除缓存以便下次重试
+    promise.catch(() => {
+      this.globalData._openIdPromise = null
+    })
     return promise
   },
 
@@ -141,6 +192,8 @@ App({
   globalData: {
     openid: null,
     token: null,
-    _openIdPromise: null
+    _openIdPromise: null,
+    _lastHideTime: 0,
+    _lastShowTime: 0
   }
 })

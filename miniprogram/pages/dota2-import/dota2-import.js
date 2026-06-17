@@ -274,7 +274,7 @@ Page({
 
     const app = getApp()
     const openid = app.globalData.openid || ''
-    const uploadUrl = api.API_BASE + '/players/import/xlsx' + (openid ? '?openid=' + openid : '')
+    const uploadUrl = api.API_BASE + '/players/import/xlsx' + (openid ? '?openid=' + encodeURIComponent(openid) : '')
 
     wx.showLoading({ title: '上传解析中...' })
     wx.uploadFile({

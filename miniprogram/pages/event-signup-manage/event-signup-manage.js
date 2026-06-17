@@ -87,6 +87,22 @@ Page({
     } catch (e) { /* 静默降级 */ }
   },
 
+  /** 手动刷新按钮 */
+  async onRefreshTap() {
+    wx.showLoading({ title: '刷新中...', mask: true })
+    try {
+      await this.loadSignups()
+      if (this.data.searchResults.length > 0) {
+        this.refreshSearchResults()
+      }
+      wx.showToast({ title: '已刷新', icon: 'success', duration: 1200 })
+    } catch (e) {
+      wx.showToast({ title: '刷新失败', icon: 'none' })
+    } finally {
+      wx.hideLoading()
+    }
+  },
+
   // ====== 加载已报名人员列表 ======
   async loadSignups() {
     this.setData({ loadingSignups: true })
@@ -133,10 +149,10 @@ Page({
         const results = res.data || []
         // 标记已报名的选手（防止重复添加）
         const signupPlayerIds = {}
-        this.data.signups.forEach(s => { signupPlayerIds[s.player_id] = true })
+        this.data.signups.forEach(s => { signupPlayerIds[String(s.player_id)] = true })
 
         results.forEach(p => {
-          p._alreadySigned = !!signupPlayerIds[p.id]
+          p._alreadySigned = !!signupPlayerIds[String(p.id)]
         })
 
         this.setData({
@@ -162,9 +178,12 @@ Page({
 
   // ====== 选择/取消选择选手 ======
   toggleSelect(e) {
-    const playerId = e.currentTarget.dataset.id
-    const player = this.data.searchResults.find(p => p.id === playerId)
-    if (player && player._alreadySigned) return  // 已报名不可选
+    const playerId = String(e.currentTarget.dataset.id)
+    const player = this.data.searchResults.find(p => String(p.id) === playerId)
+    if (player && player._alreadySigned) {
+      wx.showToast({ title: '该选手已报名', icon: 'none', duration: 1500 })
+      return
+    }
 
     const selected = { ...this.data.selectedPlayers }
     if (selected[playerId]) {
@@ -180,16 +199,20 @@ Page({
 
   // ====== 管理员批量添加报名 ======
   async doBatchAdd() {
-    const selectedIds = Object.keys(this.data.selectedPlayers)
+    // 过滤掉已报名的选手（防御性检查）
+    const players = this.data.searchResults
+    const selectedIds = Object.keys(this.data.selectedPlayers).filter(id => {
+      const p = players.find(pl => String(pl.id) === String(id))
+      return p && !p._alreadySigned
+    })
     if (selectedIds.length === 0) {
-      wx.showToast({ title: '请先选择选手', icon: 'none' })
+      wx.showToast({ title: '请先选择未报名选手', icon: 'none' })
       return
     }
 
     // 二次确认
-    const players = this.data.searchResults
     const names = selectedIds.map(id => {
-      const p = players.find(pl => pl.id === id)
+      const p = players.find(pl => String(pl.id) === String(id))
       return p ? p.wx_nickname : id
     }).join('、')
 
@@ -234,15 +257,15 @@ Page({
   // 刷新搜索结果的已报名标记
   refreshSearchResults() {
     const signupPlayerIds = {}
-    this.data.signups.forEach(s => { signupPlayerIds[s.player_id] = true })
+    this.data.signups.forEach(s => { signupPlayerIds[String(s.player_id)] = true })
     const results = this.data.searchResults.map(p => ({
       ...p,
-      _alreadySigned: !!signupPlayerIds[p.id]
+      _alreadySigned: !!signupPlayerIds[String(p.id)]
     }))
     // 清除已报名选手的选择
     const selected = { ...this.data.selectedPlayers }
     Object.keys(selected).forEach(id => {
-      if (signupPlayerIds[id]) delete selected[id]
+      if (signupPlayerIds[String(id)]) delete selected[id]
     })
     this.setData({
       searchResults: results,

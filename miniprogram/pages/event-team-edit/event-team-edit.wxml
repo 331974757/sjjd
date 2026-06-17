@@ -16,6 +16,14 @@
 
   <view class="content" wx:if="{{!loading}}">
 
+    <!-- ========== 顶部操作栏 ========== -->
+    <view class="top-bar">
+      <text class="top-bar-title">{{eventName || '队伍编组'}}</text>
+      <view class="top-bar-refresh" bindtap="onRefreshTap">
+        <text class="refresh-icon">⟳</text>
+      </view>
+    </view>
+
     <!-- ========== 顶部操作提示 ========== -->
     <view class="action-hint" wx:if="{{isAdmin && canEdit}}">
       <text class="hint-icon">👆</text>

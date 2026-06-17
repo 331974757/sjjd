@@ -132,7 +132,7 @@ function setCache(role) {
 const EVENT_STATUS = {
   CREATING: 0,        // 创建中
   SIGNUP_OPEN: 1,     // 报名中
-  SIGNUP_CLOSED: 2,   // 报名截止
+  SIGNUP_CLOSED: 2,   // 分组编队
   TEAMS_LOCKED: 3,    // 分组锁定
   BATTLE_ACTIVE: 4,   // 对战中
   FINISHED: 5,        // 已归档(event_status)
@@ -144,10 +144,10 @@ const EVENT_STATUS = {
 const STATUS_NAMES = {
   0: '创建中',
   1: '报名中',
-  2: '报名截止',
+  2: '分组编队',
   3: '分组锁定',
   4: '对战中',
-  5: '已归档',
+  5: '名次归档',
 };
 
 /**
@@ -254,6 +254,12 @@ function checkAction(action, options) {
 
     // ─── 管理员：对战管理 ───
     case 'manage_matches':
+      if (!isAdmin) return { allowed: false, disabled: true, reason: '仅管理员可操作' };
+      // 队伍锁定后(status=3)即可选队/配对/生成对战；开赛后(status=4)正式对战
+      if (status !== EVENT_STATUS.TEAMS_LOCKED && status !== EVENT_STATUS.BATTLE_ACTIVE) {
+        return { allowed: false, disabled: true, reason: `「${STATUS_NAMES[status] || '未知'}」阶段不可操作对战` };
+      }
+      return { allowed: true, disabled: false, reason: '' };
     case 'judge':
     case 'next_round':
     case 'end_battle':

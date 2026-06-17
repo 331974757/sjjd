@@ -62,7 +62,7 @@ Page({
     eventLoadingMore: false,     // 加载更多中
     historySearchText: '',       // 历史赛事搜索关键词
     historySearchTimer: null,    // 搜索防抖定时器
-    eventStatusMap: { 0: '创建中', 1: '报名中', 2: '报名截止', 3: '分组锁定', 4: '对战中', 5: '已归档' },
+    eventStatusMap: { 0: '创建中', 1: '报名中', 2: '分组编队', 3: '分组锁定', 4: '对战中', 5: '名次归档' },
     // 【赛事创建】弹窗相关数据
     showCreateModal: false,       // 是否显示新建赛事弹窗
     createEventName: '',          // 赛事名称输入
@@ -70,9 +70,13 @@ Page({
     createEventDesc: '',          // 赛事简介输入
   },
 
-  onLoad() {
+  onLoad(options) {
     const sysInfo = wx.getSystemInfoSync()
     this.setData({ statusBarHeight: sysInfo.statusBarHeight || 44 })
+    // 支持从归档页跳转过来直接切到历史赛事
+    if (options && options.subTab) {
+      this.setData({ subTab: options.subTab })
+    }
     this.loadNickname()
     this.loadUserInfo()
     this.loadAllPlayers()
@@ -528,7 +532,7 @@ Page({
       if (res.success) {
         const list = (res.data || []).map(e => ({
           ...e,
-          _statusName: '已归档',
+          _statusName: '名次归档',
           _timeLabel: this.formatEventTime(e.start_time),
           // 计算参赛总人数
           _signupCount: e.signupCount || 0,
@@ -925,7 +929,7 @@ Page({
   /**
    * 【核心】提交创建赛事
    * 1. 前端校验：赛事名称必填、长度 2-50 字符
-   * 2. 调用 POST /api/events/create
+   * 2. 调用 POST /api/events
    * 3. 成功 → 提示 + 刷新列表 + 跳转详情页
    */
   async submitCreateEvent() {
@@ -961,7 +965,7 @@ Page({
 
     try {
       // ── 【调用后端创建接口】 ──
-      var res = await api.post('/events/create', {
+      var res = await api.post('/events', {
         event_name: name,
         start_time: startTime,
         event_desc: desc || undefined

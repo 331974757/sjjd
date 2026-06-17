@@ -249,7 +249,8 @@ app.post('/api/players', async (req, res) => {
 
 app.put('/api/players/:id', async (req, res) => {
   try {
-    const openid = req._openid || req.query.openid || '';
+    // 【安全修复】仅信任 JWT 中间件注入的 openid
+    const openid = req._openid || '';
     const role = await getCallerRole(openid);
     const isAdmin = role === 'admin' || role === 'super_admin';
 
@@ -632,7 +633,8 @@ app.put('/api/users/:openid/role', async (req, res) => {
 
 app.put('/api/users/me/nickname', async (req, res) => {
   try {
-    const { openid } = req.query;
+    // 【安全修复】仅信任 JWT 中间件注入的 openid，不信任前端 query 参数
+    const openid = req._openid || '';
     const { nickName } = req.body;
     if (!openid || !nickName) return res.status(400).json({ success: false, error: '缺少参数' });
 
@@ -676,8 +678,9 @@ app.put('/api/users/me/nickname', async (req, res) => {
 
 app.put('/api/users/:openid/reset-nickcount', async (req, res) => {
   try {
-    // 权限校验：仅超级管理员可重置
-    const operatorOpenid = req.query.openid || req.body.operatorOpenid || '';
+    // 【安全修复】权限校验：仅超级管理员可重置，仅信任 JWT 注入的 openid
+    const operatorOpenid = req._openid || '';
+    if (!operatorOpenid) return res.status(401).json({ success: false, error: '请先登录' });
     const callerRole = await getCallerRole(operatorOpenid);
     if (callerRole !== 'super_admin') {
       return res.status(403).json({ success: false, error: '仅超级管理员可重置修改次数' });
@@ -689,7 +692,7 @@ app.put('/api/users/:openid/reset-nickcount', async (req, res) => {
 
 // ============== 赛事业务模块（赛事/报名/队伍/对战/名次/章程） ==============
 // 注：该模块复用 pool / assertAdmin / getCallerRole，与现有代码共享连接和权限
-require('./event-routes')(app, { pool, assertAdmin, getCallerRole });
+require('./event-routes')(app, { pool, assertAdmin, getCallerRole, upload });
 
 // ============== 【第9轮】统一权限中间件初始化 ==============
 // 挂载 auth 模块，提供标准化的权限/状态/归档中间件
@@ -699,8 +702,10 @@ auth.init(pool, getCallerRole);
 // 【调试接口】接口权限矩阵（仅开发环境，可查看完整权限配置）
 app.get('/api/_debug/permissions', async (req, res) => {
   try {
-    // 仅 super_admin 可查看
-    const role = await getCallerRole(req.query.openid || '');
+    // 【安全修复】仅信任 JWT 验证的 openid
+    const operatorOpenid = req._openid || '';
+    if (!operatorOpenid) return res.status(401).json({ success: false, error: '请先登录' });
+    const role = await getCallerRole(operatorOpenid);
     if (role !== 'super_admin') {
       return res.status(403).json({ success: false, error: '仅超级管理员可查看权限矩阵' });
     }

@@ -95,5 +95,9 @@ module.exports = {
   post: (url, data) => request({ url, method: 'POST', data }),
   put: (url, data) => request({ url, method: 'PUT', data }),
   del: (url, data) => request({ url, method: 'DELETE', data }),
+  clearCache() {
+    _openidCache = null;
+    _openidFetched = false;
+  },
   API_BASE
 }

@@ -14,6 +14,8 @@
 const { allocateTeams } = require('./utils/team-allocation');
 // 段位分值计算（用于保存队伍时计算等效 MMR）
 const { getScore } = require('./utils/rank-score');
+// 统一权限/状态校验工具（共享 validateStatusTransition, STATUS_NAMES 等）
+const { validateStatusTransition, STATUS_NAMES } = require('./utils/auth');
 
 const crypto = require('crypto');
 
@@ -23,6 +25,56 @@ const crypto = require('crypto');
  */
 function genId() {
   return crypto.randomBytes(16).toString('hex');
+}
+
+// ============================================================
+// 昵称解析工具：将 openid 转换为用户昵称
+// ============================================================
+
+/**
+ * 通过 openid 数组批量查询用户昵称
+ * @returns {Map<string, string>} openid → nickName
+ */
+async function getUserNicknames(pool, openids) {
+  const map = new Map();
+  if (!openids || !openids.length) return map;
+  const [rows] = await pool.query(
+    'SELECT openid, nick_name FROM dota2_users WHERE openid IN (?)',
+    [openids]
+  );
+  rows.forEach(r => { map.set(r.openid, r.nick_name || ''); });
+  return map;
+}
+
+/**
+ * 将 event 行的 openid 字段替换为对应昵称
+ * - creator_id  → creator_nickname
+ * - ended_by    → ended_by_nickname
+ * - archived_by → archived_by_nickname
+ */
+async function resolveCreatorNickname(pool, event) {
+  if (!event) return event;
+  const openids = [];
+  if (event.creator_id) openids.push(event.creator_id);
+  if (event.ended_by && event.ended_by.length > 10) openids.push(event.ended_by);
+  if (event.archived_by && event.archived_by.length > 10) openids.push(event.archived_by);
+  if (!openids.length) return event;
+
+  const nickMap = await getUserNicknames(pool, openids);
+
+  if (event.creator_id) {
+    event.creator_nickname = nickMap.get(event.creator_id) || '';
+    delete event.creator_id;
+  }
+  if (event.ended_by && event.ended_by.length > 10) {
+    event.ended_by_nickname = nickMap.get(event.ended_by) || '';
+    delete event.ended_by;
+  }
+  if (event.archived_by && event.archived_by.length > 10) {
+    event.archived_by_nickname = nickMap.get(event.archived_by) || '';
+    delete event.archived_by;
+  }
+  return event;
 }
 
 // ============================================================
@@ -68,7 +120,7 @@ async function assertSuperAdmin(req, res, getCallerRole) {
 // ============================================================
 // 主入口：导出路由注册函数
 // ============================================================
-module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
+module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
 
   // ════════════════════════════════════════════════════════════
   // 1. 赛事管理模块（dota2_events）
@@ -104,7 +156,9 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
       const [rows] = await pool.query(sql, [...params, ps, (p - 1) * ps]);
       const [[{ total }]] = await pool.query(countSql, params);
 
-      res.json({ success: true, data: rows, total, page: p, pageSize: ps });
+      // 将 creator_id 替换为 creator_nickname
+      const data = await Promise.all(rows.map(r => resolveCreatorNickname(pool, r)));
+      res.json({ success: true, data, total, page: p, pageSize: ps });
     } catch (e) {
       res.status(500).json({ success: false, error: e.message });
     }
@@ -172,11 +226,14 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
         }
       }
 
-      // 组装返回数据
-      const data = rows.map(e => ({
-        ...e,
-        signupCount: e.signup_count || 0,
-        topRanks: rankMap[e.event_id] || []
+      // 组装返回数据：替换 creator_id → creator_nickname
+      const data = await Promise.all(rows.map(async (e) => {
+        const resolved = await resolveCreatorNickname(pool, e);
+        return {
+          ...resolved,
+          signupCount: e.signup_count || 0,
+          topRanks: rankMap[e.event_id] || []
+        };
       }));
 
       res.json({ success: true, data, total, page: p, pageSize: ps });
@@ -194,7 +251,8 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
       const { eventId } = req.params;
       const [rows] = await pool.query('SELECT * FROM dota2_events WHERE event_id = ?', [eventId]);
       if (!rows.length) return res.status(404).json({ success: false, error: '赛事不存在' });
-      res.json({ success: true, data: rows[0] });
+      const event = await resolveCreatorNickname(pool, rows[0]);
+      res.json({ success: true, data: event });
     } catch (e) {
       res.status(500).json({ success: false, error: e.message });
     }
@@ -203,13 +261,17 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
   /**
    * 【第8轮新增】获取历史赛事全量数据（一站式接口）
    * GET /api/events/:eventId/full
-   * - 所有登录用户均可访问，无角色限制
+   * - 需要登录（JWT认证），所有已登录用户均可访问
    * - 一次性返回：赛事基础信息 + 报名人员 + 队伍 + 对战 + 名次
    * - 所有数据按 event_id 过滤，确保数据隔离
    */
   app.get('/api/events/:eventId/full', async (req, res) => {
     try {
       const { eventId } = req.params;
+      // JWT 认证：仅已登录用户可访问
+      if (!req._openid) {
+        return res.status(401).json({ success: false, error: '请先登录' });
+      }
 
       // 1. 赛事基础信息
       const [eventRows] = await pool.query(
@@ -219,7 +281,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
       if (!eventRows.length) {
         return res.status(404).json({ success: false, error: '赛事不存在' });
       }
-      const event = eventRows[0];
+      const event = await resolveCreatorNickname(pool, eventRows[0]);
 
       // 2. 报名人员（含选手详情）
       const [signups] = await pool.query(
@@ -274,7 +336,9 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
       const [matches] = await pool.query(
         `SELECT m.*,
                 ta.team_name as team_a_name, ta.total_mmr as team_a_mmr,
+                ta.avg_mmr as team_a_avg_mmr,
                 tb.team_name as team_b_name, tb.total_mmr as team_b_mmr,
+                tb.avg_mmr as team_b_avg_mmr,
                 tw.team_name as winner_name
          FROM dota2_event_matches m
          LEFT JOIN dota2_event_teams ta ON m.team_a_id = ta.team_id
@@ -303,7 +367,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
       }));
 
       // 5. 最终名次
-      const [ranks] = await pool.query(
+      const [rankRows] = await pool.query(
         `SELECT r.*, t.team_name, t.total_mmr
          FROM dota2_event_ranks r
          LEFT JOIN dota2_event_teams t ON r.team_id = t.team_id
@@ -311,6 +375,10 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
          ORDER BY r.rank_num ASC`,
         [eventId]
       );
+      const ranks = rankRows.map(r => { delete r.operator_id; return r; });
+
+      // 过滤掉报名数据中的 operator_id
+      signups.forEach(s => { delete s.operator_id; });
 
       res.json({
         success: true,
@@ -334,32 +402,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
   });
 
   /**
-   * 创建赛事（admin/super_admin）
-   * POST /api/events
-   * Body: { eventName, startTime }
-   * - 默认状态为0(创建中)，未归档
-   */
-  app.post('/api/events', async (req, res) => {
-    try {
-      if (!await assertAdmin(req, res)) return;
-      const { eventName, startTime } = req.body;
-      if (!eventName) return res.status(400).json({ success: false, error: '赛事名称不能为空' });
-
-      const eventId = genId();
-      const now = Date.now();
-      await pool.query(
-        'INSERT INTO dota2_events (event_id, event_name, creator_id, event_status, start_time, is_archived, created_at, updated_at) VALUES (?, ?, ?, 0, ?, 0, ?, ?)',
-        [eventId, eventName, req._openid || '', startTime || null, now, now]
-      );
-
-      res.json({ success: true, data: { eventId } });
-    } catch (e) {
-      res.status(500).json({ success: false, error: e.message });
-    }
-  });
-
-  /**
-   * 【赛事创建专项接口】POST /api/events/create
+   * 【赛事创建接口】POST /api/events
    *
    * 权限规则：
    *   - admin / super_admin 均可创建（两个角色权限完全一致）
@@ -370,25 +413,17 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
    *   - start_time   : 赛事开始时间（可选，bigint 毫秒时间戳）
    *   - event_desc   : 赛事简介（可选，字符串）
    *
-   * 业务逻辑：
-   *   1. 【权限校验】校验当前用户为 admin 或 super_admin
-   *   2. 【名称校验】非空 + 长度 2-50 字符
-   *   3. 【生成ID】雪花风格 genId() 生成唯一 event_id（varchar）
-   *   4. 【初始状态】event_status=0(创建中)，is_archived=0(未归档)
-   *   5. 【操作留痕】记录 creator_id、created_at、updated_at
-   *   6. 【数据隔离】同一名称允许创建（不同 event_id 隔离），不做唯一限制
-   *
    * 返回：{ success: true, data: { eventId, eventName, ... } }
    */
-  app.post('/api/events/create', async (req, res) => {
+  async function handleCreateEvent(req, res) {
     try {
       // ── 【权限校验】仅 admin 或 super_admin 可创建赛事 ──
       if (!await assertAdmin(req, res)) return;
 
-      // ── 【参数提取】 ──
-      var eventName = (req.body.event_name || '').trim();
-      var startTime = req.body.start_time || null;
-      var eventDesc = (req.body.event_desc || '').trim();
+      // ── 【参数提取】兼容新旧字段名 ──
+      var eventName = (req.body.event_name || req.body.eventName || '').trim();
+      var startTime = req.body.start_time || req.body.startTime || null;
+      var eventDesc = (req.body.event_desc || req.body.eventDesc || '').trim();
 
       // ── 【名称校验】必填 + 长度 2-50 字符 ──
       if (!eventName) {
@@ -401,70 +436,44 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
         return res.status(400).json({ success: false, error: '赛事名称不能超过50个字符' });
       }
 
-      // ── 【生成唯一 event_id】（varchar类型，雪花风格） ──
+      // ── 【数据入库】初始状态=0(创建中)，is_archived=0(未归档) ──
       var eventId = genId();
       var now = Date.now();
       var openid = req._openid || '';
 
-      // ── 【数据入库】初始状态=0(创建中)，is_archived=0(未归档) ──
-      // 注意：event_desc 字段需要在 dota2_events 表中存在
       var sql = 'INSERT INTO dota2_events (event_id, event_name, event_desc, creator_id, event_status, start_time, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, 0, ?, ?)';
       var params = [eventId, eventName, eventDesc || null, openid, startTime, now, now];
 
       await pool.query(sql, params);
 
-      // ── 【返回结果】 ──
       res.json({
         success: true,
-        data: {
-          eventId: eventId,
-          eventName: eventName,
-          eventDesc: eventDesc || '',
-          startTime: startTime,
-          eventStatus: 0,
-          isArchived: 0,
-          creatorId: openid,
-          createdAt: now,
-          message: '赛事创建成功'
-        }
+        data: { eventId, eventName, eventDesc: eventDesc || '', startTime, eventStatus: 0, isArchived: 0, creatorId: openid, createdAt: now, message: '赛事创建成功' }
       });
     } catch (e) {
-      // 兼容 event_desc 列不存在的场景
+      // 兼容 event_desc 列不存在的场景，降级为不插入该字段
       if (e.code === 'ER_BAD_FIELD_ERROR' && e.message.indexOf('event_desc') !== -1) {
-        // 降级：不插入 event_desc
         try {
           var eventId2 = genId();
           var now2 = Date.now();
-          var eventName2 = (req.body.event_name || '').trim();
-          var startTime2 = req.body.start_time || null;
+          var eventName2 = (req.body.event_name || req.body.eventName || '').trim();
+          var startTime2 = req.body.start_time || req.body.startTime || null;
           var openid2 = req._openid || '';
-
           await pool.query(
             'INSERT INTO dota2_events (event_id, event_name, creator_id, event_status, start_time, is_archived, created_at, updated_at) VALUES (?, ?, ?, 0, ?, 0, ?, ?)',
             [eventId2, eventName2, openid2, startTime2, now2, now2]
           );
-
-          return res.json({
-            success: true,
-            data: {
-              eventId: eventId2,
-              eventName: eventName2,
-              eventDesc: '',
-              startTime: startTime2,
-              eventStatus: 0,
-              isArchived: 0,
-              creatorId: openid2,
-              createdAt: now2,
-              message: '赛事创建成功（简介字段暂未启用，已忽略）'
-            }
-          });
+          return res.json({ success: true, data: { eventId: eventId2, eventName: eventName2, message: '赛事创建成功' } });
         } catch (e2) {
           return res.status(500).json({ success: false, error: e2.message });
         }
       }
       res.status(500).json({ success: false, error: e.message });
     }
-  });
+  }
+
+  app.post('/api/events', handleCreateEvent);
+  app.post('/api/events/create', handleCreateEvent); // 兼容旧路径
 
   /**
    * 编辑赛事信息（admin/super_admin）
@@ -502,33 +511,6 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
   });
 
   /**
-   * 【状态流转校验工具】校验赛事状态流转合法性
-   * 合法流向：0(创建中)→1(报名中)→2(报名截止)→3(分组锁定)→4(对战中)→5(已归档)
-   * 仅允许正向顺序流转（不允许跳跃或回退）
-   * @param {number} currentStatus - 当前状态
-   * @param {number} targetStatus  - 目标状态
-   * @returns {{ valid: boolean, error: string }}
-   */
-  function validateStatusTransition(currentStatus, targetStatus) {
-    if (currentStatus === targetStatus) {
-      return { valid: false, error: '赛事已是该状态，无需重复操作' };
-    }
-    // 仅允许向后流转到下一个状态（严格顺序：0→1→2→3→4→5）
-    if (targetStatus === currentStatus + 1) {
-      return { valid: true, error: '' };
-    }
-    return { valid: false, error: '赛事状态流转不合法，仅允许按顺序依次推进（创建中→报名中→报名截止→分组锁定→对战中→已归档）' };
-  }
-
-  /**
-   * 获取赛事状态中文名称（用于提示信息）
-   */
-  function getStatusName(status) {
-    const map = { 0: '创建中', 1: '报名中', 2: '报名截止', 3: '分组锁定', 4: '对战中', 5: '已归档' };
-    return map[status] || '未知';
-  }
-
-  /**
    * 更新赛事状态（admin/super_admin）
    * PUT /api/events/:eventId/status
    * Body: { eventStatus }  - 0创建中/1报名中/2报名截止/3分组锁定/4对战中/5已归档
@@ -546,28 +528,57 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
         return res.status(403).json({ success: false, error: '赛事已归档，不可修改状态', code: 'ARCHIVED' });
       }
 
-      const { eventStatus } = req.body;
+      const { eventStatus, signupLimit } = req.body;
       if (eventStatus === undefined || eventStatus < 0 || eventStatus > 5) {
         return res.status(400).json({ success: false, error: '无效的赛事状态，有效值0-5' });
       }
 
-      // 【状态流转校验】校验从当前状态流转到目标状态是否合法
+      // 【状态流转校验】
       const transition = validateStatusTransition(event.event_status, eventStatus);
       if (!transition.valid) {
         return res.status(400).json({ success: false, error: transition.error });
       }
 
-      await pool.query(
-        'UPDATE dota2_events SET event_status = ?, updated_at = ? WHERE event_id = ?',
-        [eventStatus, Date.now(), eventId]
-      );
+      // signupLimit 校验：仅 0→1 时生效
+      const limitVal = (eventStatus === 1 && signupLimit !== undefined) ? signupLimit : null;
+      if (limitVal !== null) {
+        if (typeof limitVal !== 'number' || limitVal < 0 || (limitVal !== 0 && !Number.isInteger(limitVal))) {
+          return res.status(400).json({ success: false, error: '报名人数上限必须为非负整数（0=无限制）' });
+        }
+      }
+
+      // 更新状态 + 可选报名人数上限（兼容旧表可能未建 signup_limit 列）
+      if (limitVal !== null) {
+        const setLimit = (limitVal === 0 ? null : limitVal);
+        try {
+          await pool.query(
+            'UPDATE dota2_events SET event_status = ?, signup_limit = ?, updated_at = ? WHERE event_id = ?',
+            [eventStatus, setLimit, Date.now(), eventId]
+          );
+        } catch (e) {
+          // signup_limit 列可能不存在（旧版表），降级仅更新状态
+          if (e.code === 'ER_BAD_FIELD_ERROR') {
+            await pool.query(
+              'UPDATE dota2_events SET event_status = ?, updated_at = ? WHERE event_id = ?',
+              [eventStatus, Date.now(), eventId]
+            );
+          } else {
+            throw e;
+          }
+        }
+      } else {
+        await pool.query(
+          'UPDATE dota2_events SET event_status = ?, updated_at = ? WHERE event_id = ?',
+          [eventStatus, Date.now(), eventId]
+        );
+      }
       res.json({
         success: true,
         data: {
           fromStatus: event.event_status,
-          fromStatusName: getStatusName(event.event_status),
+          fromStatusName: STATUS_NAMES[event.event_status],
           toStatus: eventStatus,
-          toStatusName: getStatusName(eventStatus)
+          toStatusName: STATUS_NAMES[eventStatus]
         }
       });
     } catch (e) {
@@ -576,7 +587,71 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
   });
 
   /**
-   * 删除赛事（仅 super_admin，且只能删除未归档赛事）
+   * 修改报名人数上限（admin/super_admin，分组编队前可修改）
+   * PUT /api/events/:eventId/signup-limit
+   * Body: { signupLimit: number } — 0=无限制, >0=指定人数
+   * - 仅允许在状态 0(创建中)/1(报名中)/2(报名截止) 修改，3(分组锁定)后不允许
+   */
+  app.put('/api/events/:eventId/signup-limit', async (req, res) => {
+    try {
+      if (!await assertAdmin(req, res)) return;
+      const { eventId } = req.params;
+      const event = await validateEvent(pool, eventId);
+      if (!event) return res.status(404).json({ success: false, error: '赛事不存在' });
+
+      // 【第7轮新增】已归档赛事不允许修改
+      if (event.is_archived === 1) {
+        return res.status(403).json({ success: false, error: '赛事已归档，不可修改', code: 'ARCHIVED' });
+      }
+
+      // 仅允许在分组编队前修改（状态 0/1/2）
+      if (event.event_status >= 3) {
+        const msgs = { 3: '赛事已进入分组阶段', 4: '赛事对战中', 5: '赛事已归档' };
+        return res.status(400).json({
+          success: false,
+          error: (msgs[event.event_status] || '当前阶段') + '，不可修改报名人数上限',
+          code: 'EVENT_LOCKED'
+        });
+      }
+
+      const { signupLimit } = req.body;
+      if (signupLimit === undefined || signupLimit === null || signupLimit === '') {
+        return res.status(400).json({ success: false, error: '报名人数上限不能为空' });
+      }
+      const limitVal = parseInt(signupLimit);
+      if (isNaN(limitVal) || limitVal < 0 || (limitVal !== 0 && !Number.isInteger(Number(signupLimit)))) {
+        return res.status(400).json({ success: false, error: '报名人数上限必须为非负整数（0=无限制）' });
+      }
+
+      // 如果当前报名人数已超新上限，给出警告但允许操作
+      const [[{ currentCount }]] = await pool.query(
+        'SELECT COUNT(*) as currentCount FROM dota2_event_signup WHERE event_id = ? AND signup_status = 1',
+        [eventId]
+      );
+
+      await pool.query(
+        'UPDATE dota2_events SET signup_limit = ?, updated_at = ? WHERE event_id = ?',
+        [limitVal === 0 ? null : limitVal, Date.now(), eventId]
+      );
+
+      res.json({
+        success: true,
+        data: {
+          signupLimit: limitVal === 0 ? null : limitVal,
+          displayText: limitVal === 0 ? '无限制' : (limitVal + '人'),
+          currentSignupCount: currentCount,
+          warning: currentCount > limitVal && limitVal > 0
+            ? '当前报名人数(' + currentCount + ')已超过新上限(' + limitVal + ')，超出部分不受影响'
+            : ''
+        }
+      });
+    } catch (e) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  /**
+   * 删除赛事（仅 super_admin，对阵开始前可删除，即 event_status < 4）
    * DELETE /api/events/:eventId
    */
   app.delete('/api/events/:eventId', async (req, res) => {
@@ -587,6 +662,9 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
       if (!event) return res.status(404).json({ success: false, error: '赛事不存在' });
       if (event.is_archived === 1) {
         return res.status(403).json({ success: false, error: '已归档赛事不可删除' });
+      }
+      if (event.event_status >= 4) {
+        return res.status(403).json({ success: false, error: '对战已开始，赛事不可删除' });
       }
 
       // 【级联清理】事务中删除赛事及其所有关联数据
@@ -644,6 +722,26 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
       return { valid: false, error: msg, event };
     }
     return { valid: true, error: '', event };
+  }
+
+  /**
+   * 校验报名人数是否已达上限（仅自主报名使用）
+   * @returns {{ full: boolean, error: string }}
+   */
+  async function checkSignupLimit(pool, eventId) {
+    const [eventRows] = await pool.query('SELECT signup_limit FROM dota2_events WHERE event_id = ?', [eventId]);
+    if (!eventRows.length) return { full: false, error: '' };
+    const limit = eventRows[0].signup_limit;
+    if (!limit || limit <= 0) return { full: false, error: '' }; // 无限制
+
+    const [[{ cnt }]] = await pool.query(
+      'SELECT COUNT(*) AS cnt FROM dota2_event_signup WHERE event_id = ? AND signup_status = 1',
+      [eventId]
+    );
+    if (cnt >= limit) {
+      return { full: true, error: `报名人数已满（上限${limit}人）` };
+    }
+    return { full: false, error: '' };
   }
 
   /**
@@ -727,7 +825,9 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
       const [rows] = await pool.query(sql, [...params, ps, (p - 1) * ps]);
       const [[{ total }]] = await pool.query(countSql, params);
 
-      res.json({ success: true, data: rows, total, page: p, pageSize: ps });
+      // 过滤掉 operator_id
+      const data = rows.map(r => { delete r.operator_id; return r; });
+      res.json({ success: true, data, total, page: p, pageSize: ps });
     } catch (e) {
       res.status(500).json({ success: false, error: e.message });
     }
@@ -810,6 +910,16 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
       const statusCheck = await validateSignupEvent(pool, eventId);
       if (!statusCheck.valid) {
         return res.status(400).json({ success: false, error: statusCheck.error, code: 'EVENT_NOT_OPEN' });
+      }
+
+      // 【校验1.5】报名人数上限检查（仅自主报名受限，管理员添加不受限）
+      const limitCheck = await checkSignupLimit(pool, eventId);
+      if (limitCheck.full) {
+        return res.status(400).json({
+          success: false,
+          error: limitCheck.error || '报名已满',
+          code: 'SIGNUP_FULL'
+        });
       }
 
       const openid = req._openid || '';
@@ -992,46 +1102,60 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
       const results = { success: 0, skipped: 0, failed: 0, details: [] };
       const now = Date.now();
 
-      for (const playerId of playerIds) {
-        try {
-          // 【修复】查询任意状态的已有记录（不限于status=1），处理已取消重新报名场景
-          const [existing] = await pool.query(
-            'SELECT signup_id, signup_status FROM dota2_event_signup WHERE event_id = ? AND player_id = ?',
-            [eventId, playerId]
-          );
-          if (existing.length > 0) {
-            const row = existing[0];
-            if (row.signup_status === 1) {
-              // 已经有效报名，跳过
-              results.skipped++;
-              results.details.push({ playerId, status: 'skipped', reason: '已报名' });
-            } else {
-              // 之前取消过（status=0），重新激活
-              await pool.query(
-                'UPDATE dota2_event_signup SET signup_status = 1, signup_type = 1, operator_id = ?, created_at = ? WHERE signup_id = ?',
-                [openid, now, row.signup_id]
-              );
-              results.success++;
-              results.details.push({ playerId, status: 'success', signupId: row.signup_id, reactivated: true });
+      // 【事务保护】批量操作使用事务，中途失败则全部回滚
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+
+        for (const playerId of playerIds) {
+          try {
+            const [existing] = await conn.query(
+              'SELECT signup_id, signup_status FROM dota2_event_signup WHERE event_id = ? AND player_id = ?',
+              [eventId, playerId]
+            );
+            if (existing.length > 0) {
+              const row = existing[0];
+              if (row.signup_status === 1) {
+                results.skipped++;
+                results.details.push({ playerId, status: 'skipped', reason: '已报名' });
+              } else {
+                await conn.query(
+                  'UPDATE dota2_event_signup SET signup_status = 1, signup_type = 1, operator_id = ?, created_at = ? WHERE signup_id = ?',
+                  [openid, now, row.signup_id]
+                );
+                results.success++;
+                results.details.push({ playerId, status: 'success', signupId: row.signup_id, reactivated: true });
+              }
+              continue;
             }
-            continue;
+
+            const signupId = genId();
+            await conn.query(
+              'INSERT INTO dota2_event_signup (signup_id, event_id, player_id, signup_type, signup_status, operator_id, created_at) VALUES (?, ?, ?, 1, 1, ?, ?)',
+              [signupId, eventId, playerId, openid, now]
+            );
+            results.success++;
+            results.details.push({ playerId, status: 'success', signupId });
+          } catch (e) {
+            // 单条记录失败 → 回滚整个事务
+            await conn.rollback();
+            conn.release();
+            return res.status(500).json({
+              success: false,
+              error: `批量报名失败（选手 ${playerId}）: ${e.message}`,
+              data: results
+            });
           }
-
-          // 完全新记录
-          const signupId = genId();
-          await pool.query(
-            'INSERT INTO dota2_event_signup (signup_id, event_id, player_id, signup_type, signup_status, operator_id, created_at) VALUES (?, ?, ?, 1, 1, ?, ?)',
-            [signupId, eventId, playerId, openid, now]
-          );
-          results.success++;
-          results.details.push({ playerId, status: 'success', signupId });
-        } catch (e) {
-          results.failed++;
-          results.details.push({ playerId, status: 'failed', reason: e.message });
         }
-      }
 
-      res.json({ success: true, data: results });
+        await conn.commit();
+        res.json({ success: true, data: results });
+      } catch (e) {
+        await conn.rollback();
+        res.status(500).json({ success: false, error: e.message });
+      } finally {
+        conn.release();
+      }
     } catch (e) {
       res.status(500).json({ success: false, error: e.message });
     }
@@ -1162,6 +1286,23 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
       return { locked: true, error: '比赛已开始，队伍数据已永久锁定，不可修改' };
     }
     return { locked: false, error: '', event };
+  }
+
+  /**
+   * 通过 openid 查找对应的选手ID（player_id）
+   * 逻辑：openid → dota2_users.nick_name → dota2_players.wx_nickname 精确匹配
+   * @returns {string|null} playerId 或 null
+   */
+  async function getPlayerIdByOpenid(openid) {
+    if (!openid) return null;
+    try {
+      const [userRows] = await pool.query('SELECT nick_name FROM dota2_users WHERE openid = ?', [openid]);
+      const userNick = (userRows.length && userRows[0].nick_name) ? userRows[0].nick_name : '';
+      if (!userNick) return null;
+      const [playerRows] = await pool.query('SELECT id FROM dota2_players WHERE wx_nickname = ?', [userNick]);
+      if (playerRows.length === 1) return playerRows[0].id;
+      return null;
+    } catch (_) { return null; }
   }
 
   /**
@@ -1321,18 +1462,26 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
           } catch (_) { /* MMR 计算失败不影响建队 */ }
 
           const teamId = genId();
+          const memberCount = t.playerIds.length;
+          const avgMmr = memberCount > 0 ? Math.round(totalMmr / memberCount) : 0;
           await conn.query(
-            'INSERT INTO dota2_event_teams (team_id, event_id, team_name, captain_id, player_ids, total_mmr, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [teamId, eventId, t.teamName.trim(), t.captainId, JSON.stringify(t.playerIds), totalMmr, now, now]
+            'INSERT INTO dota2_event_teams (team_id, event_id, team_name, captain_id, player_ids, total_mmr, avg_mmr, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [teamId, eventId, t.teamName.trim(), t.captainId, JSON.stringify(t.playerIds), totalMmr, avgMmr, now, now]
           );
-          results.push({ teamId, teamName: t.teamName, totalMmr, playerCount: t.playerIds.length });
+          results.push({ teamId, teamName: t.teamName, totalMmr, avgMmr, playerCount: memberCount });
         }
+
+        // 保存成功后自动推进赛事状态 2→3（分组编队→分组锁定）
+        await conn.query(
+          'UPDATE dota2_events SET event_status = 3, updated_at = ? WHERE event_id = ? AND event_status = 2',
+          [now, eventId]
+        );
 
         await conn.commit();
         res.json({
           success: true,
           data: { teamCount: results.length, teams: results },
-          message: `成功保存 ${results.length} 支队伍`
+          message: `成功保存 ${results.length} 支队伍，队伍已锁定`
         });
       } catch (e) {
         await conn.rollback();
@@ -1430,7 +1579,8 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
    * 【核心接口】开赛锁定（admin/super_admin）
    * POST /api/events/:eventId/lock-teams
    * - 二次校验队伍数据完整性（每队>=1人且有队长）
-   * - 将赛事状态更新为「对战中」(4)
+   * - 将赛事状态从「分组锁定」(3) 更新为「对战中」(4)
+   * - 状态流转：仅允许 3→4，使用统一 validateStatusTransition 校验
    * - 对战中/已归档时，所有队伍编辑接口永久拦截
    */
   app.post('/api/events/:eventId/lock-teams', async (req, res) => {
@@ -1442,14 +1592,18 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
       const event = await validateEvent(pool, eventId);
       if (!event) return res.status(404).json({ success: false, error: '赛事不存在' });
 
-      // 状态流转：报名截止(2) 或 分组锁定(3) → 对战中(4)
-      if (event.event_status !== 2 && event.event_status !== 3) {
-        const msgs = { 0: '创建中', 1: '报名中', 5: '已归档' };
-        const msg = msgs[event.event_status] || '当前状态';
+      // 归档拦截
+      if (event.is_archived === 1) {
+        return res.status(403).json({ success: false, error: '赛事已归档，不可操作', code: 'ARCHIVED' });
+      }
+
+      // 状态流转校验：仅允许「分组锁定(3)」→「对战中(4)」
+      const transition = validateStatusTransition(event.event_status, 4);
+      if (!transition.valid) {
         return res.status(400).json({
           success: false,
-          error: `赛事当前状态为「${msg}」，需要先完成分组锁定再开赛`,
-          code: 'INVALID_STATUS'
+          error: transition.error,
+          code: 'INVALID_STATUS_TRANSITION'
         });
       }
 
@@ -1497,6 +1651,68 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
   });
 
   /**
+   * 队长修改战队名（保存分组后可改，归档前）
+   * PUT /api/events/:eventId/teams/:teamId/name
+   * 权限：队长本人 或 管理员
+   */
+  app.put('/api/events/:eventId/teams/:teamId/name', async (req, res) => {
+    try {
+      const { eventId, teamId } = req.params;
+      const { teamName } = req.body;
+      const openid = req._openid || '';
+
+      if (!teamName || !teamName.trim()) {
+        return res.status(400).json({ success: false, error: '战队名不能为空' });
+      }
+      if (teamName.trim().length > 50) {
+        return res.status(400).json({ success: false, error: '战队名不能超过50个字符' });
+      }
+
+      // 校验赛事存在
+      const event = await validateEvent(pool, eventId);
+      if (!event) return res.status(404).json({ success: false, error: '赛事不存在' });
+      if (event.is_archived === 1) {
+        return res.status(403).json({ success: false, error: '赛事已归档，队伍名称不可修改' });
+      }
+      // 保存分组后(status>=2)才允许队长改名
+      if (event.event_status < 2) {
+        return res.status(400).json({ success: false, error: '请先保存分组后再修改战队名' });
+      }
+
+      // 校验队伍存在
+      const [teams] = await pool.query(
+        'SELECT * FROM dota2_event_teams WHERE team_id = ? AND event_id = ?',
+        [teamId, eventId]
+      );
+      if (!teams.length) return res.status(404).json({ success: false, error: '队伍不存在' });
+
+      const team = teams[0];
+
+      // 权限校验：管理员 or 队长本人
+      const role = await getCallerRole(openid);
+      const isAdminRole = role === 'admin' || role === 'super_admin';
+
+      if (!isAdminRole) {
+        // 非管理员：检查是否为队长
+        const playerId = await getPlayerIdByOpenid(openid);
+        if (!playerId || playerId !== team.captain_id) {
+          return res.status(403).json({ success: false, error: '仅队伍队长或管理员可修改战队名' });
+        }
+      }
+
+      // 执行更新
+      await pool.query(
+        'UPDATE dota2_event_teams SET team_name = ?, updated_at = ? WHERE team_id = ?',
+        [teamName.trim(), Date.now(), teamId]
+      );
+
+      res.json({ success: true, data: { teamId, teamName: teamName.trim(), message: '战队名已更新' } });
+    } catch (e) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  /**
    * 删除队伍（admin/super_admin，增加锁定校验）
    * DELETE /api/events/:eventId/teams/:teamId
    */
@@ -1525,6 +1741,110 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
   });
 
   // ════════════════════════════════════════════════════════════
+  // 3.5 队伍积分榜（基于对战历史计算每队输赢分数）
+  // ════════════════════════════════════════════════════════════
+
+  /**
+   * 获取赛事队伍积分榜（含赢/输/总分，用于对阵页面展示）
+   * GET /api/events/:eventId/teams/scoreboard
+   * - 统计所有已完成对战的胜场，每赢1场=1分
+   * - 按分数降序 → 队长昵称升序排列
+   * - 返回每个队伍的：teamId, teamName, captainName, wins, losses, score, totalMmr
+   */
+  app.get('/api/events/:eventId/teams/scoreboard', async (req, res) => {
+    try {
+      const { eventId } = req.params;
+      const event = await validateEvent(pool, eventId);
+      if (!event) return res.status(404).json({ success: false, error: '赛事不存在' });
+
+      // 获取所有队伍
+      const [teams] = await pool.query(
+        'SELECT team_id, team_name, captain_id, player_ids, total_mmr, avg_mmr FROM dota2_event_teams WHERE event_id = ?',
+        [eventId]
+      );
+
+      if (!teams || teams.length === 0) {
+        return res.json({ success: true, data: [] });
+      }
+
+      // 统计每队的胜场（从已完成的match_status=2的对战中）
+      const [winRows] = await pool.query(
+        `SELECT winner_id, COUNT(*) as wins
+         FROM dota2_event_matches
+         WHERE event_id = ? AND match_status = 2 AND winner_id IS NOT NULL
+         GROUP BY winner_id`,
+        [eventId]
+      );
+      const winMap = {};
+      (winRows || []).forEach(r => { winMap[r.winner_id] = r.wins; });
+
+      // 统计每队的总参战场次
+      const [playRows] = await pool.query(
+        `SELECT team_id, COUNT(*) as total
+         FROM (
+           SELECT team_a_id as team_id FROM dota2_event_matches WHERE event_id = ? AND match_status = 2
+           UNION ALL
+           SELECT team_b_id as team_id FROM dota2_event_matches WHERE event_id = ? AND match_status = 2
+         ) t
+         GROUP BY team_id`,
+        [eventId, eventId]
+      );
+      const playMap = {};
+      (playRows || []).forEach(r => { playMap[r.team_id] = r.total; });
+
+      // 获取所有队长的昵称（通过 player_ids 中的 captain_id 对应 wx_nickname）
+      const allPlayerIds = new Set();
+      teams.forEach(t => {
+        if (t.captain_id) allPlayerIds.add(t.captain_id);
+        try { const ids = JSON.parse(t.player_ids || '[]'); ids.forEach(id => allPlayerIds.add(id)); } catch (_) {}
+      });
+      const playerMap = {};
+      if (allPlayerIds.size > 0) {
+        const [players] = await pool.query(
+          'SELECT id, wx_nickname FROM dota2_players WHERE id IN (?)',
+          [[...allPlayerIds]]
+        );
+        (players || []).forEach(p => { playerMap[p.id] = p.wx_nickname || ''; });
+      }
+
+      // 组装积分榜
+      const scoreboard = teams.map(t => {
+        const wins = winMap[t.team_id] || 0;
+        const total = playMap[t.team_id] || 0;
+        const losses = total - wins;
+        const captainName = playerMap[t.captain_id] || '';
+        let memberCount = 0;
+        try { memberCount = JSON.parse(t.player_ids || '[]').length; } catch (_) {}
+        const totalMmr = Number(t.total_mmr) || 0;
+        const avgMmr = Number(t.avg_mmr) || 0;
+        return {
+          teamId: t.team_id,
+          teamName: t.team_name || '未命名',
+          captainName,
+          captainId: t.captain_id || '',
+          totalMmr,
+          avgMmr,
+          memberCount,
+          wins,
+          losses: Math.max(0, losses),
+          score: wins,
+          totalMatches: total
+        };
+      });
+
+      // 排序：分数降序 → 队长昵称升序
+      scoreboard.sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return (a.captainName || '').localeCompare(b.captainName || '', 'zh');
+      });
+
+      res.json({ success: true, data: scoreboard });
+    } catch (e) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════
   // 4. 对战管理模块（dota2_event_matches）- 第6轮完整实现
   // ════════════════════════════════════════════════════════════
   //
@@ -1538,18 +1858,19 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
 
   /**
    * 【对战状态前置校验工具】
-   * 校验赛事状态是否为「对战中」(4)，非对战状态直接拦截
+   * 校验赛事状态是否允许对战操作
+   * @param {Array<number>} allowedStatuses - 允许的状态列表，默认 [4]
    * @returns {{ valid: boolean, error: string, event: object|null }}
    */
-  async function validateBattleEvent(pool, eventId) {
+  async function validateBattleEvent(pool, eventId, allowedStatuses = [4]) {
     const event = await validateEvent(pool, eventId);
     if (!event) return { valid: false, error: '赛事不存在', event: null };
-    // 【第7轮新增】已归档赛事禁止任何对战操作
+    // 已归档赛事禁止任何对战操作
     if (event.is_archived === 1) {
       return { valid: false, error: '赛事已归档，所有对战数据不可修改', event };
     }
-    if (event.event_status !== 4) {
-      const map = { 0: '创建中', 1: '报名中', 2: '报名截止', 3: '分组锁定', 5: '已归档' };
+    if (!allowedStatuses.includes(event.event_status)) {
+      const map = { 0: '创建中', 1: '报名中', 2: '报名截止', 3: '分组锁定', 4: '对战中', 5: '已归档' };
       return { valid: false, error: `赛事当前状态为「${map[event.event_status] || '未知'}」，非对战阶段不可操作`, event };
     }
     return { valid: true, error: '', event };
@@ -1577,15 +1898,21 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
   }
 
   /**
-   * 【MMR配对算法】按队伍MMR分值从近到远两两配对
-   * 排序后相邻队伍配对，保证分差最小
-   * @param {Array} teams - 队伍列表（含 team_id, team_name, total_mmr）
+   * 【分数配对算法】按队伍积分（胜场数）从近到远两两配对
+   * 排序规则：分数降序 → 队长昵称升序（与积分榜排序一致，避免队伍排序乱动）
+   * 排序后相邻队伍配对，保证实力最接近的队伍对战
+   * @param {Array} teams - 队伍列表（含 team_id, team_name, wins, captainName）
    * @returns {Array} [{ teamA, teamB }]
    */
   function autoPairTeams(teams) {
     if (teams.length < 2) return [];
-    // 按 total_mmr 升序排列
-    const sorted = [...teams].sort((a, b) => (a.total_mmr || 0) - (b.total_mmr || 0));
+    // 按分数降序 → 队长昵称升序（与积分榜排序一致）
+    const sorted = [...teams].sort((a, b) => {
+      const scoreA = a.wins || 0
+      const scoreB = b.wins || 0
+      if (scoreB !== scoreA) return scoreB - scoreA
+      return (a.captainName || '').localeCompare(b.captainName || '', 'zh')
+    });
     const pairs = [];
     for (let i = 0; i < sorted.length - 1; i += 2) {
       pairs.push({ teamA: sorted[i], teamB: sorted[i + 1] });
@@ -1619,8 +1946,10 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
       const sql = `
         SELECT m.*,
                ta.team_name as team_a_name, ta.total_mmr as team_a_mmr,
+               ta.avg_mmr as team_a_avg_mmr,
                ta.captain_id as team_a_captain, ta.player_ids as team_a_players,
                tb.team_name as team_b_name, tb.total_mmr as team_b_mmr,
+               tb.avg_mmr as team_b_avg_mmr,
                tb.captain_id as team_b_captain, tb.player_ids as team_b_players,
                tw.team_name as winner_name
         FROM dota2_event_matches m
@@ -1707,8 +2036,8 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
 
       const { eventId } = req.params;
 
-      // 【校验1】赛事必须处于对战中
-      const battleCheck = await validateBattleEvent(pool, eventId);
+      // 【校验1】赛事必须处于分组锁定或对战中（status=3/4 都可编排对战）
+      const battleCheck = await validateBattleEvent(pool, eventId, [3, 4]);
       if (!battleCheck.valid) {
         return res.status(400).json({ success: false, error: battleCheck.error, code: 'INVALID_STATUS' });
       }
@@ -1735,8 +2064,37 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
       let matchPairs = [];
 
       if (mode === 'auto') {
-        // 【自动匹配】按MMR从近到远两两配对
-        matchPairs = autoPairTeams(allTeams);
+        // 【自动匹配】按积分（胜场）从近到远两两配对
+        // 先获取每个队伍的胜场数和队长名
+        const [winRows] = await pool.query(
+          `SELECT winner_id as team_id, COUNT(*) as wins
+           FROM dota2_event_matches
+           WHERE event_id = ? AND match_status = 2
+           GROUP BY winner_id`,
+          [eventId]
+        );
+        const winMap = {};
+        winRows.forEach(r => { winMap[r.team_id] = r.wins; });
+
+        // 批量获取队长昵称
+        const captainIds = allTeams.map(t => t.captain_id).filter(Boolean);
+        const captainMap = {};
+        if (captainIds.length > 0) {
+          const [players] = await pool.query(
+            'SELECT id, wx_nickname FROM dota2_players WHERE id IN (?)',
+            [captainIds]
+          );
+          players.forEach(p => { captainMap[p.id] = p.wx_nickname || ''; });
+        }
+
+        // 给每个队伍附上 wins + captainName
+        const teamsWithScore = allTeams.map(t => ({
+          ...t,
+          wins: winMap[t.team_id] || 0,
+          captainName: captainMap[t.captain_id] || ''
+        }));
+
+        matchPairs = autoPairTeams(teamsWithScore);
         if (matchPairs.length === 0) {
           return res.status(400).json({ success: false, error: '自动配对失败，队伍数量不足' });
         }
@@ -1821,6 +2179,88 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
         },
         message: `第${nextRound}轮已生成，共 ${createdMatches.length} 场对战`
       });
+    } catch (e) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  /**
+   * 【核心接口】开启本轮对战（admin/super_admin）
+   * PUT /api/events/:eventId/matches/round/:roundNum/start
+   * - 将本轮所有 match_status=0 的对战设为 1（进行中）
+   * - 开战后对战不可再编辑/删除，仅可判定胜负
+   */
+  app.put('/api/events/:eventId/matches/round/:roundNum/start', async (req, res) => {
+    try {
+      if (!await assertAdmin(req, res)) return;
+
+      const { eventId, roundNum } = req.params;
+      const rn = parseInt(roundNum);
+
+      // 校验赛事状态
+      const battleCheck = await validateBattleEvent(pool, eventId);
+      if (!battleCheck.valid) {
+        return res.status(400).json({ success: false, error: battleCheck.error, code: 'INVALID_STATUS' });
+      }
+
+      // 查询本轮未开始的对战
+      const [[{ pendingCount }]] = await pool.query(
+        'SELECT COUNT(*) as pendingCount FROM dota2_event_matches WHERE event_id = ? AND round_num = ? AND match_status = 0',
+        [eventId, rn]
+      );
+
+      if (pendingCount === 0) {
+        return res.status(400).json({ success: false, error: '本轮没有待开始的对战' });
+      }
+
+      const now = Date.now();
+      await pool.query(
+        'UPDATE dota2_event_matches SET match_status = 1 WHERE event_id = ? AND round_num = ? AND match_status = 0',
+        [eventId, rn]
+      );
+
+      res.json({
+        success: true,
+        data: { roundNum: rn, startedCount: pendingCount, message: `第${rn}轮对战已开始，共 ${pendingCount} 场` }
+      });
+    } catch (e) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  /**
+   * 更新一场未开始对战的队伍（admin/super_admin，仅match_status=0时可操作）
+   * PUT /api/events/:eventId/matches/:matchId
+   * Body: { teamAId?, teamBId? }
+   */
+  app.put('/api/events/:eventId/matches/:matchId', async (req, res) => {
+    try {
+      if (!await assertAdmin(req, res)) return;
+      const { eventId, matchId } = req.params;
+
+      const [matches] = await pool.query(
+        'SELECT * FROM dota2_event_matches WHERE match_id = ? AND event_id = ?',
+        [matchId, eventId]
+      );
+      if (!matches.length) return res.status(404).json({ success: false, error: '对战记录不存在' });
+
+      if (matches[0].match_status !== 0) {
+        return res.status(400).json({ success: false, error: '对战已开始或已结束，不可修改队伍' });
+      }
+
+      const { teamAId, teamBId } = req.body;
+      const sets = []; const values = [];
+      if (teamAId) { sets.push('team_a_id = ?'); values.push(teamAId); }
+      if (teamBId) { sets.push('team_b_id = ?'); values.push(teamBId); }
+
+      if (sets.length === 0) { return res.status(400).json({ success: false, error: '未指定要修改的队伍' }); }
+      if (teamAId && teamBId && teamAId === teamBId) {
+        return res.status(400).json({ success: false, error: '双方不能为同一支队伍' });
+      }
+
+      values.push(matchId);
+      await pool.query('UPDATE dota2_event_matches SET ' + sets.join(', ') + ' WHERE match_id = ?', values);
+      res.json({ success: true });
     } catch (e) {
       res.status(500).json({ success: false, error: e.message });
     }
@@ -1913,6 +2353,68 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
    * 删除对战记录（admin/super_admin，仅可删除未判定的对战）
    * DELETE /api/events/:eventId/matches/:matchId
    */
+  /**
+   * 上传对战结果图片
+   * POST /api/events/:eventId/matches/:matchId/image
+   * 要求：对战已结束(match_status=2)，管理员或参赛队长可上传，归档后不可上传
+   */
+  app.post('/api/events/:eventId/matches/:matchId/image', upload.single('file'), async (req, res) => {
+    try {
+      const { eventId, matchId } = req.params;
+      const openid = req._openid || '';
+      if (!req.file) return res.status(400).json({ success: false, error: '请选择图片' });
+
+      // 校验赛事：未归档
+      const event = await validateEvent(pool, eventId);
+      if (!event) return res.status(404).json({ success: false, error: '赛事不存在' });
+      if (event.is_archived === 1) {
+        return res.status(403).json({ success: false, error: '赛事已归档，不可上传图片' });
+      }
+
+      // 检验对战记录
+      const [matches] = await pool.query(
+        'SELECT * FROM dota2_event_matches WHERE match_id = ? AND event_id = ?',
+        [matchId, eventId]
+      );
+      if (!matches.length) return res.status(404).json({ success: false, error: '对战记录不存在' });
+      if (matches[0].match_status !== 2) {
+        return res.status(400).json({ success: false, error: '仅已结束的对战可上传结果图片' });
+      }
+
+      // 权限校验：管理员 or 参赛队长
+      const role = await getCallerRole(openid);
+      const isAdminRole = role === 'admin' || role === 'super_admin';
+
+      if (!isAdminRole) {
+        const playerId = await getPlayerIdByOpenid(openid);
+        if (!playerId) {
+          return res.status(403).json({ success: false, error: '未找到您的选手档案，无法上传' });
+        }
+        // 检查是否为参赛队伍的队长
+        const match = matches[0];
+        const [teams] = await pool.query(
+          'SELECT team_id, captain_id FROM dota2_event_teams WHERE event_id = ? AND captain_id = ?',
+          [eventId, playerId]
+        );
+        const isCaptainOfTeamA = teams.some(t => String(t.team_id) === String(match.team_a_id));
+        const isCaptainOfTeamB = teams.some(t => String(t.team_id) === String(match.team_b_id));
+        if (!isCaptainOfTeamA && !isCaptainOfTeamB) {
+          return res.status(403).json({ success: false, error: '仅参赛队伍的队长或管理员可上传对战图片' });
+        }
+      }
+
+      const imageUrl = '/uploads/' + req.file.filename;
+      await pool.query(
+        'UPDATE dota2_event_matches SET battle_image = ? WHERE match_id = ?',
+        [imageUrl, matchId]
+      );
+
+      res.json({ success: true, data: { url: imageUrl, message: '上传成功' } });
+    } catch (e) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
   app.delete('/api/events/:eventId/matches/:matchId', async (req, res) => {
     try {
       if (!await assertAdmin(req, res)) return;
@@ -2096,7 +2598,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
       if (event.event_status !== 5) {
         return res.status(400).json({
           success: false,
-          error: `赛事当前状态为「${getStatusName(event.event_status)}」，需要先结束比赛完成后才可归档`,
+          error: `赛事当前状态为「${STATUS_NAMES[event.event_status]}」，需要先结束比赛完成后才可归档`,
           code: 'NOT_ENDED'
         });
       }
@@ -2132,12 +2634,15 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
         'SELECT COUNT(*) as rankCount FROM dota2_event_ranks WHERE event_id = ?', [eventId]
       );
 
+      // 获取操作人昵称
+      const nickMap = await getUserNicknames(pool, [openid]);
+
       res.json({
         success: true,
         data: {
           eventId,
           archivedAt: now,
-          archivedBy: openid,
+          archivedBy: nickMap.get(openid) || '',
           summary: { signups: signupCount, teams: teamCount, matches: matchCount, ranks: rankCount },
           message: '赛事已归档，所有数据固化为只读状态，不可再修改。'
         }
@@ -2152,9 +2657,10 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
   // ════════════════════════════════════════════════════════════
 
   /**
-   * 获取某赛事名次排行
+   * 获取某赛事名次排行（增强版：含队员昵称）
    * GET /api/events/:eventId/ranks
    * - 所有用户可查看，按名次升序
+   * - 返回每个名次的队伍详情：队员昵称列表、队长信息
    */
   app.get('/api/events/:eventId/ranks', async (req, res) => {
     try {
@@ -2163,14 +2669,54 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole }) {
       if (!event) return res.status(404).json({ success: false, error: '赛事不存在' });
 
       const [rows] = await pool.query(
-        `SELECT r.*, t.team_name, t.total_mmr
+        `SELECT r.*, t.team_name, t.total_mmr, t.player_ids, t.captain_id
          FROM dota2_event_ranks r
          LEFT JOIN dota2_event_teams t ON r.team_id = t.team_id
          WHERE r.event_id = ? ORDER BY r.rank_num ASC`,
         [eventId]
       );
 
-      res.json({ success: true, data: rows });
+      // 收集所有队员ID，批量查询昵称
+      const allPlayerIds = new Set();
+      rows.forEach(row => {
+        try {
+          const ids = row.player_ids ? JSON.parse(row.player_ids) : [];
+          ids.forEach(id => allPlayerIds.add(id));
+        } catch (_) {}
+      });
+      const playerMap = {};
+      if (allPlayerIds.size > 0) {
+        const players = await getPlayersByIds(pool, [...allPlayerIds]);
+        players.forEach(p => { playerMap[p.id] = p.wx_nickname || ''; });
+      }
+
+      // 查找 operator 昵称（将 openid 转为昵称）
+      const allOperatorIds = [...new Set(rows.map(r => r.operator_id).filter(Boolean))];
+      const operatorNickMap = await getUserNicknames(pool, allOperatorIds);
+
+      // 组装结果：附加队员昵称列表 + operator_nickname
+      const data = rows.map(row => {
+        let members = [];
+        try {
+          const ids = row.player_ids ? JSON.parse(row.player_ids) : [];
+          members = ids.map(id => ({ id, nickName: playerMap[id] || '' }));
+        } catch (_) {}
+        const captainName = playerMap[row.captain_id] || '';
+        return {
+          rank_id: row.rank_id,
+          event_id: row.event_id,
+          rank_num: row.rank_num,
+          team_id: row.team_id,
+          team_name: row.team_name || '未知队伍',
+          total_mmr: row.total_mmr || 0,
+          captain_name: captainName,
+          members,
+          operator_nickname: operatorNickMap.get(row.operator_id) || '',
+          created_at: row.created_at
+        };
+      });
+
+      res.json({ success: true, data });
     } catch (e) {
       res.status(500).json({ success: false, error: e.message });
     }

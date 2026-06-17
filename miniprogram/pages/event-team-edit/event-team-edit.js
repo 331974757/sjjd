@@ -14,7 +14,6 @@
  * ============================================================
  */
 
-const app = getApp()
 const api = require('../../utils/api')
 const perm = require('../../utils/permission')
 
@@ -63,6 +62,22 @@ Page({
       // 【BUG-P5修复】同步刷新赛事状态，确保 canEdit 不滞后
       this.loadEventStatus()
       this.loadTeamData()
+    }
+  },
+
+  /** 手动刷新按钮 */
+  async onRefreshTap() {
+    wx.showLoading({ title: '刷新中...', mask: true })
+    try {
+      await Promise.all([
+        this.loadEventStatus(),
+        this.loadTeamData()
+      ])
+      wx.showToast({ title: '已刷新', icon: 'success', duration: 1200 })
+    } catch (e) {
+      wx.showToast({ title: '刷新失败', icon: 'none' })
+    } finally {
+      wx.hideLoading()
     }
   },
 
@@ -242,7 +257,7 @@ Page({
 
     this.setData({ teams })
 
-    const isRemoving = this.data.teams.find(t => t.teamId === teamId)?.captain?.id === playerId
+    const isRemoving = teams.find(t => t.teamId === teamId)?.captain?.id === playerId
     wx.showToast({
       title: isRemoving ? '已取消队长' : '已设为队长',
       icon: 'success',

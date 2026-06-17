@@ -19,7 +19,9 @@
     <view class="section signup-section">
       <view class="section-title-row">
         <text class="section-title">已报名人员</text>
-        <text class="section-refresh" bindtap="loadSignups">刷新</text>
+        <view class="section-refresh" bindtap="onRefreshTap">
+          <text class="refresh-icon">⟳</text>
+        </view>
       </view>
 
       <view class="signup-list" wx:if="{{signups.length > 0}}">

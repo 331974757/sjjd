@@ -22,6 +22,9 @@
         <text class="info-round">编排第 {{nextRound}} 轮对战</text>
       </view>
       <view class="info-right">
+        <view class="match-refresh" bindtap="onRefreshTap">
+          <text class="refresh-icon">⟳</text>
+        </view>
         <text class="info-team-count">{{teams.length}} 队</text>
       </view>
     </view>

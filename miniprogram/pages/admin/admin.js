@@ -31,6 +31,19 @@ Page({
     this.loadAll()
   },
 
+  /** 手动刷新按钮 */
+  async onRefreshTap() {
+    wx.showLoading({ title: '刷新中...', mask: true })
+    try {
+      await this.loadAll()
+      wx.showToast({ title: '已刷新', icon: 'success', duration: 1200 })
+    } catch (e) {
+      wx.showToast({ title: '刷新失败', icon: 'none' })
+    } finally {
+      wx.hideLoading()
+    }
+  },
+
   async loadAll() {
     this.setData({ loading: true })
     try {
@@ -46,12 +59,10 @@ Page({
 
       let rawUsers = (res && res.data) ? res.data : []
       rawUsers = rawUsers.map((u) => {
-        const shortId = u.openid ? (u.openid.slice(0, 6) + '...' + u.openid.slice(-4)) : '-'
         return {
           _id: u._id,
           openid: u.openid,
-          openidShort: shortId,
-          displayName: u.nickName || shortId,   // 有昵称显示昵称，否则显示 openid
+          displayName: u.nickName || '未命名用户',
           role: u.role,
           nickName: u.nickName || '',
           isMe: u.openid === openid,

@@ -72,7 +72,7 @@ Page({
         wx.showLoading({ title: '上传中...' })
         const app = getApp()
         const openid = app.globalData.openid || ''
-        const uploadUrl = api.API_BASE + '/upload' + (openid ? '?openid=' + openid : '')
+        const uploadUrl = api.API_BASE + '/upload' + (openid ? '?openid=' + encodeURIComponent(openid) : '')
         wx.uploadFile({
           url: uploadUrl,
           filePath: tempPath,

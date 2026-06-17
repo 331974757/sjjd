@@ -23,6 +23,41 @@
   color: #8b949e;
 }
 
+/* ===== 顶部标题栏 ===== */
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 28rpx 12rpx;
+}
+.top-bar-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #e6edf3;
+}
+.top-bar-refresh {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 22rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(255, 255, 255, 0.04);
+  border: 1rpx solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+.top-bar-refresh:active {
+  background-color: rgba(31, 111, 235, 0.3);
+  transform: scale(0.92);
+}
+.top-bar-refresh .refresh-icon {
+  font-size: 28rpx;
+  color: #8b949e;
+  font-weight: 300;
+  line-height: 1;
+}
+
 /* ===== 顶部操作提示 ===== */
 .action-hint {
   display: flex;

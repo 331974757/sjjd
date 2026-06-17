@@ -25,15 +25,31 @@
         <view class="event-status {{event._statusClass}}">
           <text>{{event._statusName}}</text>
         </view>
+        <!-- 删除赛事（超管可见，对阵开始前可删除） -->
+        <view class="event-del-btn" wx:if="{{event.event_status < 4 && isSuperAdmin && !isArchived}}" bindtap="showCancelEvent">
+          <text>🗑</text>
+        </view>
+        <!-- 刷新按钮 -->
+        <view class="event-refresh" bindtap="onRefreshTap">
+          <text class="refresh-icon">⟳</text>
+        </view>
+      </view>
+      <!-- 删除赛事提示 -->
+      <view class="event-del-hint" wx:if="{{event.event_status < 4 && isSuperAdmin && !isArchived}}">
+        <text>💡 对阵对战开始前可删除赛事</text>
       </view>
       <view class="event-meta">
         <view class="meta-item">
-          <text class="meta-label">比赛时间</text>
-          <text class="meta-value">{{event._timeLabel}}</text>
+          <text class="meta-label">比赛时间<text wx:if="{{isAdmin && !isArchived && event.event_status < 4}}" class="meta-edit-icon"> ✎</text></text>
+          <picker wx:if="{{isAdmin && !isArchived && event.event_status < 4}}" mode="multiSelector" range="{{editTimeRange}}" value="{{editTimeIndex}}" bindchange="onEditTimeChange" bindcolumnchange="onEditTimeColumnChange">
+            <view class="meta-value meta-time-editable">{{event._timeLabel}}</view>
+          </picker>
+          <text wx:else class="meta-value">{{event._timeLabel}}</text>
         </view>
-        <view class="meta-item">
-          <text class="meta-label">已报名</text>
-          <text class="meta-value meta-count">{{signupCount}} 人</text>
+        <view wx:if="{{event.event_status > 0}}" class="meta-item {{isAdmin && !isArchived && event.event_status < 3 ? 'meta-clickable' : ''}}" bindtap="{{isAdmin && !isArchived && event.event_status < 3 ? 'showEditSignupLimit' : ''}}">
+          <text class="meta-label">已报名<text wx:if="{{isAdmin && !isArchived && event.event_status < 3}}" class="meta-edit-icon"> ✎</text></text>
+          <text class="meta-value meta-count">{{signupCount}}<text wx:if="{{event.signup_limit && event.signup_limit > 0}}">/{{event.signup_limit}}</text> 人</text>
+          <text class="meta-sub" wx:if="{{event.signup_limit && event.signup_limit > 0 && signupCount >= event.signup_limit}}">（已满）</text>
         </view>
       </view>
       <!-- 历史/归档只读提示 -->
@@ -68,7 +84,6 @@
           <text class="os-title">📋 赛事简介</text>
           <text class="edit-pencil edit-pencil-sm" wx:if="{{isAdmin && !isArchived && !editingDesc}}" bindtap="startEditDesc">✎</text>
         </view>
-        <!-- 简介内容：admin 且非归档时可点击编辑 -->
         <text class="os-desc {{isAdmin && !isArchived ? 'os-desc-editable' : ''}}" wx:if="{{!editingDesc}}" bindtap="{{isAdmin && !isArchived ? 'startEditDesc' : ''}}">{{event.event_desc || '暂无简介'}}</text>
         <view class="os-desc-editing" wx:else>
           <textarea class="os-desc-textarea" value="{{editDescValue}}" placeholder="请输入赛事简介..." bindinput="onEditDescInput" focus="{{true}}" auto-height maxlength="500"/>
@@ -79,42 +94,67 @@
         </view>
         <text class="os-creator" wx:if="{{event.creator_nickname}}">创建人：{{event.creator_nickname}}</text>
         <text class="os-time" wx:if="{{event.created_at}}">创建时间：{{event.created_at}}</text>
-        <!-- 归档信息（仅历史赛事/已归档展示） -->
         <view class="os-archive-info" wx:if="{{isArchived}}">
           <text class="os-archive" wx:if="{{_archiveTimeText}}">{{_archiveTimeText}}</text>
           <text class="os-archive" wx:if="{{_archiveByText}}">{{_archiveByText}}</text>
         </view>
       </view>
 
-      <!-- 主操作区：基于事件状态的总控按钮 -->
-      <view class="overview-actions" wx:if="{{actions.change_status.allowed || actions.manage_teams.allowed || actions.manage_matches.allowed || actions.manage_ranks.allowed || actions.archive_event.allowed}}">
-        <!-- 状态0: 开启报名 -->
-        <button class="oa-btn oa-btn-status" wx:if="{{event.event_status === 0 && actions.change_status.allowed}}" bindtap="showStatusConfirm" loading="{{loading}}">开启报名</button>
-        <!-- 状态1: 截止报名 -->
-        <button class="oa-btn oa-btn-status" wx:if="{{event.event_status === 1 && actions.change_status.allowed}}" bindtap="showStatusConfirm" loading="{{loading}}">截止报名</button>
-        <!-- 状态2: 去分组 -->
-        <button class="oa-btn oa-btn-status" wx:if="{{event.event_status === 2 && actions.manage_teams.allowed}}" bindtap="goToTeamsTab">去分组编组 →</button>
-        <!-- 状态3: 锁定并开赛(本应在分组Tab，这里提供快捷入口) -->
-        <button class="oa-btn oa-btn-warn" wx:if="{{event.event_status === 3 && actions.lock_teams.allowed}}" bindtap="doLockTeams" loading="{{locking}}">锁定分组并开赛</button>
-        <!-- 状态4: 去对战 -->
-        <button class="oa-btn oa-btn-status" wx:if="{{event.event_status === 4 && actions.manage_matches.allowed}}" bindtap="goMatchEdit">编排对阵</button>
-        <!-- 状态5未归档: 去归档 -->
-        <button class="oa-btn oa-btn-archive" wx:if="{{event.event_status === 5 && !isArchived && actions.archive_event.allowed}}" bindtap="goToRanksTab">去名次归档 →</button>
+      <!-- 概览操作按钮区 -->
+      <!-- 状态0：开始报名 -->
+      <view class="overview-action ova-start-block" wx:if="{{event.event_status === 0 && isAdmin && !isArchived && actions.change_status.allowed}}">
+        <button class="ova-btn ova-btn-start" bindtap="showStatusConfirm" loading="{{loading}}">
+          📝 开始报名
+        </button>
+        <text class="ova-hint">点击开启报名，设置人数上限后可让选手自助报名</text>
       </view>
 
-      <!-- 普通用户报名入口 -->
-      <view class="overview-signup" wx:if="{{!readonly}}">
-        <button class="signup-btn btn-primary" wx:if="{{signupBtn.allowed && mySignupLoaded && (!mySignup || !mySignup.signedUp)}}" bindtap="doSignup" loading="{{loading}}">立即报名</button>
-        <view class="signup-done" wx:if="{{signupBtn.allowed && mySignup && mySignup.signedUp}}">
-          <view class="sd-left"><text class="done-icon">✓</text><text class="done-text">已报名</text><text class="done-type" wx:if="{{mySignup.signupType === 'admin_add'}}">（管理员添加）</text></view>
-          <button class="signup-btn btn-cancel" wx:if="{{cancelSignupBtn.allowed}}" bindtap="showCancelSignup">取消报名</button>
+
+
+      <!-- 赛事进度条 -->
+      <view class="progress-section">
+        <text class="progress-title">🏁 赛事进度</text>
+        <view class="progress-track">
+          <view
+            class="progress-step {{item._active ? 'ps-active' : ''}} {{item._done ? 'ps-done' : ''}}"
+            wx:for="{{progressSteps}}"
+            wx:key="key"
+          >
+            <view class="ps-dot">
+              <text wx:if="{{item._done}}">✓</text>
+              <text wx:else>{{index + 1}}</text>
+            </view>
+            <view class="ps-line-right" wx:if="{{index < 5}}"></view>
+            <view class="ps-line-left" wx:if="{{index > 0}}"></view>
+            <text class="ps-label">{{item.label}}</text>
+          </view>
         </view>
-        <button class="signup-btn btn-disabled" wx:if="{{!signupBtn.allowed && mySignupLoaded && (!mySignup || !mySignup.signedUp)}}" disabled>立即报名</button>
-        <view class="signup-hint" wx:if="{{!signupBtn.allowed && mySignupLoaded && (!mySignup || !mySignup.signedUp)}}"><text>{{signupDisabledReason}}</text></view>
-        <view class="signup-done" wx:if="{{!signupBtn.allowed && mySignup && mySignup.signedUp}}">
-          <view class="sd-left"><text class="done-icon">✓</text><text class="done-text">已报名</text></view>
+      </view>
+
+      <!-- 快捷跳转按钮（根据赛事阶段动态显示单个按钮） -->
+      <view class="overview-jump" wx:if="{{_overviewJump && !isArchived}}">
+        <button class="oj-single-btn" bindtap="switchTab" data-index="{{_overviewJump.index}}">
+          {{_overviewJump.label}}
+        </button>
+        <text class="oj-single-hint">{{_overviewJump.desc}}</text>
+      </view>
+
+      <!-- 底部统计 -->
+      <view class="overview-meta" wx:if="{{event.event_status > 0}}">
+        <view class="om-item">
+          <text class="om-num">{{signupCount}}</text>
+          <text class="om-label">已报名</text>
         </view>
-        <view class="signup-cancelled" wx:if="{{mySignup && mySignup.wasCancelled && !mySignup.signedUp}}"><text class="cancelled-text">您已取消报名</text></view>
+        <view class="om-divider"></view>
+        <view class="om-item" wx:if="{{teams.length > 0 || event.event_status >= 2}}">
+          <text class="om-num">{{teams.length || 0}}</text>
+          <text class="om-label">队伍数</text>
+        </view>
+        <view class="om-divider" wx:if="{{event.event_status >= 5 || isArchived}}"></view>
+        <view class="om-item" wx:if="{{event.event_status >= 5 || isArchived}}">
+          <text class="om-num">{{ranks.length || 0}}</text>
+          <text class="om-label">已排名</text>
+        </view>
       </view>
     </view>
 
@@ -122,9 +162,19 @@
           Tab2: 报名管理
           ================================================================ -->
     <view class="tab-content" wx:if="{{activeTab === 'signups'}}">
+      <!-- 管理员操作区：状态流转 -->
+      <view class="signup-admin-actions" wx:if="{{actions.change_status.allowed && !isArchived}}">
+        <!-- 状态0: 开启报名 -->
+        <button class="saa-btn saa-btn-primary" wx:if="{{event.event_status === 0}}" bindtap="showStatusConfirm" loading="{{loading}}">📝 开启报名</button>
+        <!-- 状态1: 截止报名 -->
+        <button class="saa-btn saa-btn-warn" wx:if="{{event.event_status === 1}}" bindtap="showStatusConfirm" loading="{{loading}}">🚫 截止报名</button>
+
+      </view>
+
       <!-- 顶部统计 -->
       <view class="signup-stats">
-        <text class="ss-count">已报名：<text class="ss-num">{{signupCount}}</text> 人</text>
+        <text class="ss-count">已报名：<text class="ss-num">{{signupCount}}</text><text wx:if="{{event.signup_limit && event.signup_limit > 0}}">/{{event.signup_limit}}</text> 人</text>
+        <text class="ss-full" wx:if="{{event.signup_limit && event.signup_limit > 0 && signupCount >= event.signup_limit}}">⚠ 名额已满</text>
       </view>
 
       <!-- 管理员操作区：搜索选手添加 -->
@@ -190,7 +240,7 @@
           <view class="sp-info">
             <text class="sp-current">{{signupPage}}</text>
             <text class="sp-sep">/</text>
-            <text class="sp-total">{{Math.ceil(signupTotal / signupPageSize) || 1}}</text>
+            <text class="sp-total">{{signupTotalPages}}</text>
           </view>
           <view class="sp-btn sp-next {{!signupHasMore ? 'sp-disabled' : ''}}" bindtap="goSignupPage" data-page="{{signupPage + 1}}">
             <text>下一页</text>
@@ -296,7 +346,19 @@
             data-team-id="{{item.team_id}}"
           >
             <view class="tc-header">
-              <text class="tc-name">{{item.team_name || '未命名'}}</text>
+              <!-- 战队名：编辑模式 -->
+              <block wx:if="{{_editingTeamId === item.team_id}}">
+                <input class="tc-name-input" value="{{_editTeamNameValue}}" placeholder="输入战队名" bindinput="onEditTeamNameInput" focus="{{true}}" maxlength="50"/>
+                <text class="tc-name-confirm" catchtap="confirmEditTeamName">✓</text>
+                <text class="tc-name-cancel" catchtap="cancelEditTeamName">✕</text>
+              </block>
+              <!-- 战队名：查看模式 -->
+              <block wx:else>
+                <view class="tc-name-row">
+                  <text class="tc-name">{{item.team_name || '未命名'}}</text>
+                  <text class="tc-name-edit" wx:if="{{item._canEditName}}" catchtap="startEditTeamName" data-team-id="{{item.team_id}}">✎</text>
+                </view>
+              </block>
               <view class="tc-header-right">
                 <text class="tc-mmr">总分 {{item.total_mmr || 0}}　均分 {{item._avgMmr || 0}}</text>
                 <text class="tc-count">{{item._memberCount}}人</text>
@@ -356,21 +418,81 @@
     </view>
 
     <!--  ================================================================
-          Tab4: 对阵对战
+          Tab4: 对阵对战（积分榜模式）
+          流程: 选队 → 自动匹配 → 调整配对 → 确认生成(自动锁队) → 判胜负 → 下一轮/结束
           ================================================================ -->
     <view class="tab-content" wx:if="{{activeTab === 'matches'}}">
-      <!-- 编排按钮 -->
-      <view class="match-admin-bar" wx:if="{{actions.manage_matches.allowed && !isArchived}}">
-        <button class="ma-btn" bindtap="goMatchEdit">编排对阵</button>
+
+      <!-- 加载中 -->
+      <view class="empty-state mini" wx:if="{{battleLoading}}">
+        <text class="empty-text">加载中...</text>
       </view>
 
-      <!-- 无对战数据 -->
-      <view class="battle-section" wx:if="{{rounds.length > 0}}">
-        <!-- 轮次切换 -->
+      <block wx:if="{{!battleLoading}}">
+
+      <!-- ========== 一、出战队伍（始终展示） ========== -->
+      <view class="sb-section" wx:if="{{battleScoreboard.length > 0}}">
+        <view class="sb-header">
+          <text class="sb-title">⚔️ 出战队伍</text>
+          <text class="sb-count">{{battleScoreboard.length}} 队</text>
+        </view>
+        <text class="sb-hint" wx:if="{{actions.manage_matches.allowed && !isArchived && battleRoundStatus !== 'fighting' && battleRoundStatus !== 'done'}}">👆 点击队伍卡片高亮选中参战队 - 不选择则默认全部参战</text>
+        <view class="sb-list sb-grid">
+          <view
+            class="sb-card {{item._selected ? 'sb-selected' : ''}} {{battleRoundStatus === 'fighting' || battleRoundStatus === 'done' || isArchived ? 'sb-readonly' : ''}}"
+            wx:for="{{battleScoreboard}}"
+            wx:key="teamId"
+            bindtap="toggleBattleTeam"
+            data-team-id="{{item.teamId}}"
+          >
+            <view class="sbc-info">
+              <text class="sbc-name">{{item.teamName || '未命名'}}</text>
+              <text class="sbc-captain">👑 {{item.captainName || '未知'}}</text>
+            </view>
+            <view class="sbc-right">
+              <text class="sbc-wins">🏅 {{item.wins || 0}}胜</text>
+              <text class="sbc-losses" wx:if="{{item.losses > 0}}">{{item.losses}}负</text>
+              <text class="sbc-mmr">📊 均{{item.avgMmr || 0}}分</text>
+            </view>
+            <view class="sbc-check" wx:if="{{item._selected && battleRoundStatus !== 'fighting' && battleRoundStatus !== 'done'}}">
+              <text>✓</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 暂无队伍 -->
+      <view class="empty-state" wx:if="{{battleScoreboard.length === 0 && !battleRoundHasMatches}}">
+        <text class="empty-icon">⚔️</text>
+        <text class="empty-text">暂无队伍数据</text>
+        <text class="empty-sub">请先在「分组编组」页完成队伍编制</text>
+      </view>
+
+      <!-- ========== 二、快捷操作栏（选队/配对阶段） ========== -->
+      <view class="bb-quick-bar" wx:if="{{actions.manage_matches.allowed && !isArchived && battleRoundStatus !== 'fighting' && battleRoundStatus !== 'done' && battleScoreboard.length > 0}}">
+        <!-- 尚未生成对战：选队模式 -->
+        <block wx:if="{{!battleRoundHasMatches}}">
+          <view class="bqb-btn bqb-auto" bindtap="doBattleAutoMatch">
+            <text>🤖 自动匹配 ({{battleSelectedIds.length > 0 ? battleSelectedIds.length : battleScoreboard.length}}队)</text>
+          </view>
+          <view class="bqb-btn bqb-manual" bindtap="addManualPair">
+            <text>+ 手动添加对战组</text>
+          </view>
+        </block>
+        <!-- 已有对战：可调整 -->
+        <block wx:if="{{battleRoundHasMatches && (battleRoundStatus === 'pairing' || battleRoundStatus === 'fighting')}}">
+          <view class="bqb-btn bqb-del" bindtap="doDeleteRoundMatches" loading="{{battleDeleting}}">
+            <text>🗑 清除本轮</text>
+          </view>
+        </block>
+      </view>
+
+      <!-- ========== 三、轮次切换栏 ========== -->
+      <view class="bb-round-bar" wx:if="{{battleRounds.length > 0}}">
         <scroll-view class="round-tabs" scroll-x="true" enable-flex>
           <view
-            class="round-tab {{currentRound === item.roundNum ? 'rt-active' : ''}} {{item.allDone ? 'rt-done' : ''}}"
-            wx:for="{{rounds}}"
+            class="round-tab {{battleRound === item.roundNum ? 'rt-active' : ''}} {{item.allDone ? 'rt-done' : ''}}"
+            wx:for="{{battleRounds}}"
             wx:key="roundNum"
             bindtap="switchRound"
             data-round="{{item.roundNum}}"
@@ -380,55 +502,188 @@
             <text class="rt-check" wx:if="{{item.allDone}}">✓</text>
           </view>
         </scroll-view>
+      </view>
 
-        <!-- 对战列表 -->
-        <view class="match-list" wx:if="{{matches.length > 0}}">
+      <!-- ========== 四、本轮对战信息头 ========== -->
+      <view class="bb-round-header" wx:if="{{battleRound > 0}}">
+        <view class="bb-rh-left">
+          <text class="bb-rh-title">⚔️ 第{{battleRound}}轮对战</text>
+          <text class="bb-rh-judge-hint" wx:if="{{battleRoundStatus === 'fighting' && actions.manage_matches.allowed && !isArchived}}">👆 点击卡片判定胜负</text>
+        </view>
+      </view>
+
+      <!-- ========== 五、对战配对展示区（local配对 + DB对战） ========== -->
+
+      <!-- 5a. 对战编排（手动编辑 + 自动匹配结果） -->
+      <view class="bb-pair-section" wx:if="{{!battleRoundHasMatches}}">
+        <view class="bb-ps-hd">
+          <view class="bb-ps-hd-left">
+            <text class="bb-ps-title">对战编排</text>
+            <text class="bb-ps-count" wx:if="{{battlePairs.length > 0}}">{{battlePairs.length}}组</text>
+          </view>
+          <text class="bb-ps-hint" wx:if="{{battlePairs.length > 0}}">💡 点击更换队伍</text>
+        </view>
+        <view class="bb-pair-list">
+          <view class="bb-pair-card" wx:for="{{battlePairs}}" wx:key="index">
+            <view class="bbpc-vs-row">
+              <text class="bbpc-swap-edge" wx:if="{{actions.manage_matches.allowed && !isArchived}}">⇄</text>
+              <view class="bbpc-team bbpc-a {{item.teamA ? 'bbpc-filled' : 'bbpc-empty'}}" bindtap="{{actions.manage_matches.allowed && !isArchived ? 'pickTeamForPair' : ''}}" data-index="{{index}}" data-side="A">
+                <block wx:if="{{item.teamA}}">
+                  <text class="bbpct-name">{{item.teamA.teamName || '未知'}}</text>
+                  <text class="bbpct-score">🏅 {{item.teamA.wins || 0}}胜</text>
+                  <text class="bbpct-captain">👑 {{item.teamA.captainName || ''}}</text>
+                </block>
+                <block wx:else>
+                  <text class="bbpct-empty">点击选择A队</text>
+                </block>
+              </view>
+              <view class="bbpc-vs">
+                <text class="bbpc-vs-text">VS</text>
+              </view>
+              <view class="bbpc-team bbpc-b {{item.teamB ? 'bbpc-filled' : 'bbpc-empty'}}" bindtap="{{actions.manage_matches.allowed && !isArchived ? 'pickTeamForPair' : ''}}" data-index="{{index}}" data-side="B">
+                <block wx:if="{{item.teamB}}">
+                  <text class="bbpct-name">{{item.teamB.teamName || '未知'}}</text>
+                  <text class="bbpct-score">🏅 {{item.teamB.wins || 0}}胜</text>
+                  <text class="bbpct-captain">👑 {{item.teamB.captainName || ''}}</text>
+                </block>
+                <block wx:else>
+                  <text class="bbpct-empty">点击选择B队</text>
+                </block>
+              </view>
+              <text class="bbpc-swap-edge" wx:if="{{actions.manage_matches.allowed && !isArchived}}">⇄</text>
+            </view>
+            <view class="bbpc-remove" bindtap="cancelBattlePair" data-index="{{index}}" wx:if="{{actions.manage_matches.allowed && !isArchived}}">
+              <text>移除</text>
+            </view>
+          </view>
+        </view>
+        <!-- 生成对战按钮 -->
+        <view class="bb-gen-wrap" wx:if="{{battlePairs.length > 0 && actions.manage_matches.allowed && !isArchived}}">
+          <button class="bb-gen-btn" bindtap="doGenerateMatches" loading="{{battlePairing}}">
+            确认生成第{{battleRoundNum}}轮对战（{{battlePairs.length}}组）
+          </button>
+        </view>
+      </view>
+
+      <!-- 5b. DB对战列表（已生成记录） -->
+      <view class="bb-match-section" wx:if="{{battleMatches.length > 0}}">
+        <view class="bb-match-list">
           <view
-            class="match-card {{item._isDone ? 'mc-done' : 'mc-pending'}} {{isAdmin && !item._isDone && !isArchived ? 'mc-clickable' : ''}}"
-            wx:for="{{matches}}"
+            class="bb-match-card {{item.match_status === 2 ? 'bbmc-done' : ''}} {{item.match_status === 1 && actions.manage_matches.allowed && !isArchived ? 'bbmc-clickable' : ''}}"
+            wx:for="{{battleMatches}}"
             wx:key="match_id"
-            bindtap="{{isAdmin && !item._isDone && !isArchived ? 'openJudgeModal' : ''}}"
             data-match-id="{{item.match_id}}"
           >
-            <view class="mc-team mc-team-a {{item.winner_id === item.team_a_id ? 'mc-winner' : ''}}">
-              <text class="mct-name">{{item.team_a_name || '未知队伍'}}</text>
-              <text class="mct-mmr">{{item.team_a_mmr || 0}}分</text>
-              <text class="mct-win-badge" wx:if="{{item.winner_id === item.team_a_id}}">🏆</text>
+            <!-- ===== 状态标签 ===== -->
+            <view class="bbmc-status-tag">
+              <text class="bbmc-st-tag {{item.match_status === 2 ? 'st-done' : item.match_status === 1 ? 'st-fight' : 'st-wait'}}">
+                {{item.match_status === 2 ? '已结束' : item.match_status === 1 ? '待裁决' : '待开战'}}
+              </text>
             </view>
-            <view class="mc-center">
-              <text class="mc-vs">VS</text>
-              <text class="mc-status {{item._isDone ? 's-done' : 's-pending'}}">{{item._isDone ? '已结束' : '待判定'}}</text>
-              <text class="mc-time" wx:if="{{item._isDone && item.judge_time}}">{{item._winnerLabel}}</text>
-            </view>
-            <view class="mc-team mc-team-b {{item.winner_id === item.team_b_id ? 'mc-winner' : ''}}">
-              <text class="mct-name">{{item.team_b_name || '未知队伍'}}</text>
-              <text class="mct-mmr">{{item.team_b_mmr || 0}}分</text>
-              <text class="mct-win-badge" wx:if="{{item.winner_id === item.team_b_id}}">🏆</text>
-            </view>
-            <view class="mc-admin-hint" wx:if="{{actions.manage_matches.allowed && !item._isDone && !isArchived}}"><text>点击判定胜负</text></view>
-          </view>
-        </view>
 
-        <!-- 无对战 -->
-        <view class="empty-state" wx:if="{{matches.length === 0}}">
-          <text class="empty-icon">⚔️</text>
-          <text class="empty-text">暂无对战数据</text>
-        </view>
+            <!-- ===== 对战线 ===== -->
+            <view class="bbmc-row">
 
-        <!-- 本轮全完成 → 下一轮/结束比赛 -->
-        <view class="battle-actions" wx:if="{{actions.manage_matches.allowed && roundAllDone && matches.length > 0 && !isArchived}}">
-          <view class="ba-row">
-            <button class="ba-btn ba-btn-next" wx:if="{{!allBattlesDone}}" bindtap="showBattleAction" data-action="next-round">下一轮</button>
-            <button class="ba-btn ba-btn-end" bindtap="showBattleAction" data-action="end-battle">结束比赛</button>
+            <!-- ===== A队 卡片 ===== -->
+            <view class="bbmc-team bbmc-team-a {{item.winner_id === item.team_a_id ? 'bbmc-team-win' : ''}} {{item.winner_id && item.winner_id !== item.team_a_id ? 'bbmc-team-lose' : ''}}">
+              <view class="bbmc-tap-area" wx:if="{{item.match_status === 0 && actions.manage_matches.allowed && !isArchived}}" catchtap="openSwapModal" data-match-id="{{item.match_id}}" data-side="A">
+                <text class="bbmc-swap-hint">⇄ 换队</text>
+              </view>
+              <text class="bbmc-team-winicon" wx:if="{{item.winner_id === item.team_a_id}}">🏆</text>
+              <text class="bbmc-team-name">{{item.team_a_name || '未知队伍'}}</text>
+              <text class="bbmc-team-captain" wx:if="{{item.team_a_captain}}">{{item.team_a_captain}}</text>
+              <view class="bbmc-team-stats">
+                <text class="bbmc-stat-item">{{item.team_a_score || 0}} <text class="bbmc-stat-label">胜</text></text>
+                <text class="bbmc-stat-item" wx:if="{{item.team_a_avg_mmr || item.team_a_mmr}}">{{item.team_a_avg_mmr || 0}} <text class="bbmc-stat-label">均分</text></text>
+              </view>
+            </view>
+
+            <!-- ===== VS 中心 ===== -->
+            <view class="bbmc-vs-block">
+              <view class="bbmc-vs-ring">
+                <text class="bbmc-vs-text">VS</text>
+              </view>
+              <!-- 对决状态 -->
+              <text class="bbmc-vs-sub" wx:if="{{item.match_status === 2}}">已决出</text>
+              <text class="bbmc-vs-sub bbmc-vs-sub-live" wx:if="{{item.match_status === 1}}">待裁决</text>
+              <text class="bbmc-vs-sub" wx:if="{{item.match_status === 0}}">待开战</text>
+            </view>
+
+            <!-- ===== B队 卡片 ===== -->
+            <view class="bbmc-team bbmc-team-b {{item.winner_id === item.team_b_id ? 'bbmc-team-win' : ''}} {{item.winner_id && item.winner_id !== item.team_b_id ? 'bbmc-team-lose' : ''}}">
+              <view class="bbmc-tap-area" wx:if="{{item.match_status === 0 && actions.manage_matches.allowed && !isArchived}}" catchtap="openSwapModal" data-match-id="{{item.match_id}}" data-side="B">
+                <text class="bbmc-swap-hint">⇄ 换队</text>
+              </view>
+              <text class="bbmc-team-winicon" wx:if="{{item.winner_id === item.team_b_id}}">🏆</text>
+              <text class="bbmc-team-name">{{item.team_b_name || '未知队伍'}}</text>
+              <text class="bbmc-team-captain" wx:if="{{item.team_b_captain}}">{{item.team_b_captain}}</text>
+              <view class="bbmc-team-stats">
+                <text class="bbmc-stat-item">{{item.team_b_score || 0}} <text class="bbmc-stat-label">胜</text></text>
+                <text class="bbmc-stat-item" wx:if="{{item.team_b_avg_mmr || item.team_b_mmr}}">{{item.team_b_avg_mmr || 0}} <text class="bbmc-stat-label">均分</text></text>
+              </view>
+            </view>
+
+            </view><!-- /bbmc-row -->
+
+            <!-- ===== 底部操作栏 ===== -->
+            <view class="bbmc-actions" wx:if="{{!isArchived}}">
+              <!-- 待裁决：裁决按钮 -->
+              <view
+                class="bbmc-act-btn bbmc-act-judge"
+                wx:if="{{item.match_status === 1 && actions.manage_matches.allowed}}"
+                catchtap="openJudgeModal"
+                data-match-id="{{item.match_id}}"
+              >
+                <text>⚖️ 裁决胜负</text>
+              </view>
+              <!-- 已结束：上传对战结果 -->
+              <view class="bbmc-upload-row" wx:if="{{item.match_status === 2}}">
+                <block wx:if="{{!item.battle_image}}">
+                  <view class="bbmc-upload-btn" catchtap="uploadMatchImage" data-match-id="{{item.match_id}}">
+                    <text>📷 上传截图</text>
+                  </view>
+                </block>
+                <block wx:if="{{item.battle_image}}">
+                  <image class="bbmc-upload-img" src="{{item.battle_image}}" mode="aspectFill" catchtap="previewMatchImage" data-url="{{item.battle_image}}"></image>
+                  <view class="bbmc-replace-btn" catchtap="uploadMatchImage" data-match-id="{{item.match_id}}">
+                    <text>🔄 换图</text>
+                  </view>
+                </block>
+              </view>
+            </view>
           </view>
         </view>
       </view>
 
-      <view class="empty-state" wx:if="{{rounds.length === 0}}">
+      <!-- 无对战数据 -->
+      <view class="empty-state mini" wx:if="{{battleRound > 0 && battleMatches.length === 0 && battlePairs.length === 0 && battleRoundStatus !== 'select'}}">
+        <text class="empty-text">本轮暂无对战</text>
+      </view>
+
+      <!-- 首次编排提示 -->
+      <view class="empty-state" wx:if="{{battleRound === 0 && battleScoreboard.length > 0}}">
         <text class="empty-icon">⚔️</text>
-        <text class="empty-text">尚无对战数据</text>
-        <text class="empty-sub" wx:if="{{actions.manage_matches.allowed}}">点击「编排对阵」开始第一轮</text>
+        <text class="empty-text">尚未开始对战</text>
+        <text class="empty-sub">点「自动匹配」或「手动添加」生成对战编排</text>
       </view>
+
+
+
+      <!-- ========== 七、本轮完成 → 下一轮/结束比赛 ========== -->
+      <view class="bb-action-wrap" wx:if="{{battleRoundStatus === 'done' && actions.manage_matches.allowed && !isArchived}}">
+        <text class="bb-action-done">✅ 第{{battleRound}}轮全部完成</text>
+        <view class="bb-action-row">
+          <button class="bb-action-btn bb-next-btn" wx:if="{{!battleAllDone}}" bindtap="showBattleAction" data-action="next-round">
+            下一轮 →
+          </button>
+          <button class="bb-action-btn bb-end-btn" bindtap="showBattleAction" data-action="end-battle">
+            🏁 结束比赛
+          </button>
+        </view>
+        <text class="bb-action-hint" wx:if="{{battleAllDone}}">所有轮次已完成，点击「结束比赛」进入名次归档</text>
+      </view>
+
+      </block>
     </view>
 
     <!--  ================================================================
@@ -436,70 +691,132 @@
           ================================================================ -->
     <view class="tab-content" wx:if="{{activeTab === 'ranks'}}">
       <view class="rank-section">
+
+        <!-- ===== 队伍展示（网格布局，始终在最上方） ===== -->
+        <view class="sb-section" wx:if="{{rankTeamCards.length > 0}}">
+          <view class="sb-header">
+            <text class="sb-title">队伍展示</text>
+            <text class="sb-count">{{rankTeamCards.length}} 队</text>
+          </view>
+          <text class="sb-hint" wx:if="{{ranksEditing}}">👆 点击队伍卡片自动按顺序填入名次（冠军→亚军→季军…）</text>
+          <view class="sb-list sb-grid">
+            <view
+              class="sb-card {{!ranksEditing ? 'sb-readonly' : ''}} {{ranksEditing && _rankUsedTeamMap[item.teamId] ? 'sb-selected' : ''}}"
+              wx:for="{{rankTeamCards}}"
+              wx:key="teamId"
+              bindtap="{{ranksEditing ? 'selectRankTeam' : ''}}"
+              data-team-id="{{item.teamId}}"
+            >
+              <view class="sbc-info">
+                <text class="sbc-name">{{item.teamName || '未命名'}}</text>
+                <text class="sbc-captain">👑 {{item.captainName || '未知'}}</text>
+              </view>
+              <view class="sbc-right">
+                <text class="sbc-wins">🏅 {{item.wins || 0}}胜</text>
+                <text class="sbc-losses" wx:if="{{item.losses > 0}}">{{item.losses}}负</text>
+                <text class="sbc-mmr">📊 均{{item.avgMmr || 0}}分</text>
+              </view>
+              <view class="sbc-check" wx:if="{{ranksEditing && _rankUsedTeamMap[item.teamId]}}">
+                <text>✓</text>
+              </view>
+            </view>
+          </view>
+        </view>
+
         <view class="rank-section-header">
           <text class="rank-section-title">🏆 最终排名</text>
           <button class="rank-edit-btn" wx:if="{{actions.manage_ranks.allowed && !ranksEditing && !isArchived}}" bindtap="startEditRanks" size="mini">编辑名次</button>
           <button class="rank-cancel-btn" wx:if="{{isAdmin && ranksEditing}}" bindtap="cancelEditRanks" size="mini">取消编辑</button>
         </view>
 
-        <!-- 编辑模式 -->
-        <view class="rank-edit-area" wx:if="{{actions.manage_ranks.allowed && ranksEditing}}">
-          <view class="rank-slot-list">
-            <view class="rank-slot" wx:for="{{rankEditSlots}}" wx:key="rankNum">
-              <view class="rank-slot-header">
-                <text class="rank-slot-label">{{item.label}}</text>
-                <text class="rank-slot-remove" wx:if="{{index >= 3}}" bindtap="removeRankSlot" data-index="{{index}}">✕</text>
-              </view>
-              <picker mode="selector" range="{{teamsForRank}}" range-key="team_name" bindchange="onRankTeamChange" data-index="{{index}}">
-                <view class="rank-picker {{item.teamId ? 'rank-picker-filled' : 'rank-picker-empty'}}">
-                  <text wx:if="{{item.teamId}}">{{item._displayName || '未知'}}</text>
-                  <text wx:else>请选择队伍</text>
-                  <text class="rank-picker-arrow">▼</text>
-                </view>
-              </picker>
-            </view>
-          </view>
-          <view class="rank-add-more" bindtap="addMoreRankSlots">
-            <text class="ram-icon">+</text>
-            <text class="ram-text">添加更多名次（第{{rankEditSlots.length + 1}}名）</text>
-          </view>
-          <view class="rank-save-row">
-            <button class="rank-save-btn" bindtap="saveRanks" loading="{{ranksSaving}}">保存名次</button>
-            <text class="rank-hint">名次非必填，留空项将不做记录</text>
-          </view>
-        </view>
+        <!-- ===== 编辑模式 ===== -->
+        <block wx:if="{{actions.manage_ranks.allowed && ranksEditing}}">
 
-        <!-- 查看模式 -->
-        <view class="rank-display" wx:if="{{!ranksEditing}}">
-          <view class="rank-podium" wx:if="{{ranks.length > 0}}">
-            <view class="rank-item {{item.rank_num === 1 ? 'rank-gold' : item.rank_num === 2 ? 'rank-silver' : item.rank_num === 3 ? 'rank-bronze' : ''}}" wx:for="{{ranks}}" wx:key="rank_id">
-              <view class="rank-badge">
-                <text class="rank-badge-num" wx:if="{{item.rank_num > 3}}">{{item.rank_num}}</text>
-                <text class="rank-badge-medal" wx:if="{{item.rank_num === 1}}">🥇</text>
-                <text class="rank-badge-medal" wx:if="{{item.rank_num === 2}}">🥈</text>
-                <text class="rank-badge-medal" wx:if="{{item.rank_num === 3}}">🥉</text>
+          <!-- 排名区 -->
+          <view class="rank-slots-area">
+            <text class="rsa-title">📋 排名设置</text>
+            <view class="rank-slot-row" wx:for="{{rankEditSlots}}" wx:key="rankNum">
+              <view class="rsr-left">
+                <view
+                  class="rsr-team-box {{item.teamId ? 'rsr-team-filled' : 'rsr-team-empty'}}"
+                  bindtap="assignTeamToRank"
+                  data-index="{{index}}"
+                >
+                  <block wx:if="{{item.teamId}}">
+                    <text class="rsr-team-name">{{item.teamName || '未知队伍'}}</text>
+                    <text class="rsr-team-captain">👑 {{item.captainName || ''}}</text>
+                    <view class="rsr-members" wx:if="{{item.members.length > 0}}">
+                      <text class="rsr-member" wx:for="{{item.members}}" wx:key="id" wx:for-item="m">{{m.isCaptain ? '👑' : '👤'}}{{m.nickName || '未知'}}</text>
+                    </view>
+                    <view class="rsr-clear-btn" catchtap="clearRankSlot" data-index="{{index}}">
+                      <text>✕ 清除</text>
+                    </view>
+                  </block>
+                  <block wx:else>
+                    <text class="rsr-placeholder">点击此处填入选中的队伍</text>
+                  </block>
+                </view>
               </view>
-              <view class="rank-info">
-                <text class="rank-team-name">{{item.team_name || '未知队伍'}}</text>
-                <text class="rank-team-mmr">{{item.total_mmr || 0}} 分</text>
+              <view class="rsr-right">
+                <view class="rsr-rank-badge {{index === 0 ? 'rsr-gold' : index === 1 ? 'rsr-silver' : index === 2 ? 'rsr-bronze' : ''}}">
+                  <text wx:if="{{index === 0}}">🥇</text>
+                  <text wx:elif="{{index === 1}}">🥈</text>
+                  <text wx:elif="{{index === 2}}">🥉</text>
+                  <text wx:else class="rsr-rank-num">{{index + 1}}</text>
+                </view>
+                <text class="rsr-rank-label">{{index < 3 ? ['冠军', '亚军', '季军'][index] : '第' + (index + 1) + '名'}}</text>
+                <text class="rsr-rank-remove" wx:if="{{rankEditSlots.length > 1}}" bindtap="removeRankSlot" data-index="{{index}}">✕ 移除此名次</text>
               </view>
             </view>
+
+            <view class="rank-add-more" bindtap="addMoreRankSlots">
+              <text class="ram-icon">+</text>
+              <text class="ram-text">添加更多名次（第{{rankEditSlots.length + 1}}名）</text>
+            </view>
           </view>
+
+          <view class="rank-save-row">
+            <button class="rank-save-btn" bindtap="saveRanks" loading="{{ranksSaving}}">💾 保存名次</button>
+            <text class="rank-hint">保存后所有用户可见最终排名</text>
+          </view>
+        </block>
+
+        <!-- ===== 查看模式 ===== -->
+        <block wx:if="{{!actions.manage_ranks.allowed || !ranksEditing}}">
+
+          <scroll-view class="rank-scroll-view" scroll-y="true" wx:if="{{ranks.length > 0}}" enhanced show-scrollbar="{{false}}">
+            <view class="rank-podium">
+              <view class="rank-item {{item.rank_num === 1 ? 'rank-gold' : item.rank_num === 2 ? 'rank-silver' : item.rank_num === 3 ? 'rank-bronze' : ''}}" wx:for="{{ranks}}" wx:key="rank_id">
+                <view class="rank-badge">
+                  <text class="rank-badge-num" wx:if="{{item.rank_num > 3}}">{{item.rank_num}}</text>
+                  <text class="rank-badge-medal" wx:if="{{item.rank_num === 1}}">🥇</text>
+                  <text class="rank-badge-medal" wx:if="{{item.rank_num === 2}}">🥈</text>
+                  <text class="rank-badge-medal" wx:if="{{item.rank_num === 3}}">🥉</text>
+                </view>
+                <view class="rank-info">
+                  <text class="rank-team-name">{{item.team_name || '未知队伍'}}</text>
+                  <text class="rank-team-captain-name" wx:if="{{item.captain_name}}">👑 {{item.captain_name}}</text>
+                  <view class="rank-members-row" wx:if="{{item.members && item.members.length > 0}}">
+                    <text class="rank-member-tag" wx:for="{{item.members}}" wx:key="id" wx:for-item="m">{{m.isCaptain ? '👑' : '👤'}}{{m.nickName || ''}}</text>
+                  </view>
+                  <text class="rank-team-mmr">{{item.total_mmr || 0}} 分</text>
+                </view>
+              </view>
+            </view>
+          </scroll-view>
           <view class="rank-empty" wx:if="{{ranks.length === 0}}">
             <text class="rank-empty-icon">🏆</text>
-            <!-- 历史赛事只读模式 → 提示未设置；进行中已归档 → 提示未记录；其他 → 提示尚未设定 -->
             <text class="rank-empty-text">{{readonly ? '本次赛事未设置名次' : (isArchived ? '未记录名次' : '尚未设定名次')}}</text>
           </view>
-        </view>
 
-        <!-- 归档按钮 -->
-        <view class="archive-btn-area" wx:if="{{actions.archive_event.allowed}}">
-          <button class="archive-btn" bindtap="showArchiveBtn">🏁 归档比赛</button>
-          <text class="archive-btn-hint">归档后所有数据将固化为只读，不可再修改</text>
-        </view>
-        <view class="archive-done-tip" wx:if="{{isArchived}}">
-          <text class="ad-text">📋 本届赛事数据已归档 · {{_archiveTimeText}}</text>
-        </view>
+          <view class="archive-btn-area" wx:if="{{actions.archive_event.allowed}}">
+            <button class="archive-btn" bindtap="showArchiveBtn">🏁 归档比赛</button>
+            <text class="archive-btn-hint">归档后所有数据将固化为只读，不可再修改</text>
+          </view>
+          <view class="archive-done-tip" wx:if="{{isArchived}}">
+            <text class="ad-text">📋 本届赛事数据已归档 · {{_archiveTimeText}}</text>
+          </view>
+        </block>
       </view>
     </view>
 
@@ -525,14 +842,29 @@
     </view>
   </view>
 
-  <!-- 状态变更确认 -->
+  <!-- 状态变更确认（含报名人数滚轮选择器） -->
   <view class="modal-mask" wx:if="{{showStatusConfirm}}" catchtouchmove="preventMove">
     <view class="modal-box">
       <text class="modal-title">{{_confirmTitle}}</text>
-      <text class="modal-content">{{_confirmMsg}}</text>
-      <view class="modal-btns">
+      <!-- 开启报名时显示人数选择器 -->
+      <block wx:if="{{targetStatus === 1}}">
+        <text class="modal-label">报名人数上限</text>
+        <picker mode="selector" range="{{signupLimitOptions}}" value="{{signupLimitIndex}}" bindchange="onSignupLimitPick">
+          <view class="limit-picker-row">
+            <text class="limit-picker-val">{{signupLimitOptions[signupLimitIndex]}}</text>
+            <text class="limit-picker-arrow">▼</text>
+          </view>
+        </picker>
+        <view class="limit-custom-row" wx:if="{{signupLimitOptions[signupLimitIndex] === '自定义'}}">
+          <input class="limit-custom-input" type="number" placeholder="输入人数" value="{{customSignupLimit}}" bindinput="onCustomLimitInput" />
+          <text class="limit-custom-unit">人</text>
+        </view>
+      </block>
+      <!-- 截止报名显示原提示 -->
+      <text class="modal-content" wx:else>{{_confirmMsg}}</text>
+      <view class="modal-btns modal-btns-bottom">
         <view class="modal-btn btn-secondary" bindtap="hideStatusConfirm"><text>取消</text></view>
-        <view class="modal-btn btn-primary-confirm" bindtap="doChangeStatus"><text>确认</text></view>
+        <view class="modal-btn btn-primary-confirm" bindtap="doChangeStatus"><text>确认{{targetStatus === 1 ? '开启报名' : ''}}</text></view>
       </view>
     </view>
   </view>
@@ -554,7 +886,7 @@
     <view class="modal-box judge-modal">
       <text class="modal-title">判定胜负</text>
       <block wx:if="{{judgeStep === 0}}">
-        <text class="modal-subtitle">第{{currentRound}}轮 · {{judgeMatch.team_a_name}} VS {{judgeMatch.team_b_name}}</text>
+        <text class="modal-subtitle">第{{battleRound}}轮 · {{judgeMatch.team_a_name}} VS {{judgeMatch.team_b_name}}</text>
         <text class="judge-prompt">请选择胜方队伍：</text>
         <view class="judge-options">
           <view class="judge-option" bindtap="selectWinner" data-team-id="{{judgeMatch.team_a_id}}">
@@ -585,7 +917,7 @@
       <text class="modal-content">{{_battleActionContent}}</text>
       <view class="modal-btns">
         <view class="modal-btn btn-secondary" bindtap="hideBattleActionModal"><text>取消</text></view>
-        <view class="modal-btn {{battleActionType === 'end-battle' ? 'btn-danger' : 'btn-primary-confirm'}}" bindtap="doBattleAction"><text>{{battleActionType === 'end-battle' ? '确认结束' : '确认进入'}}</text></view>
+        <view class="modal-btn {{battleActionType === 'end-battle' ? 'btn-danger' : 'btn-primary-confirm'}}" bindtap="doBattleAction" loading="{{battleActionSubmitting}}"><text>{{battleActionType === 'end-battle' ? '确认结束' : '确认进入'}}</text></view>
       </view>
     </view>
   </view>
@@ -598,6 +930,66 @@
       <view class="modal-btns">
         <view class="modal-btn btn-secondary" bindtap="hideArchiveBtn"><text>取消</text></view>
         <view class="modal-btn btn-danger" bindtap="doArchive" loading="{{archiveSubmitting}}"><text>确认归档</text></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 修改报名人数上限弹窗 -->
+  <view class="slim-mask" wx:if="{{showSignupLimitModal}}" catchtouchmove="preventMove">
+    <view class="slim-modal" catchtap="">
+      <!-- 关闭按钮 -->
+      <view class="slim-close" bindtap="hideEditSignupLimit">
+        <text class="slim-close-icon">✕</text>
+      </view>
+      <text class="slim-title">修改报名人数上限</text>
+
+      <!-- 当前报名人数 -->
+      <view class="slim-field">
+        <text class="slim-label">当前已报名 <text class="slim-count-num">{{signupCount}}</text> 人</text>
+      </view>
+
+      <!-- 人数上限选择 -->
+      <view class="slim-field">
+        <text class="slim-label">设置人数上限</text>
+        <view class="slim-options">
+          <view class="slim-opt {{editSignupLimitVal === '10' ? 'slim-opt-active' : ''}}" bindtap="selectEditSignupLimit" data-val="10">
+            <text>10 人</text>
+          </view>
+          <view class="slim-opt {{editSignupLimitVal === '20' ? 'slim-opt-active' : ''}}" bindtap="selectEditSignupLimit" data-val="20">
+            <text>20 人</text>
+          </view>
+          <view class="slim-opt {{editSignupLimitVal === '30' ? 'slim-opt-active' : ''}}" bindtap="selectEditSignupLimit" data-val="30">
+            <text>30 人</text>
+          </view>
+          <view class="slim-opt {{editSignupLimitVal === '40' ? 'slim-opt-active' : ''}}" bindtap="selectEditSignupLimit" data-val="40">
+            <text>40 人</text>
+          </view>
+          <view class="slim-opt {{editSignupLimitVal === 'unlimited' ? 'slim-opt-active' : ''}}" bindtap="selectEditSignupLimit" data-val="unlimited">
+            <text>无限制</text>
+          </view>
+          <view class="slim-opt {{editSignupLimitVal === 'custom' ? 'slim-opt-active' : ''}}" bindtap="selectEditSignupLimit" data-val="custom">
+            <text>自定义</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 自定义输入 -->
+      <view class="slim-field" wx:if="{{editSignupLimitVal === 'custom'}}">
+        <text class="slim-label">自定义人数</text>
+        <view class="slim-custom-row">
+          <input class="slim-input" type="number" placeholder="输入人数上限" value="{{editCustomSignupLimit}}" bindinput="onEditCustomLimitInput" />
+          <text class="slim-unit">人</text>
+        </view>
+      </view>
+
+      <!-- 按钮行 -->
+      <view class="slim-btn-row">
+        <view class="slim-btn slim-btn-cancel" bindtap="hideEditSignupLimit">
+          <text>取消</text>
+        </view>
+        <view class="slim-btn slim-btn-confirm" bindtap="doUpdateSignupLimit">
+          <text>确认修改</text>
+        </view>
       </view>
     </view>
   </view>
@@ -623,6 +1015,85 @@
       <view class="modal-btns">
         <view class="modal-btn btn-secondary" bindtap="closeTeamCountModal"><text>取消</text></view>
         <view class="modal-btn btn-primary-confirm" bindtap="confirmAutoAllocate"><text>开始分队</text></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 换队选择弹窗 -->
+  <view class="modal-mask" wx:if="{{showSwapModal}}" catchtouchmove="preventMove">
+    <view class="modal-box">
+      <text class="modal-title">选择替换队伍</text>
+      <text class="modal-subtitle">替换 {{swapSide === 'A' ? 'A队' : 'B队'}} 位置</text>
+      <scroll-view class="swap-team-list" scroll-y="true" style="max-height:500rpx;">
+        <view
+          class="swap-team-item"
+          wx:for="{{battleScoreboard}}"
+          wx:key="teamId"
+          bindtap="doSwapTeam"
+          data-team-id="{{item.teamId}}"
+        >
+          <text class="sti-name">{{item.teamName || '未命名'}}</text>
+          <text class="sti-score">🏅 {{item.wins || 0}}胜</text>
+          <text class="sti-captain">👑 {{item.captainName || ''}}</text>
+        </view>
+      </scroll-view>
+      <view class="modal-btns" style="margin-top:20rpx;">
+        <view class="modal-btn btn-secondary" bindtap="closeSwapModal"><text>取消</text></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 手动配对-队伍选择弹窗 -->
+  <view class="modal-mask" wx:if="{{showPairTeamPicker}}" catchtouchmove="preventMove">
+    <view class="modal-box">
+      <text class="modal-title">选择{{pairPickerSide === 'A' ? 'A队' : 'B队'}}</text>
+      <text class="modal-subtitle">第{{pairPickerIndex + 1}}组对战 • {{pairPickerSide === 'A' ? '左侧' : '右侧'}}位置</text>
+      <scroll-view class="swap-team-list" scroll-y="true" style="max-height:500rpx;">
+        <view
+          class="swap-team-item {{_pairUsedIds.indexOf(item.teamId) >= 0 ? 'sti-disabled' : ''}}"
+          wx:for="{{pairPickerTeams}}"
+          wx:key="teamId"
+          bindtap="selectPairTeam"
+          data-team-id="{{item.teamId}}"
+        >
+          <text class="sti-name">{{item.teamName || '未命名'}}</text>
+          <text class="sti-score">🏅 {{item.wins || 0}}胜</text>
+          <text class="sti-captain">👑 {{item.captainName || ''}}</text>
+          <text class="sti-used" wx:if="{{_pairUsedIds.indexOf(item.teamId) >= 0}}">已使用</text>
+        </view>
+      </scroll-view>
+      <view class="modal-btns" style="margin-top:20rpx;">
+        <view class="modal-btn btn-secondary" bindtap="closePairTeamPicker"><text>取消</text></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 取消赛事确认 -->
+  <view class="modal-mask" wx:if="{{showCancelEventModal}}" catchtouchmove="preventMove">
+    <view class="modal-box">
+      <text class="modal-title">取消赛事</text>
+      <text class="modal-content">⚠ 确定要取消「{{event.event_name}}」吗？\n\n取消后赛事及所有关联数据（报名、队伍、对战）将被永久删除，此操作不可撤销。</text>
+      <view class="modal-btns">
+        <view class="modal-btn btn-secondary" bindtap="hideCancelEvent"><text>再想想</text></view>
+        <view class="modal-btn btn-danger" bindtap="doCancelEvent" loading="{{cancelEventSubmitting}}"><text>确认取消</text></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 对战确认弹窗 -->
+  <view class="modal-mask" wx:if="{{showBattleConfirmModal}}" catchtouchmove="preventMove" bindtap="onBattleConfirmCancel">
+    <view class="modal-box" catchtap="preventMove">
+      <text class="modal-title">{{battleConfirmTitle}}</text>
+      <view class="bcm-list">
+        <view class="bcm-row" wx:for="{{battleConfirmList}}" wx:key="index">
+          <text class="bcm-num">{{index + 1}}</text>
+          <text class="bcm-text">{{item}}</text>
+        </view>
+      </view>
+      <text class="bcm-hint" wx:if="{{battleConfirmHint}}">{{battleConfirmHint}}</text>
+      <view class="modal-btns">
+        <view class="modal-btn btn-secondary" bindtap="onBattleConfirmCancel"><text>取消</text></view>
+        <view class="modal-btn btn-primary" bindtap="onBattleConfirmOk"><text>确定</text></view>
       </view>
     </view>
   </view>

@@ -13,7 +13,10 @@
  * 【设计说明】
  *   - 内置 2026 年 DOTA2 官方段位体系配置表，后续若版本数值调整，只需修改本文件
  *   - 分值计算优先级：实际 MMR > 0 直接用 → 否则按段位+星级公式推算等效分
- *   - 冠绝一世（rank_sort=8）无星级概念，默认取 6000 分
+ *   - 冠绝一世（rank_sort=8/80）无星级概念，默认取 6000 分
+ *   - 兼容两种 calibrate_rank_sort 编码：
+ *     ① Dota 2 原生 medal 编码（11-15=先锋, 21-25=卫士, ..., 61-65=万古, 71-75=超凡, 80=冠绝）
+ *     ② 已映射的 1-8 简化值（向后兼容）
  * ============================================================
  */
 
@@ -141,16 +144,16 @@ function getScore(player) {
   }
 
   // --- 优先级2：按段位+星级推算 ---
-  const rankSort = Number(player.calibrate_rank_sort) || 0;
+  const rawSort = Number(player.calibrate_rank_sort) || 0;
   const star = Number(player.calibrate_rank_star) || 0;
 
   // 未定段/无有效段位 → 0 分
-  if (rankSort <= 0) {
-    return {
-      score: 0,
-      source: 'unranked',
-    };
+  if (rawSort <= 0) {
+    return { score: 0, source: 'unranked' };
   }
+
+  // 把 Dota 2 原生 medal 编码（11-80）映射到内部 1-8 段位体系
+  const { rankSort, effectiveStar } = mapRawRankSort(rawSort, star);
 
   // 冠绝一世（rank_sort=8）：无星级，固定 6000
   if (rankSort === 8) {
@@ -164,7 +167,7 @@ function getScore(player) {
   const rankCfg = RANK_CONFIG[rankSort];
   if (rankCfg && rankCfg.hasStars) {
     // 确保星级在有效范围内 [1, 5]
-    const clampedStar = Math.max(1, Math.min(5, star || 1));
+    const clampedStar = Math.max(1, Math.min(5, effectiveStar || 1));
     const equivalentScore = rankCfg.baseScore + (clampedStar - 1) * rankCfg.stepPerStar;
     // 有段位的最低 100 分
     return {
@@ -174,10 +177,41 @@ function getScore(player) {
   }
 
   // 兜底：rankSort 不在 1-8 范围内 → 0 分（视为未定段）
-  return {
-    score: 0,
-    source: 'unranked',
-  };
+  return { score: 0, source: 'unranked' };
+}
+
+/**
+ * 将 Dota 2 原生 medal tier 编码（11-80）映射到内部 1-8 段位体系
+ *
+ * Dota 2 编码规则：
+ *   11~15 = 先锋 1~5星      21~25 = 卫士 1~5星
+ *   31~35 = 中军 1~5星      41~45 = 统帅 1~5星
+ *   51~55 = 传奇 1~5星      61~65 = 万古流芳 1~5星
+ *   71~75 = 超凡入圣 1~5星   80 = 冠绝一世（无星级）
+ *
+ * 同时兼容已映射的 1-8 直接输入（向后兼容）
+ */
+function mapRawRankSort(rawSort, starFromDb) {
+  // 已经是 1-8 映射值 → 直接使用
+  if (rawSort >= 1 && rawSort <= 8) {
+    return { rankSort: rawSort, effectiveStar: starFromDb };
+  }
+
+  const tier = Math.floor(rawSort / 10); // 十位数 = 段位
+  const localStar = rawSort % 10;          // 个位数 = 星级
+
+  // 冠绝一世
+  if (rawSort === 80) {
+    return { rankSort: 8, effectiveStar: 0 };
+  }
+
+  // 有效段位范围：1-7，星级范围：1-5
+  if (tier >= 1 && tier <= 7 && localStar >= 1 && localStar <= 5) {
+    return { rankSort: tier, effectiveStar: localStar };
+  }
+
+  // 无法映射 → 0
+  return { rankSort: 0, effectiveStar: 0 };
 }
 
 /**
@@ -218,6 +252,7 @@ function getRankConfigTable() {
 
 module.exports = {
   RANK_CONFIG,
+  RANK_OPTIONS: Object.values(RANK_CONFIG).map(c => c.rankName),
   getScore,
   attachScores,
   getRankConfigTable,

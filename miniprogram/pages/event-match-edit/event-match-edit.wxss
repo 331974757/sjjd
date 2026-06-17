@@ -43,7 +43,36 @@
   font-size: 24rpx;
   color: #58a6ff;
 }
-.info-right {}
+.info-right {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+/* 对战编排刷新按钮 */
+.match-refresh {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 22rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(255, 255, 255, 0.04);
+  border: 1rpx solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+.match-refresh:active {
+  background-color: rgba(31, 111, 235, 0.3);
+  transform: scale(0.92);
+}
+.match-refresh .refresh-icon {
+  font-size: 28rpx;
+  color: #8b949e;
+  font-weight: 300;
+  line-height: 1;
+}
+
 .info-team-count {
   font-size: 36rpx;
   font-weight: 700;

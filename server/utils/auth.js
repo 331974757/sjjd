@@ -59,7 +59,7 @@ const STATUS = {
 const STATUS_NAMES = {
   0: '创建中',
   1: '报名中',
-  2: '报名截止',
+  2: '分组编队',
   3: '分组锁定',
   4: '对战中',
   5: '已归档',
@@ -82,7 +82,7 @@ function validateStatusTransition(currentStatus, targetStatus) {
   }
   return {
     valid: false,
-    error: `状态流转不合法：当前「${STATUS_NAMES[currentStatus]}」→「${STATUS_NAMES[targetStatus]}」不是合法跳转。仅允许按顺序依次推进：创建中→报名中→报名截止→分组锁定→对战中→已归档`
+    error: `状态流转不合法：当前「${STATUS_NAMES[currentStatus]}」→「${STATUS_NAMES[targetStatus]}」不是合法跳转。仅允许按顺序依次推进：创建中→报名中→分组编队→分组锁定→对战中→已归档`
   };
 }
 
@@ -108,7 +108,7 @@ function getAllowedActions(eventStatus, isArchived) {
       actions.push('manage_teams', 'edit_event', 'manage_signups');
       break;
     case STATUS.TEAMS_LOCKED:
-      actions.push('manage_teams', 'lock_teams', 'edit_event');
+      actions.push('manage_teams', 'lock_teams', 'edit_event', 'manage_matches');
       break;
     case STATUS.BATTLE_ACTIVE:
       actions.push('manage_matches', 'judge', 'next_round', 'end_battle');
