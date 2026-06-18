@@ -1,6 +1,6 @@
 {
-  "usingComponents": {},
-  "navigationBarTitleText": "对战编排",
+  "usingComponents": { "modal": "/components/modal/modal" },
+  "navigationBarTitleText": "",
   "navigationBarBackgroundColor": "#0d1117",
   "navigationBarTextStyle": "white",
   "backgroundColor": "#0d1117"

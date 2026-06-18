@@ -8,6 +8,7 @@ const api = require('../../utils/api.js')
 const perm = require('../../utils/permission.js')
 const R = require('../../utils/rank-utils.js')
 const dt = require('../../utils/datetime-picker.js')
+const modal = require('../../utils/modal.js')
 
 // 位置格式化：优先 signup_position（报名位置），其次 good_at_positions → "1,2号位"
 function formatPosition(p) {
@@ -306,6 +307,11 @@ Page({
 
       // 更新 Tab 解锁状态
       this._updateTabLocks()
+      // 进入页面时默认跳转到最新可用环节（如报名管理阶段则直接定位到报名管理）
+      const latestUnlocked = [...this.data.tabs].reverse().find(t => !t._locked)
+      if (latestUnlocked && latestUnlocked.key !== this.data.activeTab) {
+        this._switchToTab(latestUnlocked.key)
+      }
       // 解析权限
       this._updateActions()
 
@@ -326,6 +332,7 @@ Page({
         event._statusName = this.getStatusName(event.event_status)
         event._statusClass = this.getStatusClass(event.event_status)
         event._timeLabel = this.formatTime(event.start_time)
+        event._createdAtText = event.created_at ? '创建时间：' + this.formatTime(event.created_at) : ''
         const ts = event.start_time
         this.setData({
           event,
@@ -523,7 +530,6 @@ Page({
       const res = await api.put('/events/' + this.data.eventId, { eventName: val })
       if (res.success) {
         this.setData({ 'event.event_name': val })
-        wx.showToast({ title: '名称已更新', icon: 'success' })
       } else {
         wx.showToast({ title: res.error || '更新失败', icon: 'none' })
       }
@@ -551,7 +557,6 @@ Page({
       const res = await api.put('/events/' + this.data.eventId, { eventDesc: val || null })
       if (res.success) {
         this.setData({ 'event.event_desc': val || '' })
-        wx.showToast({ title: val ? '简介已更新' : '简介已清空', icon: 'success' })
       } else {
         wx.showToast({ title: res.error || '更新失败', icon: 'none' })
       }
@@ -612,7 +617,6 @@ Page({
           'event._timeLabel': this.formatTime(ts),
           editTimeIndex: idx
         })
-        wx.showToast({ title: '比赛时间已更新', icon: 'success' })
       } else {
         wx.showToast({ title: res.error || '更新失败', icon: 'none' })
         const backIdx = this._getEditTimeIndex(this.data.event.start_time)
@@ -686,7 +690,23 @@ Page({
   },
   formatTime(ts) {
     if (!ts) return '待定'
-    const d = new Date(parseInt(ts))
+    // 兼容多种格式：数字时间戳 / ISO字符串 / MySQL日期时间字符串
+    let d
+    if (typeof ts === 'number') {
+      d = new Date(ts)
+    } else if (typeof ts === 'string') {
+      // MySQL datetime 可能没有 T 分隔符，先标准化
+      const norm = ts.trim().replace(' ', 'T')
+      d = new Date(norm)
+    } else {
+      d = new Date(ts)
+    }
+    if (isNaN(d.getTime())) {
+      // 最后兜底：尝试 parseInt
+      const n = parseInt(ts)
+      if (!isNaN(n) && n > 0) d = new Date(n > 10000000000 ? n : n * 1000)
+      else return '待定'
+    }
     return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
       ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes())
   },
@@ -708,23 +728,45 @@ Page({
     return null
   },
 
-  // 开启/截止报名 (二次确认弹窗)
+  // 开启/截止报名
   showStatusConfirm() {
     const next = this.getNextStatus()
     if (!next) { wx.showToast({ title: '当前状态不支持此操作', icon: 'none' }); return }
-    const data = {
+    // 开启报名：直接执行，不弹窗
+    if (next.status === 1) {
+      this._doChangeStatusDirect(1)
+      return
+    }
+    this.setData({
       showStatusConfirm: true,
       targetStatus: next.status,
       targetStatusName: next.name,
       _confirmTitle: next.title,
       _confirmMsg: next.msg
+    })
+  },
+  // 直接变更状态（无需弹窗确认）
+  async _doChangeStatusDirect(status) {
+    const payload = { eventStatus: status }
+    if (status === 1) {
+      const limit = this.data.event.signup_limit
+      payload.signupLimit = (limit && limit > 0) ? limit : 0
     }
-    // 开启报名时初始化人数选择器
-    if (next.status === 1) {
-      data.signupLimitIndex = 4  // 默认「无限制」
-      data.customSignupLimit = ''
+    this.setData({ loading: true })
+    try {
+      const res = await api.put('/events/' + this.data.eventId + '/status', payload)
+      this.setData({ loading: false })
+      if (res.success) {
+        await this.loadEvent()
+        this._updateTabLocks()
+        this._updateActions()
+      } else {
+        wx.showToast({ title: res.error || '操作失败', icon: 'none' })
+      }
+    } catch (e) {
+      this.setData({ loading: false })
+      wx.showToast({ title: '操作失败，请重试', icon: 'none' })
     }
-    this.setData(data)
   },
   hideStatusConfirm() {
     this.setData({ showStatusConfirm: false, signupLimitIndex: 0, customSignupLimit: '' })
@@ -736,28 +778,7 @@ Page({
   // 自定义人数输入
   onCustomLimitInput(e) { this.setData({ customSignupLimit: e.detail.value }) },
   async doChangeStatus() {
-    // 开启报名时校验自定义人数
-    if (this.data.targetStatus === 1) {
-      const sel = this.data.signupLimitValues[this.data.signupLimitIndex]
-      if (sel === 'custom') {
-        const val = parseInt(this.data.customSignupLimit)
-        if (!val || val <= 0) {
-          wx.showToast({ title: '请输入有效人数', icon: 'none' }); return
-        }
-      }
-    }
     const payload = { eventStatus: this.data.targetStatus }
-    // 开启报名时传 signupLimit
-    if (this.data.targetStatus === 1) {
-      const sel = this.data.signupLimitValues[this.data.signupLimitIndex]
-      if (sel === 'unlimited') {
-        payload.signupLimit = 0  // 服务端将 0 转为 NULL
-      } else if (sel === 'custom') {
-        payload.signupLimit = parseInt(this.data.customSignupLimit)
-      } else {
-        payload.signupLimit = parseInt(sel)
-      }
-    }
     this.setData({ showStatusConfirm: false, loading: true })
     try {
       const res = await api.put('/events/' + this.data.eventId + '/status', payload)
@@ -827,11 +848,6 @@ Page({
       const res = await api.put('/events/' + this.data.eventId + '/signup-limit', { signupLimit: limitVal })
       this.setData({ loading: false })
       if (res.success) {
-        if (res.data && res.data.warning) {
-          wx.showToast({ title: '已更新（' + res.data.displayText + '）', icon: 'success', duration: 2500 })
-        } else {
-          wx.showToast({ title: '已更新为' + (res.data ? res.data.displayText : '无限制'), icon: 'success' })
-        }
         await this.loadEvent()
         await this.loadSignups()
         this._updateActions()
@@ -868,6 +884,13 @@ Page({
 
   // 去归档(状态=5未归档时) — 直接切Tab
   goToRanksTab() { this._switchToTab('ranks') },
+
+  // 从概览页点击名次图标 → 切到名次Tab并进入编辑模式
+  goEditRanks() {
+    this._switchToTab('ranks')
+    // 稍等Tab切换完成后再进入编辑
+    setTimeout(() => this.startEditRanks(), 300)
+  },
 
   // ================================================================
   //  Tab2: 报名管理
@@ -951,15 +974,15 @@ Page({
     }
   },
 
-  _handleSignupError(res) {
+  async _handleSignupError(res) {
     const code = res.code || ''
     switch (code) {
       case 'NICKNAME_EMPTY':
-        wx.showModal({ title: '未设置昵称', content: '请先设置您的微信群昵称后再报名。\n\n点击「确认」去设置昵称。', success: r => { if (r.confirm) wx.navigateBack() } }); break
+        const r1 = await modal.confirm(this, { theme: 'warning', title: '未设置昵称', content: '请先设置您的微信群昵称后再报名。\n\n点击「确认」去设置昵称。' }); if (r1.confirm) wx.navigateBack(); break
       case 'PLAYER_NOT_FOUND':
-        wx.showModal({ title: '未找到选手档案', content: '未找到与您昵称匹配的选手档案，请联系管理员先录入您的选手信息。', showCancel: false }); break
+        await modal.confirm(this, { theme: 'warning', title: '未找到选手档案', content: '未找到与您昵称匹配的选手档案，请联系管理员先录入您的选手信息。', showCancel: false }); break
       case 'MULTIPLE_MATCH':
-        wx.showModal({ title: '匹配到多条记录', content: '您的昵称匹配到多个选手档案，请联系管理员手动添加报名。', showCancel: false }); break
+        await modal.confirm(this, { theme: 'warning', title: '匹配到多条记录', content: '您的昵称匹配到多个选手档案，请联系管理员手动添加报名。', showCancel: false }); break
       case 'ALREADY_SIGNED':
         wx.showToast({ title: '您已报名当前赛事', icon: 'none' }); break
       case 'EVENT_NOT_OPEN':
@@ -1028,17 +1051,17 @@ Page({
   },
 
   // 单个添加：直接添加一名选手到报名池
-  doSingleAdd(e) {
+  async doSingleAdd(e) {
     const pid = e.currentTarget.dataset.pid
     const player = this.data.searchResults.find(p => p._id == pid)
     const name = player ? (player.wx_nickname || '未知') : ''
-    wx.showModal({
+    const r = await modal.confirm(this, {
       title: '添加报名',
-      content: '确定将「' + name + '」加入报名池？',
-      success: async (r) => {
-        if (!r.confirm) return
-        this.setData({ addLoading: true })
-        try {
+      content: '确定将「' + name + '」加入报名池？'
+    })
+    if (!r.confirm) return
+    this.setData({ addLoading: true })
+    try {
           const res = await api.post('/events/' + this.data.eventId + '/signups/batch', { playerIds: [pid] })
           // 服务器始终返回 success:true，实际添加结果在 res.data 中
           const result = res.data || {}
@@ -1065,8 +1088,6 @@ Page({
           this.setData({ addLoading: false })
           wx.showToast({ title: '添加失败，请重试', icon: 'none' })
         }
-      }
-    })
   },
 
   // --- 管理员：单个剔除报名 ---
@@ -1300,25 +1321,24 @@ Page({
   },
 
   // 删除队伍（释放队员到自由区）
-  deleteTeam(e) {
+  async deleteTeam(e) {
     const teamId = e.currentTarget.dataset.teamId
     const team = this.data.teams.find(t => String(t.team_id) === String(teamId))
     if (!team) return
 
     const members = team.members || team.players || []
-    wx.showModal({
+    const r = await modal.confirm(this, {
+      theme: 'danger',
       title: '删除队伍',
       content: members.length > 0
         ? '删除「' + team.team_name + '」将释放 ' + members.length + ' 名队员到自由区，确认删除？'
-        : '确认删除空队伍「' + team.team_name + '」？',
-      success: (r) => {
-        if (!r.confirm) return
-        const freeAgents = [...this.data.freeAgents, ...members]
-        const teams = this.data.teams.filter(t => String(t.team_id) !== String(teamId))
-        this.setData({ teams: this._normalizeTeams(teams), freeAgents, selectedPlayerId: '', teamsDirty: true })
-        wx.showToast({ title: '已删除', icon: 'success' })
-      }
+        : '确认删除空队伍「' + team.team_name + '」？'
     })
+    if (!r.confirm) return
+    const freeAgents = [...this.data.freeAgents, ...members]
+    const teams = this.data.teams.filter(t => String(t.team_id) !== String(teamId))
+    this.setData({ teams: this._normalizeTeams(teams), freeAgents, selectedPlayerId: '', teamsDirty: true })
+    wx.showToast({ title: '已删除', icon: 'success' })
   },
 
   // ============ 战队名编辑（队长/管理员，保存分组后，归档前） ============
@@ -1505,13 +1525,14 @@ Page({
       wx.showToast({ title: '请先保存编组再锁定开赛', icon: 'none' })
       return
     }
-    wx.showModal({
+    const r = await modal.confirm(this, {
+      theme: 'danger',
       title: '锁定分组并开赛',
-      content: '确认锁定当前分组并开始比赛？\n\n锁定后队伍信息不可修改，赛事进入对战中状态。',
-      success: async (r) => {
-        if (!r.confirm) return
-        this.setData({ locking: true })
-        try {
+      content: '确认锁定当前分组并开始比赛？\n\n锁定后队伍信息不可修改，赛事进入对战中状态。'
+    })
+    if (!r.confirm) return
+    this.setData({ locking: true })
+    try {
           const res = await api.post('/events/' + this.data.eventId + '/lock-teams', {})
           this.setData({ locking: false })
           if (res.success) {
@@ -1527,8 +1548,6 @@ Page({
           this.setData({ locking: false })
           wx.showToast({ title: '操作失败，请重试', icon: 'none' })
         }
-      }
-    })
   },
 
   // 跳转到队伍编辑页（保留兼容，但不再使用）
@@ -1904,11 +1923,11 @@ Page({
 
   // ============ 删除本轮所有对战（配对阶段回到选队） ============
   async doDeleteRoundMatches() {
-    const confirmRes = await new Promise(r => wx.showModal({
+    const confirmRes = await modal.confirm(this, {
+      theme: 'danger',
       title: '清除本轮对战',
-      content: '将删除第' + this.data.battleRound + '轮所有对战记录，回到选队阶段。\n\n确认清除？',
-      success: r
-    }))
+      content: '将删除第' + this.data.battleRound + '轮所有对战记录，回到选队阶段。\n\n确认清除？'
+    })
     if (!confirmRes.confirm) return
     this.setData({ battleDeleting: true })
     try {
@@ -2399,19 +2418,18 @@ Page({
     this._updateRankUsedMap()
   },
 
-  removeRankSlot(e) {
+  async removeRankSlot(e) {
     const index = e.currentTarget.dataset.index
     const slots = [...this.data.rankEditSlots]
     if (slots.length <= 1) { wx.showToast({ title: '至少保留1个名次', icon: 'none' }); return }
     // 如果被移除的槽位有队伍数据，提示确认
     if (slots[index].teamId) {
-      wx.showModal({
+      const r = await modal.confirm(this, {
+        theme: 'danger',
         title: '移除名次',
-        content: '将移除第' + slots[index].rankNum + '名（' + (slots[index].teamName || '未命名') + '）的数据，确定？',
-        success: r => {
-          if (r.confirm) this._doRemoveSlot(index, slots)
-        }
+        content: '将移除第' + slots[index].rankNum + '名（' + (slots[index].teamName || '未命名') + '）的数据，确定？'
       })
+      if (r.confirm) this._doRemoveSlot(index, slots)
     } else {
       this._doRemoveSlot(index, slots)
     }
@@ -2430,7 +2448,7 @@ Page({
     this.setData({ rankEditSlots: slots, _rankUsedTeamMap: usedMap })
   },
 
-  saveRanks() {
+  async saveRanks() {
     const { rankEditSlots } = this.data
     // 只提交有队伍的槽位
     const ranks = rankEditSlots
@@ -2438,10 +2456,11 @@ Page({
       .map(s => ({ rankNum: s.rankNum, teamId: s.teamId }))
     const hasContent = ranks.length > 0
     if (!hasContent) {
-      wx.showModal({
-        title: '清空名次', content: '当前所有名次均为空，提交将清空所有已有名次记录。确定继续？',
-        success: r => { if (r.confirm) this.doBatchSaveRanks([]) }
+      const r = await modal.confirm(this, {
+        theme: 'danger',
+        title: '清空名次', content: '当前所有名次均为空，提交将清空所有已有名次记录。确定继续？'
       })
+      if (r.confirm) this.doBatchSaveRanks([])
       return
     }
     this.doBatchSaveRanks(ranks)

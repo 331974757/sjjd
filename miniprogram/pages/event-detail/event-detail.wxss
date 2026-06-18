@@ -4,6 +4,37 @@
    深色主题(#0d1117)，完全复用原有风格
    ============================================================ */
 
+/* ===== 页面标题 ===== */
+.page-header {
+  padding: 40rpx 32rpx 36rpx;
+  text-align: center;
+  background-color: #0d1117;
+}
+.page-header-title {
+  display: inline-block;
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #f0f6fc;
+  letter-spacing: 6rpx;
+  position: relative;
+}
+.page-header-title::after {
+  content: '';
+  display: block;
+  width: 44rpx;
+  height: 5rpx;
+  border-radius: 3rpx;
+  background: linear-gradient(135deg, #4f8cff, #7c5cfc);
+  margin: 14rpx auto 0;
+}
+.page-header-sub {
+  display: block;
+  font-size: 24rpx;
+  color: #8b949e;
+  margin-top: 12rpx;
+  letter-spacing: 3rpx;
+}
+
 /* ===== 基础 ===== */
 .page {
   min-height: 100vh;
@@ -34,7 +65,7 @@
   display: flex;
   flex-direction: row;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 16rpx;
 }
 
@@ -42,22 +73,30 @@
   font-size: 34rpx;
   font-weight: 700;
   color: #e6edf3;
-  flex: 1;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  margin-right: 8rpx;
 }
 
 /* 赛事名：编辑笔图标 */
 .edit-pencil {
-  font-size: 28rpx;
+  font-size: 24rpx;
   color: #484f58;
-  padding: 4rpx 8rpx;
+  padding: 2rpx 6rpx;
   flex-shrink: 0;
 }
 .edit-pencil:active { color: #58a6ff; }
 .edit-pencil-sm { font-size: 24rpx; }
+
+/* 赛事名：编辑名次图标 */
+.event-rank-icon {
+  width: 28rpx;
+  height: 28rpx;
+  flex-shrink: 0;
+  margin-left: 4rpx;
+  opacity: 0.55;
+}
 
 .event-name-row {
   display: flex;
@@ -65,12 +104,14 @@
   align-items: center;
   flex: 1;
   overflow: hidden;
-  margin-right: 16rpx;
+  margin-right: 12rpx;
+  padding-top: 4rpx;
 }
 
 .event-name-editing {
   flex-direction: row;
   gap: 8rpx;
+  max-width: 480rpx;
 }
 
 .event-name-input {
@@ -94,31 +135,6 @@
 }
 .edit-done:active { color: #2ea043; }
 
-/* 赛事详情刷新按钮 */
-.event-refresh {
-  width: 44rpx;
-  height: 44rpx;
-  border-radius: 22rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: rgba(255, 255, 255, 0.04);
-  border: 1rpx solid rgba(255, 255, 255, 0.08);
-  flex-shrink: 0;
-  margin-left: 8rpx;
-  transition: all 0.15s ease;
-}
-.event-refresh:active {
-  background-color: rgba(31, 111, 235, 0.3);
-  transform: scale(0.92);
-}
-.event-refresh .refresh-icon {
-  font-size: 28rpx;
-  color: #8b949e;
-  font-weight: 300;
-  line-height: 1;
-}
-
 .edit-cancel {
   font-size: 26rpx;
   color: #f85149;
@@ -136,33 +152,67 @@
   flex-shrink: 0;
 }
 
-/* 删除赛事小图标（超管可见，对阵前） */
+/* 右侧区域：状态 + 删除组 */
+.event-header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+  gap: 8rpx;
+}
+
+/* 删除入口（与比赛时间同行右侧） */
+.event-del-group {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  flex-shrink: 0;
+}
 .event-del-btn {
-  width: 40rpx;
-  height: 40rpx;
+  width: 44rpx;
+  height: 44rpx;
   border-radius: 50%;
   background: rgba(248,81,73,0.08);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-left: 10rpx;
   flex-shrink: 0;
 }
-.event-del-btn text {
-  font-size: 20rpx;
+.event-del-btn .icon-img-sm {
+  width: 22rpx;
+  height: 22rpx;
 }
 .event-del-btn:active {
   background: rgba(248,81,73,0.25);
 }
-
-/* 删除赛事提示行 */
-.event-del-hint {
-  margin-top: 10rpx;
-  padding: 0 4rpx;
+.event-del-hint-text {
+  font-size: 22rpx;
+  color: #6e7681;
+  white-space: nowrap;
 }
-.event-del-hint text {
-  font-size: 20rpx;
-  color: #484f58;
+
+/* 赛事详情刷新按钮 */
+.event-refresh {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 22rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(255, 255, 255, 0.04);
+  border: 1rpx solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+  margin-left: 8rpx;
+  margin-top: 2rpx;
+  transition: all 0.15s ease;
+}
+.event-refresh:active {
+  background-color: rgba(31, 111, 235, 0.3);
+  transform: scale(0.92);
+}
+.event-refresh .icon-img-sm {
+  width: 28rpx;
+  height: 28rpx;
 }
 
 /* 状态颜色 */
@@ -174,6 +224,14 @@
 .s-archived { background: rgba(119,141,169,0.12); color: #778da9; border: 1rpx solid rgba(119,141,169,0.2); }
 
 .event-meta {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 32rpx;
+}
+
+.event-meta-left {
   display: flex;
   flex-direction: row;
   gap: 32rpx;
@@ -2627,156 +2685,75 @@
 }
 
 /* ===== 修改报名人数上限弹窗（匹配创建赛事 UI） ===== */
-.slim-mask {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background-color: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-.slim-modal {
-  width: 620rpx;
-  max-height: 85vh;
-  background-color: #1e2530;
-  border: 1rpx solid rgba(255, 255, 255, 0.1);
-  border-radius: 24rpx;
-  padding: 40rpx 32rpx 32rpx;
-  position: relative;
-  overflow-y: auto;
-}
 
-/* 关闭按钮 */
-.slim-close {
-  position: absolute;
-  top: 20rpx;
-  right: 24rpx;
-  width: 44rpx;
-  height: 44rpx;
-  border-radius: 22rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: rgba(255, 255, 255, 0.04);
-}
-.slim-close:active { background-color: rgba(255, 255, 255, 0.1); }
-.slim-close-icon {
-  font-size: 28rpx;
-  color: #5a6678;
-  line-height: 1;
-}
-
-/* 弹窗标题 */
-.slim-title {
-  font-size: 36rpx;
-  font-weight: 700;
-  color: #ffffff;
-  margin-bottom: 32rpx;
-  display: block;
-}
-
-/* 表单字段 */
-.slim-field { margin-bottom: 28rpx; }
-.slim-label {
-  display: block;
-  font-size: 26rpx;
-  color: #c9d1d9;
-  font-weight: 500;
-  margin-bottom: 12rpx;
+/* 当前已报名提示 */
+.slim-count-hint {
+  font-size: 24rpx;
+  color: #8b949e;
+  margin-bottom: 20rpx;
 }
 .slim-count-num {
   color: #58a6ff;
   font-weight: 700;
 }
 
-/* 选项网格 */
-.slim-options {
+/* 选项行 */
+.limit-pick-row {
   display: flex;
-  flex-wrap: wrap;
-  gap: 16rpx;
+  gap: 12rpx;
+  margin-bottom: 12rpx;
 }
-.slim-opt {
+
+.limit-pick-opt {
   flex: 1;
-  min-width: 150rpx;
-  height: 72rpx;
+  min-width: 120rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 12rpx;
   background-color: rgba(255, 255, 255, 0.04);
   border: 1rpx solid rgba(255, 255, 255, 0.08);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 26rpx;
+  font-size: 24rpx;
   color: #8b949e;
   transition: all 0.15s;
 }
-.slim-opt:active {
+.limit-pick-opt:active {
   background-color: rgba(255, 255, 255, 0.08);
 }
-.slim-opt-active {
-  background-color: rgba(31, 111, 235, 0.15);
-  border-color: rgba(31, 111, 235, 0.4);
-  color: #58a6ff;
-  font-weight: 600;
+
+.limit-pick-on {
+  background-color: rgba(31, 111, 235, 0.15) !important;
+  border-color: rgba(31, 111, 235, 0.4) !important;
+  color: #58a6ff !important;
+  font-weight: 600 !important;
 }
 
 /* 自定义输入行 */
-.slim-custom-row {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-}
-.slim-input {
-  flex: 1;
-  height: 80rpx;
-  padding: 0 24rpx;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1rpx solid rgba(255, 255, 255, 0.1);
-  border-radius: 12rpx;
-  font-size: 28rpx;
-  color: #e6edf3;
-  box-sizing: border-box;
-}
-.slim-input::placeholder { color: #4a5568; font-size: 26rpx; }
-.slim-unit {
-  font-size: 26rpx;
-  color: #8b949e;
-  flex-shrink: 0;
-}
-
-/* 按钮行 */
-.slim-btn-row {
-  display: flex;
-  flex-direction: row;
-  width: 100%;
-  gap: 16rpx;
-  margin-top: 16rpx;
-}
-.slim-btn {
-  flex: 1;
-  height: 84rpx;
-  border-radius: 42rpx;
-  font-size: 30rpx;
+.limit-pick-custom-row {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 600;
-  transition: all 0.15s;
+  margin-top: 12rpx;
+  gap: 12rpx;
 }
-.slim-btn-cancel {
-  border: 1rpx solid rgba(255, 255, 255, 0.15);
+.limit-pick-input {
+  width: 200rpx;
+  flex-shrink: 0;
+  height: 64rpx;
+  padding: 0 20rpx;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1rpx solid rgba(255, 255, 255, 0.1);
+  border-radius: 12rpx;
+  color: #e6edf3;
+  font-size: 28rpx;
+  box-sizing: border-box;
+}
+.limit-pick-input::placeholder { color: #4a5568; font-size: 24rpx; }
+
+.limit-pick-unit {
+  font-size: 24rpx;
   color: #8b949e;
-  background-color: transparent;
-}
-.slim-btn-cancel:active { background-color: rgba(255, 255, 255, 0.05); }
-.slim-btn-confirm {
-  background: linear-gradient(135deg, #1f6feb, #1a5dcc);
-  color: #ffffff;
-  box-shadow: 0 4rpx 16rpx rgba(31, 111, 235, 0.3);
-}
-.slim-btn-confirm:active {
-  background: linear-gradient(135deg, #1a5dcc, #154aa3);
-  transform: scale(0.96);
 }
 
 /* 状态确认弹窗：报名人数上限选择器 */

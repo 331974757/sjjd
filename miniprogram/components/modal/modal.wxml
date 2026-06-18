@@ -1,0 +1,40 @@
+<!-- 通用美化弹窗组件 - 多主题 -->
+<view class="modal-mask {{_showClass}}" wx:if="{{visible}}" catchtouchmove="preventTouchMove">
+  <view class="modal-box modal-theme-{{theme}}">
+
+    <!-- 主题色顶部装饰条 -->
+    <view class="modal-accent-bar"></view>
+
+    <!-- 确认框模式 -->
+    <block wx:if="{{type === 'confirm'}}">
+      <!-- 主题图标 -->
+      <view class="modal-icon-wrap">
+        <image wx:if="{{theme === 'danger'}}" class="modal-icon-img" src="/images/icons/trash.svg" mode="aspectFit"/>
+        <image wx:elif="{{theme === 'success'}}" class="modal-icon-img" src="/images/icons/check.svg" mode="aspectFit"/>
+        <image wx:elif="{{theme === 'warning'}}" class="modal-icon-img" src="/images/icons/warn.svg" mode="aspectFit"/>
+        <image wx:else class="modal-icon-img" src="/images/icons/info.svg" mode="aspectFit"/>
+      </view>
+      <text class="modal-title">{{title}}</text>
+      <text class="modal-content">{{content}}</text>
+      <view class="modal-btns">
+        <view class="modal-btn btn-cancel" wx:if="{{showCancel}}" bindtap="onCancel">{{cancelText}}</view>
+        <view class="modal-btn btn-confirm" bindtap="onConfirm">{{confirmText}}</view>
+      </view>
+    </block>
+
+    <!-- 列表选择模式 -->
+    <block wx:if="{{type === 'sheet'}}">
+      <text class="modal-title sheet-title">{{title}}</text>
+      <view class="sheet-list">
+        <view class="sheet-item {{item.destructive ? 'destructive' : ''}}" wx:for="{{items}}" wx:key="index" data-index="{{index}}" bindtap="onSelect">
+          <text class="sheet-icon" wx:if="{{item.icon}}">{{item.icon}}</text>
+          <text>{{item.label}}</text>
+        </view>
+      </view>
+      <view class="sheet-cancel" bindtap="onCancel">
+        <text>取消</text>
+      </view>
+    </block>
+
+  </view>
+</view>

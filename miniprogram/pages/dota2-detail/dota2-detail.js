@@ -2,6 +2,7 @@
 const perm = require('../../utils/permission.js')
 const R = require('../../utils/rank-utils.js')
 const api = require('../../utils/api.js')
+const modal = require('../../utils/modal.js')
 const RANK_OPTIONS = R.RANK_OPTIONS
 
 Page({
@@ -18,10 +19,13 @@ Page({
     posModalField: '',      // 'goodAtPositions' 或 'signupPosition'
     posModalSelected: { 1: false, 2: false, 3: false, 4: false, 5: false },
 
-    // 段位选择弹窗
-    showRankModal: false,
-    rankPickedIndex: -1,     // 当前选中的段位索引（0~7）
-    starPickedIndex: -1      // 当前选中的星数索引（0~4 对应 1~5星）
+    // 段位内联编辑
+    editingRank: false,
+    rankPickedIndex: -1,
+    starPickedIndex: -1,
+    // 行内编辑
+    editingField: '',         // 正在编辑的字段名（空表示未编辑）
+    editingFieldValue: ''     // 编辑中的值
   },
 
   onLoad(options) {
@@ -107,42 +111,50 @@ Page({
     })
   },
 
-  // 编辑文本字段
+  // 编辑文本字段 → 进入行内编辑模式
   editField(e) {
     const field = e.currentTarget.dataset.field
     const currentVal = this.data.player[field] || ''
-
-    // 天梯分使用 number 类型输入
-    const isNumberField = field === 'calibrateMmr'
-
-    wx.showModal({
-      title: '修改' + getFieldLabel(field),
-      editable: true,
-      placeholderText: isNumberField ? '请输入整数天梯分' : ('请输入' + getFieldLabel(field)),
-      content: String(currentVal),
-      success: (res) => {
-        if (res.confirm && res.content !== undefined) {
-          let val = res.content.trim()
-          if (!val && !isNumberField) {
-            wx.showToast({ title: getFieldLabel(field) + '不能为空', icon: 'none' })
-            return
-          }
-          // 天梯分：空值允许清空，非空时转为数字
-          if (isNumberField) {
-            val = val ? parseInt(val) : null
-            if (val !== null && (isNaN(val) || val < 0 || val > 20000)) {
-              wx.showToast({ title: '请输入有效的天梯分（0-20000）', icon: 'none' })
-              return
-            }
-          }
-          if (String(val) === String(currentVal)) return
-          this.updateField(field, val)
-        }
-      }
-    })
+    this.setData({ editingField: field, editingFieldValue: String(currentVal) })
   },
 
-  // 打开段位选择弹窗（预填当前段位和星数）
+  // 行内输入变更
+  onEditInput(e) {
+    this.setData({ editingFieldValue: e.detail.value })
+  },
+
+  // 行内编辑确认 ✓
+  confirmEditField() {
+    const field = this.data.editingField
+    const currentVal = this.data.player[field] || ''
+    const isNumberField = field === 'calibrateMmr'
+    let val = this.data.editingFieldValue.trim()
+
+    if (!val && !isNumberField) {
+      wx.showToast({ title: getFieldLabel(field) + '不能为空', icon: 'none' })
+      return
+    }
+    if (isNumberField) {
+      val = val ? parseInt(val) : null
+      if (val !== null && (isNaN(val) || val < 0 || val > 20000)) {
+        wx.showToast({ title: '请输入有效的天梯分（0-20000）', icon: 'none' })
+        return
+      }
+    }
+    if (String(val) === String(currentVal)) {
+      this.setData({ editingField: '', editingFieldValue: '' })
+      return
+    }
+    this.setData({ editingField: '', editingFieldValue: '' })
+    this.updateField(field, val)
+  },
+
+  // 行内编辑取消 ✗
+  cancelEditField() {
+    this.setData({ editingField: '', editingFieldValue: '' })
+  },
+
+  // 进入段位编辑模式
   editRankTitle() {
     const player = this.data.player
     const currentRank = player.calibrateRankName || ''
@@ -150,62 +162,33 @@ Page({
     const rankIdx = RANK_OPTIONS.indexOf(currentRank)
     const starIdx = currentStar > 0 ? currentStar - 1 : -1
     this.setData({
-      showRankModal: true,
+      editingRank: true,
       rankPickedIndex: rankIdx >= 0 ? rankIdx : -1,
       starPickedIndex: rankIdx >= 0 && rankIdx < 7 ? starIdx : -1
     })
   },
 
-  // 点击段位 → 高亮选中
+  // 点击段位 → 冠绝直接保存，否则等选星
   pickRank(e) {
     const idx = parseInt(e.currentTarget.dataset.index)
     if (isNaN(idx) || idx < 0 || idx >= RANK_OPTIONS.length) return
-    this.setData({
-      rankPickedIndex: idx,
-      starPickedIndex: -1
-    })
+    if (idx === 7) {
+      // 冠绝一世直接保存
+      this.setData({ editingRank: false, rankPickedIndex: -1, starPickedIndex: -1 })
+      this.updateFields({ calibrateRankName: '冠绝一世', calibrateRankStar: 0 })
+      return
+    }
+    this.setData({ rankPickedIndex: idx, starPickedIndex: -1 })
   },
 
-  // 关闭段位弹窗
-  closeRankModal() {
-    this.setData({ showRankModal: false, rankPickedIndex: -1, starPickedIndex: -1 })
-  },
-
-  // 点击星数 → 高亮选中
+  // 点击星数 → 直接保存
   pickStar(e) {
     const idx = parseInt(e.currentTarget.dataset.index)
     if (isNaN(idx) || idx < 0 || idx > 4) return
-    this.setData({ starPickedIndex: idx })
-  },
-
-  // 确认段位+星数
-  confirmRankStar() {
-    const rankIdx = this.data.rankPickedIndex
-    if (rankIdx < 0) return
-
-    // 冠绝一世无星级，直接保存
-    if (rankIdx === 7) {
-      this.setData({ showRankModal: false, rankPickedIndex: -1, starPickedIndex: -1 })
-      this.updateFields({
-        calibrateRankName: '冠绝一世',
-        calibrateRankStar: 0
-      })
-      return
-    }
-
-    const starIdx = this.data.starPickedIndex
-    if (starIdx < 0) {
-      wx.showToast({ title: '请选择星数', icon: 'none' })
-      return
-    }
-    const star = starIdx + 1
-    const newTitle = RANK_OPTIONS[rankIdx]
-
-    this.setData({ showRankModal: false, rankPickedIndex: -1, starPickedIndex: -1 })
-    this.updateFields({
-      calibrateRankName: newTitle,
-      calibrateRankStar: star
-    })
+    const star = idx + 1
+    const rankName = RANK_OPTIONS[this.data.rankPickedIndex]
+    this.setData({ editingRank: false, rankPickedIndex: -1, starPickedIndex: -1 })
+    this.updateFields({ calibrateRankName: rankName, calibrateRankStar: star })
   },
 
   // 编辑擅长位置（弹窗多选）
@@ -318,15 +301,13 @@ Page({
   },
 
   // 删除选手
-  deletePlayer() {
-    wx.showModal({
+  async deletePlayer() {
+    const r = await modal.confirm(this, {
+      theme: 'danger',
       title: '确认删除',
-      content: '删除后不可恢复，确定要删除该选手吗？',
-      confirmColor: '#da3633',
-      success: (res) => {
-        if (res.confirm) this.doDelete()
-      }
+      content: '删除后不可恢复，确定要删除该选手吗？'
     })
+    if (r.confirm) this.doDelete()
   },
 
   async doDelete() {

@@ -2,6 +2,7 @@
 const perm = require('../../utils/permission.js')
 const R = require('../../utils/rank-utils.js')
 const api = require('../../utils/api.js')
+const modal = require('../../utils/modal.js')
 
 // 段位选项（与详情页保持一致）
 const RANK_OPTIONS = R.RANK_OPTIONS
@@ -20,11 +21,7 @@ Page({
     signupPos: { 1: false, 2: false, 3: false, 4: false, 5: false },
     submitting: false,
     accessChecked: false,
-    accessDenied: false,
-    // 段位弹窗
-    showRankModal: false,
-    rankPickedIndex: -1,
-    starPickedIndex: -1
+    accessDenied: false
   },
 
   onLoad() {
@@ -36,14 +33,13 @@ Page({
       const isAdmin = await perm.isAdmin()
       if (!isAdmin) {
         this.setData({ accessChecked: true, accessDenied: true })
-        wx.showModal({
+        modal.confirm(this, {
+          theme: 'warning',
           title: '仅管理员可添加选手',
           content: '请联系管理员添加选手',
-          showCancel: false,
-          success: () => {
-            wx.navigateBack()
-          }
+          showCancel: false
         })
+        wx.navigateBack()
       } else {
         this.setData({ accessChecked: true, accessDenied: false })
       }
@@ -116,74 +112,27 @@ Page({
     this.setData(obj)
   },
 
-  // 打开段位弹窗
-  openRankModal() {
-    const idx = this.data.rankIndex
-    const star = this.data.rankStars
-    this.setData({
-      showRankModal: true,
-      rankPickedIndex: idx >= 0 ? idx : -1,
-      starPickedIndex: idx >= 0 && idx < 7 && star > 0 ? star - 1 : -1
-    })
-  },
-
-  // 关闭段位弹窗
-  closeRankModal() {
-    this.setData({ showRankModal: false, rankPickedIndex: -1, starPickedIndex: -1 })
-  },
-
-  // 点击段位
-  pickRank(e) {
+  // 点击段位（直接选中）
+  onPickRank(e) {
     const idx = parseInt(e.currentTarget.dataset.index)
     if (isNaN(idx) || idx < 0 || idx >= RANK_OPTIONS.length) return
-    this.setData({ rankPickedIndex: idx, starPickedIndex: -1 })
-  },
-
-  // 点击星数
-  pickStar(e) {
-    const idx = parseInt(e.currentTarget.dataset.index)
-    if (isNaN(idx) || idx < 0 || idx > 4) return
-    this.setData({ starPickedIndex: idx })
-  },
-
-  // 确认段位+星数
-  confirmRankStar() {
-    const rankIdx = this.data.rankPickedIndex
-    if (rankIdx < 0) return
-
-    const rankName = RANK_OPTIONS[rankIdx]
-
-    if (rankIdx === 7) {
+    const rankName = RANK_OPTIONS[idx]
+    if (idx === 7) {
       // 冠绝一世无星
-      this.setData({
-        showRankModal: false,
-        rankPickedIndex: -1,
-        starPickedIndex: -1,
-        rankIndex: rankIdx,
-        rankStars: 0,
-        rankDisplay: '冠绝一世'
-      })
-      return
+      this.setData({ rankIndex: idx, rankStars: 0, rankDisplay: '冠绝一世' })
+    } else {
+      // 换段位时重置星数
+      this.setData({ rankIndex: idx, rankStars: 0, rankDisplay: rankName + ' ?★' })
     }
-
-    const starIdx = this.data.starPickedIndex
-    if (starIdx < 0) {
-      wx.showToast({ title: '请选择星数', icon: 'none' })
-      return
-    }
-    const star = starIdx + 1
-
-    this.setData({
-      showRankModal: false,
-      rankPickedIndex: -1,
-      starPickedIndex: -1,
-      rankIndex: rankIdx,
-      rankStars: star,
-      rankDisplay: rankName + star + '★'
-    })
   },
 
-  preventMove() {},
+  // 点击星数（直接选中）
+  onPickStar(e) {
+    const star = parseInt(e.currentTarget.dataset.star)
+    if (isNaN(star) || star < 1 || star > 5) return
+    const rankName = RANK_OPTIONS[this.data.rankIndex]
+    this.setData({ rankStars: star, rankDisplay: rankName + star + '★' })
+  },
 
   async onSubmit() {
     if (this.data.submitting) return

@@ -1,6 +1,37 @@
 /* pages/event-match-edit/event-match-edit.wxss */
 /* 对战编排页 - 深色主题 */
 
+/* ===== 页面标题 ===== */
+.page-header {
+  padding: 40rpx 32rpx 36rpx;
+  text-align: center;
+  background-color: #0d1117;
+}
+.page-header-title {
+  display: inline-block;
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #f0f6fc;
+  letter-spacing: 6rpx;
+  position: relative;
+}
+.page-header-title::after {
+  content: '';
+  display: block;
+  width: 44rpx;
+  height: 5rpx;
+  border-radius: 3rpx;
+  background: linear-gradient(135deg, #4f8cff, #7c5cfc);
+  margin: 14rpx auto 0;
+}
+.page-header-sub {
+  display: block;
+  font-size: 24rpx;
+  color: #8b949e;
+  margin-top: 12rpx;
+  letter-spacing: 3rpx;
+}
+
 .page {
   min-height: 100vh;
   background-color: #0d1117;
@@ -66,11 +97,9 @@
   background-color: rgba(31, 111, 235, 0.3);
   transform: scale(0.92);
 }
-.match-refresh .refresh-icon {
-  font-size: 28rpx;
-  color: #8b949e;
-  font-weight: 300;
-  line-height: 1;
+.match-refresh .icon-img-sm {
+  width: 28rpx;
+  height: 28rpx;
 }
 
 .info-team-count {

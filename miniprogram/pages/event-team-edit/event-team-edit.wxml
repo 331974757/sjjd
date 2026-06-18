@@ -1,3 +1,9 @@
+<!-- 页面标题 -->
+<view class="page-header">
+  <text class="page-header-title">队伍编组</text>
+  <text class="page-header-sub">选手分队与队长指定</text>
+</view>
+
 <!--
   ============================================================
   第5轮：队伍拖拽编组 + 指定队长
@@ -20,7 +26,7 @@
     <view class="top-bar">
       <text class="top-bar-title">{{eventName || '队伍编组'}}</text>
       <view class="top-bar-refresh" bindtap="onRefreshTap">
-        <text class="refresh-icon">⟳</text>
+        <image class="icon-img-sm" src="/images/icons/refresh.svg" mode="aspectFit"/>
       </view>
     </view>
 
@@ -59,7 +65,7 @@
           </view>
           <text class="chip-mmr">{{item.calibrate_mmr || 0}}</text>
           <view class="chip-check" wx:if="{{selectedPlayerId === item.id}}">
-            <text>✓</text>
+            <text>✓︎</text>
           </view>
         </view>
       </view>
@@ -188,7 +194,23 @@
       <text wx:if="{{eventStatus >= 4}}">🔒 队伍已锁定，比赛进行中</text>
       <text wx:elif="{{eventStatus === 5}}">📦 赛事已归档</text>
       <text wx:else>👁 只读模式</text>
-    </view>
-
   </view>
+
+  <!-- 分队参数行内编辑器 -->
+  <view class="team-count-editor" wx:if="{{showTeamCountEditor}}">
+    <view class="tce-card">
+      <text class="tce-info">{{teamCountInfo}}</text>
+      <view class="tce-row">
+        <input class="tce-input" type="number" value="{{teamCountInput}}" bindinput="onTeamCountInput" focus auto-focus maxlength="3" placeholder="队伍数量"/>
+        <view class="tce-btn tce-cancel" bindtap="cancelTeamCount"><text>✗︎</text></view>
+        <view class="tce-btn tce-confirm" bindtap="confirmTeamCount"><text>✓︎</text></view>
+      </view>
+      <view class="tce-suggest" bindtap="useSuggestedTeamCount">
+        <text>👉 使用建议 {{suggestedTeamCount}} 队</text>
+      </view>
+    </view>
+  </view>
+
+  <modal id="modal"></modal>
+</view>
 </view>

@@ -1,3 +1,9 @@
+<!-- 页面标题 -->
+<view class="page-header">
+  <text class="page-header-title">对战编排</text>
+  <text class="page-header-sub">对阵配对与赛程生成</text>
+</view>
+
 <!--
   ============================================================
   第6轮：对战编排页
@@ -23,7 +29,7 @@
       </view>
       <view class="info-right">
         <view class="match-refresh" bindtap="onRefreshTap">
-          <text class="refresh-icon">⟳</text>
+          <image class="icon-img-sm" src="/images/icons/refresh.svg" mode="aspectFit"/>
         </view>
         <text class="info-team-count">{{teams.length}} 队</text>
       </view>
@@ -156,4 +162,5 @@
     </view>
   </view>
 
+  <modal id="modal"></modal>
 </view>

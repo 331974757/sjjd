@@ -1,4 +1,10 @@
 <!--pages/event-signup-manage/event-signup-manage.wxml-->
+<!-- 页面标题 -->
+<view class="page-header">
+  <text class="page-header-title">报名管理</text>
+  <text class="page-header-sub">选手报名审核与分配</text>
+</view>
+
 <!--【管理员报名人员管理页】左侧已报名列表 + 右侧选手检索 + 批量添加/单个剔除 -->
 <view class="page">
 
@@ -20,7 +26,7 @@
       <view class="section-title-row">
         <text class="section-title">已报名人员</text>
         <view class="section-refresh" bindtap="onRefreshTap">
-          <text class="refresh-icon">⟳</text>
+          <image class="icon-img-sm" src="/images/icons/refresh.svg" mode="aspectFit"/>
         </view>
       </view>
 
@@ -134,4 +140,5 @@
     </view>
   </view>
 
+  <modal id="modal"></modal>
 </view>

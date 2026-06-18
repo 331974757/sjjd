@@ -3,6 +3,7 @@ const perm = require('../../utils/permission.js')
 const R = require('../../utils/rank-utils.js')
 const C = require('../../utils/constants.js')
 const api = require('../../utils/api.js')
+const modal = require('../../utils/modal.js')
 const dt = require('../../utils/datetime-picker.js')
 const pad2 = n => String(n).padStart(2, '0')
 
@@ -611,11 +612,30 @@ Page({
   // 格式化赛事时间
   formatEventTime(ts) {
     if (!ts) return '待定'
-    const ms = parseInt(ts)
-    if (isNaN(ms) || ms <= 0) return '待定'
-    const d = new Date(ms)
-    if (isNaN(d.getTime())) return '待定'
-    return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes())
+    // 兼容多种格式：数字时间戳 / ISO字符串 / MySQL日期时间字符串
+    let d
+    if (typeof ts === 'number') {
+      d = new Date(ts)
+    } else if (typeof ts === 'string') {
+      const norm = ts.trim().replace(' ', 'T')
+      d = new Date(norm)
+    } else {
+      d = new Date(ts)
+    }
+    if (isNaN(d.getTime())) {
+      const n = parseInt(ts)
+      if (!isNaN(n) && n > 0) d = new Date(n > 10000000000 ? n : n * 1000)
+      else return '待定'
+    }
+    const y = d.getFullYear()
+    const M = pad2(d.getMonth() + 1)
+    const D = pad2(d.getDate())
+    const h = pad2(d.getHours())
+    const m = pad2(d.getMinutes())
+    // 如果是今年，不显示年份
+    const now = new Date()
+    if (y === now.getFullYear()) return M + '/' + D + ' ' + h + ':' + m
+    return y + '/' + M + '/' + D + ' ' + h + ':' + m
   },
 
   // 【第4轮新增】跳转赛事详情页
@@ -689,10 +709,11 @@ Page({
   },
 
   // ====== 导航 ======
-  goAdd() {
+  async goAdd() {
     if (!this.data.isAdmin) {
       const names = this.data.superAdminNames.join('、')
-      wx.showModal({
+      await modal.confirm(this, {
+        theme: 'warning',
         title: '仅管理员可添加选手',
         content: '请联系管理员添加选手：\n' + (names || '请稍后再试'),
         showCancel: false
@@ -716,19 +737,16 @@ Page({
   },
 
   // ⚙ 管理员菜单（导入/导出/批量删除/管理员设置）
-  showAdminMenu() {
+  async showAdminMenu() {
     const isSuper = this.data.userRole === 'super_admin'
     const items = ['批量导入', '批量导出']
     if (isSuper) items.push('批量删除选手')
-    wx.showActionSheet({
-      itemList: items,
-      success: (res) => {
-        const action = items[res.tapIndex]
-        if (action === '批量导入') { this.goImport() }
-        else if (action === '批量导出') { this.doExport() }
-        else if (action === '批量删除选手') { this.toggleDeleteMode() }
-      }
-    })
+    const res = await modal.sheet(this, { title: '管理员操作', items: items.map(label => ({ label })) })
+    if (!res.confirm) return
+    const action = items[res.tapIndex]
+    if (action === '批量导入') { this.goImport() }
+    else if (action === '批量导出') { this.doExport() }
+    else if (action === '批量删除选手') { this.toggleDeleteMode() }
   },
 
   // 跳转管理员页面
@@ -740,11 +758,14 @@ Page({
 
   // ====== 段位分布饼图 ======
   toggleChart() {
-    // 始终打开饼图（关闭请用饼图右上角 ✕）
-    this.setData({ showChart: true })
-    this.computeRankDistribution()
-    if (this._pieTimer) clearTimeout(this._pieTimer)
-    this._pieTimer = setTimeout(() => { this.drawPieChart() }, 300)
+    // 按一下打开，再按一下关闭
+    const willShow = !this.data.showChart
+    this.setData({ showChart: willShow })
+    if (willShow) {
+      this.computeRankDistribution()
+      if (this._pieTimer) clearTimeout(this._pieTimer)
+      this._pieTimer = setTimeout(() => { this.drawPieChart() }, 300)
+    }
   },
 
   closeChart() {
@@ -842,7 +863,7 @@ Page({
     this.setData({ selectedIds: selected, selectedCount: Object.keys(selected).length })
   },
 
-  batchDelete() {
+  async batchDelete() {
     const ids = Object.keys(this.data.selectedIds)
     if (ids.length === 0) {
       wx.showToast({ title: '请先选择要删除的选手', icon: 'none' })
@@ -854,14 +875,12 @@ Page({
       const p = players.find(pl => { return pl._id === id })
       return p ? p.wxNickname : id
     }).join('、')
-    wx.showModal({
+    const r = await modal.confirm(this, {
+      theme: 'danger',
       title: '批量删除',
-      content: '确定删除以下 ' + ids.length + ' 名选手？\n\n' + names + '\n\n此操作不可恢复！',
-      confirmColor: '#da3633',
-      success: (res) => {
-        if (res.confirm) this.doBatchDelete(ids)
-      }
+      content: '确定删除以下 ' + ids.length + ' 名选手？\n\n' + names + '\n\n此操作不可恢复！'
     })
+    if (r.confirm) this.doBatchDelete(ids)
   },
 
   async doBatchDelete(ids) {
@@ -1125,25 +1144,24 @@ Page({
       }
       
       // 弹窗询问是否打开
-      setTimeout(() => {
-        wx.showModal({
+      setTimeout(async () => {
+        const modalRes = await modal.confirm(this, {
+          theme: 'success',
           title: '导出成功',
           content: '共导出 ' + count + ' 名选手数据',
           confirmText: '打开文件',
-          cancelText: '关闭',
-          success: (modalRes) => {
-            if (modalRes.confirm && filePath) {
-              wx.openDocument({ 
-                filePath: filePath, 
-                showMenu: true,
-                fail: (err) => {
-                  console.error('[导出] 打开文件失败:', err)
-                  wx.showToast({ title: '打开失败，文件已保存', icon: 'none' })
-                }
-              })
-            }
-          }
+          cancelText: '关闭'
         })
+        if (modalRes.confirm && filePath) {
+          wx.openDocument({ 
+            filePath: filePath, 
+            showMenu: true,
+            fail: (err) => {
+              console.error('[导出] 打开文件失败:', err)
+              wx.showToast({ title: '打开失败，文件已保存', icon: 'none' })
+            }
+          })
+        }
       }, 300)
     } catch (err) {
       wx.hideLoading()

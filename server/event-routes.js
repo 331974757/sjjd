@@ -56,7 +56,10 @@ function cleanSql(baseName) {
   return `DELETE FROM ${baseName} WHERE event_id = ?`;
 }
 
-/** 需要归档迁移的业务表列表（events 表保留元数据不删除） */
+/**
+ * 需要归档迁移的业务表列表（events 表保留元数据不删除）
+ * 注意：dota2_event_rules 不参与归档 — 章程是模板性质的，被多场赛事复用，永久留在主表
+ */
 const ARCHIVE_TABLES = [
   'dota2_event_signup',
   'dota2_event_teams',

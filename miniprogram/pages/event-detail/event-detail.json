@@ -1,6 +1,9 @@
 {
-  "navigationBarTitleText": "赛事详情",
+  "navigationBarTitleText": "",
   "navigationBarBackgroundColor": "#0d1117",
   "navigationBarTextStyle": "white",
-  "enablePullDownRefresh": true
+  "enablePullDownRefresh": true,
+  "usingComponents": {
+    "modal": "/components/modal/modal"
+  }
 }

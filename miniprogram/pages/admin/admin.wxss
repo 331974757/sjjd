@@ -5,6 +5,38 @@
   padding: 24rpx 32rpx 60rpx;
 }
 
+/* ===== 页面标题 ===== */
+.page-header {
+  padding: 48rpx 0 40rpx;
+  text-align: center;
+  border-bottom: 2rpx solid #21262d;
+  margin-bottom: 32rpx;
+}
+.page-header-title {
+  display: inline-block;
+  font-size: 42rpx;
+  font-weight: 700;
+  color: #f0f6fc;
+  letter-spacing: 6rpx;
+  position: relative;
+}
+.page-header-title::after {
+  content: '';
+  display: block;
+  width: 48rpx;
+  height: 6rpx;
+  border-radius: 3rpx;
+  background: linear-gradient(135deg, #4f8cff, #7c5cfc);
+  margin: 16rpx auto 0;
+}
+.page-header-sub {
+  display: block;
+  font-size: 24rpx;
+  color: #8b949e;
+  margin-top: 12rpx;
+  letter-spacing: 3rpx;
+}
+
 /* Section */
 .section {
   margin-bottom: 32rpx;
@@ -44,11 +76,9 @@
   background-color: rgba(31, 111, 235, 0.3);
   transform: scale(0.92);
 }
-.admin-refresh .refresh-icon {
-  font-size: 28rpx;
-  color: #8b949e;
-  font-weight: 300;
-  line-height: 1;
+.admin-refresh .icon-img-sm {
+  width: 28rpx;
+  height: 28rpx;
 }
 
 .user-count {

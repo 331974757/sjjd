@@ -92,18 +92,20 @@
 }
 
 .gtb-btn-admin {
-  background: linear-gradient(135deg, rgba(212, 160, 58, 0.12), rgba(31, 111, 235, 0.08));
-  border-color: rgba(212, 160, 58, 0.25);
+  background-color: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.06);
 }
 
 .gtb-btn-admin:active {
-  background: linear-gradient(135deg, rgba(212, 160, 58, 0.22), rgba(31, 111, 235, 0.15));
-  border-color: rgba(212, 160, 58, 0.45);
+  background-color: rgba(255, 255, 255, 0.1);
+  transform: scale(0.95);
 }
 
 .gtb-icon {
-  font-size: 24rpx;
-  line-height: 1;
+  width: 28rpx;
+  height: 28rpx;
+  display: block;
+  flex-shrink: 0;
 }
 
 .gtb-divider {
@@ -350,8 +352,6 @@
   width: 52rpx;
   height: 52rpx;
   border-radius: 50%;
-  font-size: 30rpx;
-  color: #8b949e;
   background-color: rgba(255, 255, 255, 0.04);
   border: 1rpx solid rgba(255, 255, 255, 0.08);
   display: flex;
@@ -380,14 +380,21 @@
   justify-content: center;
   font-size: 26rpx;
   line-height: 1;
-  border: 1rpx solid rgba(212, 160, 58, 0.25);
-  background-color: rgba(212, 160, 58, 0.08);
-  color: #d4a03a;
+  border: 1rpx solid rgba(255, 255, 255, 0.10);
+  background-color: rgba(255, 255, 255, 0.04);
+  color: #8b949e;
   flex-shrink: 0;
   overflow: hidden;
 }
 
-.chart-btn.chart-active { background-color: rgba(212, 160, 58, 0.22); border-color: rgba(212, 160, 58, 0.5); }
+.chart-btn.chart-active { background-color: rgba(88, 166, 255, 0.15); border-color: rgba(88, 166, 255, 0.35); }
+
+/* 图片图标通用样式 */
+.icon-img {
+  width: 24rpx;
+  height: 24rpx;
+  display: block;
+}
 
 /* ===== 双列卡片网格 ===== */
 .card-grid {
@@ -1624,13 +1631,14 @@
   transform: scale(0.96);
 }
 
-/* 报名人数上限选项 */
-.ecm-limit-options {
+/* 报名人数上限选项 - 分行布局 */
+.ecm-limit-row {
   display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
   gap: 12rpx;
   margin-bottom: 12rpx;
+}
+.ecm-limit-row2 {
+  margin-bottom: 0;
 }
 
 .ecm-limit-opt {
@@ -1658,15 +1666,17 @@
   font-weight: 600 !important;
 }
 
+/* 自定义输入行（选中自定义时下方出现） */
 .ecm-limit-custom-row {
   display: flex;
   align-items: center;
-  margin-top: 10rpx;
+  justify-content: center;
+  margin-top: 12rpx;
   gap: 12rpx;
 }
-
 .ecm-limit-input {
-  flex: 1;
+  width: 200rpx;
+  flex-shrink: 0;
   height: 64rpx;
   padding: 0 20rpx;
   background: rgba(255, 255, 255, 0.06);
@@ -1676,6 +1686,7 @@
   font-size: 28rpx;
   box-sizing: border-box;
 }
+.ecm-limit-input::placeholder { color: #4a5568; font-size: 24rpx; }
 
 .ecm-limit-unit {
   font-size: 24rpx;

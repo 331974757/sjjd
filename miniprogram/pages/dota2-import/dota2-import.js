@@ -1,6 +1,7 @@
 // pages/dota2-import/dota2-import.js
 const perm = require('../../utils/permission.js')
 const api = require('../../utils/api.js')
+const modal = require('../../utils/modal.js')
 const COLUMN_MAP = [
   { name: '微信群昵称', field: 'wxNickname', required: true, hint: '' },
   { name: 'Steam ID', field: 'steamId', required: false, hint: '选填' },
@@ -21,12 +22,13 @@ Page({
       const isAdmin = await perm.isAdmin()
       if (!isAdmin) {
         this.setData({ accessChecked: true, accessDenied: true })
-        wx.showModal({
+        modal.confirm(this, {
+          theme: 'warning',
           title: '仅管理员可导入',
           content: '请联系管理员操作',
-          showCancel: false,
-          success: () => { wx.navigateBack() }
+          showCancel: false
         })
+        wx.navigateBack()
       } else {
         this.setData({ accessChecked: true, accessDenied: false })
       }
@@ -95,7 +97,8 @@ Page({
     wx.setClipboardData({
       data: content,
       success: () => {
-        wx.showModal({
+        modal.confirm(this, {
+          theme: 'success',
           title: '已复制到剪贴板',
           content: '请打开一个空白 Excel，直接粘贴（Ctrl+V）即可自动分列，然后另存为 .xlsx 格式上传。',
           showCancel: false,
@@ -247,7 +250,7 @@ Page({
       this.setData({
         importing: false,
         importDone: true,
-        importedCount: res.imported || 0,
+        importedCount: res.inserted || 0,
         replacedCount: res.updated || 0,
         failCount: res.failed || 0
       })

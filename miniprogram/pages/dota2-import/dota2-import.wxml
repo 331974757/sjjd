@@ -1,5 +1,11 @@
 <!--pages/dota2-import/dota2-import.wxml-->
 <view class="import-page">
+  <!-- 页面标题 -->
+  <view class="page-header" wx:if="{{!accessDenied}}">
+    <text class="page-header-title">批量导入</text>
+    <text class="page-header-sub">CSV / JSON / XLSX 一键导入</text>
+  </view>
+
   <!-- 权限检查中 -->
   <view class="loading-state" wx:if="{{!accessChecked}}" style="padding:160rpx 0;">
     <text class="loading-text">验证权限中...</text>
@@ -97,4 +103,6 @@
     <text class="result-text">导入完成！成功 {{importedCount}} 条{{replacedCount > 0 ? '，更新已有 ' + replacedCount + ' 条' : ''}}{{failCount > 0 ? '，失败 ' + failCount + ' 条' : ''}}</text>
   </view>
   </block>
+
+  <modal id="modal"></modal>
 </view>

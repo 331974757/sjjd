@@ -1,1 +1,1 @@
-{"navigationStyle": "custom", "enablePullDownRefresh": true, "onReachBottomDistance": 100, "backgroundColor": "#0d1117", "backgroundTextStyle": "dark"}
+{  "navigationStyle": "custom", "enablePullDownRefresh": true, "onReachBottomDistance": 100, "backgroundColor": "#0d1117", "backgroundTextStyle": "dark", "usingComponents": { "modal": "/components/modal/modal" } }

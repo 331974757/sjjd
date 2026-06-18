@@ -1,13 +1,19 @@
 <!--pages/admin/admin.wxml-->
 <view class="admin-page">
 
+  <!-- 页面标题 -->
+  <view class="page-header">
+    <text class="page-header-title">权限管理</text>
+    <text class="page-header-sub">用户权限分配与角色管理</text>
+  </view>
+
   <!-- 所有用户列表 -->
   <view class="section">
     <view class="section-title">
-      <text>权限管理</text>
+      <text>用户列表</text>
       <view class="section-title-right">
         <view class="admin-refresh" bindtap="onRefreshTap">
-          <text class="refresh-icon">⟳</text>
+          <image class="icon-img-sm" src="/images/icons/refresh.svg" mode="aspectFit"/>
         </view>
         <text class="user-count">{{keyword ? _filteredTotal : allUsers.length}} 人</text>
       </view>
@@ -87,4 +93,5 @@
     <text class="hint-desc">让对方打开小程序即可自动注册。注册后你就能在这里看到他，点击设为管理员。</text>
   </view>
 
+  <modal id="modal"></modal>
 </view>

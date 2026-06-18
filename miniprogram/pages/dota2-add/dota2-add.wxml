@@ -1,5 +1,11 @@
 <!--pages/dota2-add/dota2-add.wxml-->
 <view class="add-page">
+  <!-- 页面标题 -->
+  <view class="page-header" wx:if="{{!accessDenied}}">
+    <text class="page-header-title">添加选手</text>
+    <text class="page-header-sub">录入新选手信息</text>
+  </view>
+
   <!-- 权限检查中 -->
   <view class="loading-state" wx:if="{{!accessChecked}}">
     <text class="loading-text">验证权限中...</text>
@@ -41,12 +47,57 @@
       <input class="form-input" placeholder="请输入 Dota2 游戏昵称" value="{{gameId}}" bindinput="onInput" data-field="gameId" />
     </view>
 
-    <!-- 核准段位 + 星数 -->
+    <!-- 核准段位（可滑动选择） -->
     <view class="form-group">
       <text class="form-label">核准段位 <text class="required">*</text></text>
-      <view class="picker-display" bindtap="openRankModal">
-        <text class="picker-text">{{rankDisplay}}</text>
-        <text class="picker-arrow">▸</text>
+      <scroll-view class="rank-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+        <view class="rank-scroll-inner">
+          <view class="rank-chip {{rankIndex === 0 ? 'rank-chip-active' : ''}}" bindtap="onPickRank" data-index="0">
+            <text class="rank-chip-text">先锋</text>
+          </view>
+          <view class="rank-chip {{rankIndex === 1 ? 'rank-chip-active' : ''}}" bindtap="onPickRank" data-index="1">
+            <text class="rank-chip-text">卫士</text>
+          </view>
+          <view class="rank-chip {{rankIndex === 2 ? 'rank-chip-active' : ''}}" bindtap="onPickRank" data-index="2">
+            <text class="rank-chip-text">中军</text>
+          </view>
+          <view class="rank-chip {{rankIndex === 3 ? 'rank-chip-active' : ''}}" bindtap="onPickRank" data-index="3">
+            <text class="rank-chip-text">统帅</text>
+          </view>
+          <view class="rank-chip {{rankIndex === 4 ? 'rank-chip-active' : ''}}" bindtap="onPickRank" data-index="4">
+            <text class="rank-chip-text">传奇</text>
+          </view>
+          <view class="rank-chip {{rankIndex === 5 ? 'rank-chip-active' : ''}}" bindtap="onPickRank" data-index="5">
+            <text class="rank-chip-text">万古流芳</text>
+          </view>
+          <view class="rank-chip {{rankIndex === 6 ? 'rank-chip-active' : ''}}" bindtap="onPickRank" data-index="6">
+            <text class="rank-chip-text">超凡入圣</text>
+          </view>
+          <view class="rank-chip {{rankIndex === 7 ? 'rank-chip-active' : ''}}" bindtap="onPickRank" data-index="7">
+            <text class="rank-chip-text">冠绝一世</text>
+          </view>
+        </view>
+      </scroll-view>
+      <!-- 星数选择（非冠绝时显示） -->
+      <view class="star-row-inline" wx:if="{{rankIndex >= 0 && rankIndex < 7}}">
+        <text class="star-label-inline">选择星数</text>
+        <view class="star-select-row">
+          <view class="pm-circle {{rankStars === 1 ? 'pm-sel-1' : 'pm-def'}}" bindtap="onPickStar" data-star="1">
+            <text class="pm-num">1</text>
+          </view>
+          <view class="pm-circle {{rankStars === 2 ? 'pm-sel-2' : 'pm-def'}}" bindtap="onPickStar" data-star="2">
+            <text class="pm-num">2</text>
+          </view>
+          <view class="pm-circle {{rankStars === 3 ? 'pm-sel-3' : 'pm-def'}}" bindtap="onPickStar" data-star="3">
+            <text class="pm-num">3</text>
+          </view>
+          <view class="pm-circle {{rankStars === 4 ? 'pm-sel-4' : 'pm-def'}}" bindtap="onPickStar" data-star="4">
+            <text class="pm-num">4</text>
+          </view>
+          <view class="pm-circle {{rankStars === 5 ? 'pm-sel-5' : 'pm-def'}}" bindtap="onPickStar" data-star="5">
+            <text class="pm-num">5</text>
+          </view>
+        </view>
       </view>
     </view>
 
@@ -107,69 +158,5 @@
   </view>
   </block>
 
-  <!-- 段位选择弹窗 -->
-  <view class="pos-modal-mask" wx:if="{{showRankModal}}" bindtap="closeRankModal">
-    <view class="pos-modal" catchtap="preventMove">
-      <view class="pos-modal-header">
-        <text class="pos-modal-title">选择核准段位</text>
-        <text class="pos-modal-close" bindtap="closeRankModal">×</text>
-      </view>
-      <view class="rank-grid">
-        <view class="rank-cell {{rankPickedIndex === 0 ? 'rank-cell-active' : ''}}" catchtap="pickRank" data-index="0">
-          <text class="rank-cell-text">先锋</text>
-        </view>
-        <view class="rank-cell {{rankPickedIndex === 1 ? 'rank-cell-active' : ''}}" catchtap="pickRank" data-index="1">
-          <text class="rank-cell-text">卫士</text>
-        </view>
-        <view class="rank-cell {{rankPickedIndex === 2 ? 'rank-cell-active' : ''}}" catchtap="pickRank" data-index="2">
-          <text class="rank-cell-text">中军</text>
-        </view>
-        <view class="rank-cell {{rankPickedIndex === 3 ? 'rank-cell-active' : ''}}" catchtap="pickRank" data-index="3">
-          <text class="rank-cell-text">统帅</text>
-        </view>
-        <view class="rank-cell {{rankPickedIndex === 4 ? 'rank-cell-active' : ''}}" catchtap="pickRank" data-index="4">
-          <text class="rank-cell-text">传奇</text>
-        </view>
-        <view class="rank-cell {{rankPickedIndex === 5 ? 'rank-cell-active' : ''}}" catchtap="pickRank" data-index="5">
-          <text class="rank-cell-text">万古流芳</text>
-        </view>
-        <view class="rank-cell {{rankPickedIndex === 6 ? 'rank-cell-active' : ''}}" catchtap="pickRank" data-index="6">
-          <text class="rank-cell-text">超凡入圣</text>
-        </view>
-        <view class="rank-cell {{rankPickedIndex === 7 ? 'rank-cell-active' : ''}}" catchtap="pickRank" data-index="7">
-          <text class="rank-cell-text">冠绝一世</text>
-        </view>
-      </view>
-
-      <!-- 星级选择（选中非冠绝段位后显示） -->
-      <view class="star-section" wx:if="{{rankPickedIndex >= 0 && rankPickedIndex < 7}}">
-        <text class="star-label">选择星数</text>
-        <view class="star-row">
-          <view class="pm-circle {{starPickedIndex === 0 ? 'pm-sel-1' : 'pm-def'}}" catchtap="pickStar" data-index="0">
-            <text class="pm-num">1</text>
-          </view>
-          <view class="pm-circle {{starPickedIndex === 1 ? 'pm-sel-2' : 'pm-def'}}" catchtap="pickStar" data-index="1">
-            <text class="pm-num">2</text>
-          </view>
-          <view class="pm-circle {{starPickedIndex === 2 ? 'pm-sel-3' : 'pm-def'}}" catchtap="pickStar" data-index="2">
-            <text class="pm-num">3</text>
-          </view>
-          <view class="pm-circle {{starPickedIndex === 3 ? 'pm-sel-4' : 'pm-def'}}" catchtap="pickStar" data-index="3">
-            <text class="pm-num">4</text>
-          </view>
-          <view class="pm-circle {{starPickedIndex === 4 ? 'pm-sel-5' : 'pm-def'}}" catchtap="pickStar" data-index="4">
-            <text class="pm-num">5</text>
-          </view>
-        </view>
-        <view class="pos-modal-confirm" catchtap="confirmRankStar">
-          <text class="pos-modal-confirm-text">确认</text>
-        </view>
-      </view>
-
-      <!-- 冠绝一世确认按钮 -->
-      <view class="pos-modal-confirm" wx:if="{{rankPickedIndex === 7}}" catchtap="confirmRankStar">
-        <text class="pos-modal-confirm-text">确认</text>
-      </view>
-    </view>
-  </view>
+  <modal id="modal"></modal>
 </view>

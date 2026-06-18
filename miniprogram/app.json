@@ -13,7 +13,7 @@
   "window": {
     "backgroundTextStyle": "dark",
     "navigationBarBackgroundColor": "#0d1117",
-    "navigationBarTitleText": "Dota2选手管理",
+    "navigationBarTitleText": "",
     "navigationBarTextStyle": "white"
   },
   "style": "v2",

@@ -3,6 +3,7 @@
 // 复用现有选手档案检索能力，通过 api.js 和 permission.js
 const api = require('../../utils/api.js')
 const perm = require('../../utils/permission.js')
+const modal = require('../../utils/modal.js')
 
 Page({
   data: {
@@ -216,12 +217,9 @@ Page({
       return p ? p.wx_nickname : id
     }).join('、')
 
-    const confirmRes = await new Promise(resolve => {
-      wx.showModal({
-        title: '批量添加报名',
-        content: `确定添加以下 ${selectedIds.length} 名选手？\n\n${names}`,
-        success: res => resolve(res.confirm)
-      })
+    const confirmRes = await modal.confirm(this, {
+      title: '批量添加报名',
+      content: `确定添加以下 ${selectedIds.length} 名选手？\n\n${names}`
     })
 
     if (!confirmRes) return

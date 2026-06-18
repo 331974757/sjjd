@@ -2,6 +2,7 @@
 const perm = require('../../utils/permission.js')
 const C = require('../../utils/constants.js')
 const api = require('../../utils/api.js')
+const modal = require('../../utils/modal.js')
 const PAGE_SIZE = C.PAGE_SIZE
 
 Page({
@@ -101,13 +102,16 @@ Page({
     this.filterUsers()
   },
 
-  // 公共筛选方法：显示所有用户（优先显示有昵称的）并支持关键词搜索
+  // 公共筛选方法：只展示已改名的用户，支持关键词搜索
   _getFiltered() {
-    // 【修复】不直接排序 allUsers（会修改 data 原数组），创建副本排序
-    let list = [...this.data.allUsers].sort((a, b) => {
-      // 有昵称的排前面
-      if (a.nickName && !b.nickName) return -1;
-      if (!a.nickName && b.nickName) return 1;
+    // 只展示有昵称的用户（已注册/已改名），排除无 nickName 的游客
+    let list = this.data.allUsers.filter(u => u.nickName);
+    list = [...list].sort((a, b) => {
+      // 有昵称的排前面（已经全部有昵称，此排序保持角色优先）
+      if (a.role === 'super_admin' && b.role !== 'super_admin') return -1;
+      if (a.role !== 'super_admin' && b.role === 'super_admin') return 1;
+      if (a.role === 'admin' && b.role === 'user') return -1;
+      if (a.role === 'user' && b.role === 'admin') return 1;
       return 0;
     });
     const kw = this.data.keyword.toLowerCase()
@@ -154,7 +158,7 @@ Page({
   },
 
   // 切换权限（仅超级管理员可操作，ActionSheet 多选）
-  toggleAdmin(e) {
+  async toggleAdmin(e) {
     if (this.data._operating) return
     const openid = e.currentTarget.dataset.openid
     const role = e.currentTarget.dataset.role
@@ -181,37 +185,29 @@ Page({
       actions = ['setSuper', 'setAdmin']
     }
 
-    wx.showActionSheet({
-      itemList: itemList,
-      success: (res) => {
-        const action = actions[res.tapIndex]
-        const name = nickName || '该用户'
-        switch (action) {
-          case 'setSuper':
-            this._confirmAction('设为超级管理员', '确定将「' + name + '」设为超级管理员吗？\n\n超管拥有最高权限。', '#1a237e', '确认设置', () => { this.doSetSuperAdmin(openid) })
-            break
-          case 'removeSuper':
-            this._confirmAction('取消超级管理员', '确定取消「' + name + '」的超级管理员权限吗？\n\n将降为普通用户。', '#e74c3c', '', () => { this.doRemoveSuperAdmin(openid) })
-            break
-          case 'setAdmin':
-            this._confirmAction('设为管理员', '确定将「' + name + '」设为管理员吗？', '#27ae60', '', () => { this.doSetAdmin(openid) })
-            break
-          case 'removeAdmin':
-            this._confirmAction('取消管理员', '确定取消「' + name + '」的管理员权限吗？', '#e74c3c', '', () => { this.doRemoveAdmin(openid) })
-            break
-        }
-      }
-    })
+    const res = await modal.sheet(this, { title: '选择操作', items: itemList.map(label => ({ label })) })
+    if (!res.confirm) return
+    const action = actions[res.tapIndex]
+    const name = nickName || '该用户'
+    switch (action) {
+      case 'setSuper':
+        this._confirmAction('设为超级管理员', '确定将「' + name + '」设为超级管理员吗？\n\n超管拥有最高权限。', 'default', '确认设置', () => { this.doSetSuperAdmin(openid) })
+        break
+      case 'removeSuper':
+        this._confirmAction('取消超级管理员', '确定取消「' + name + '」的超级管理员权限吗？\n\n将降为普通用户。', 'danger', '', () => { this.doRemoveSuperAdmin(openid) })
+        break
+      case 'setAdmin':
+        this._confirmAction('设为管理员', '确定将「' + name + '」设为管理员吗？', 'success', '', () => { this.doSetAdmin(openid) })
+        break
+      case 'removeAdmin':
+        this._confirmAction('取消管理员', '确定取消「' + name + '」的管理员权限吗？', 'danger', '', () => { this.doRemoveAdmin(openid) })
+        break
+    }
   },
 
-  _confirmAction(title, content, confirmColor, confirmText, callback) {
-    wx.showModal({
-      title: title,
-      content: content,
-      confirmColor: confirmColor,
-      confirmText: confirmText || '确认',
-      success: (r) => { if (r.confirm) callback() }
-    })
+  async _confirmAction(title, content, theme, confirmText, callback) {
+    const r = await modal.confirm(this, { theme, title, content, confirmText: confirmText || '确认' })
+    if (r.confirm) callback()
   },
 
   // 【重构】统一角色修改方法，消除4个方法的重复代码
@@ -238,19 +234,18 @@ Page({
   doRemoveSuperAdmin(openid) { return this._doSetRole(openid, 'user', '取消超级管理员') },
 
   // 重置昵称修改次数（仅超级管理员可操作）
-  resetNickCount(e) {
+  async resetNickCount(e) {
     if (this.data._operating) return
     const openid = e.currentTarget.dataset.openid
     const nickName = e.currentTarget.dataset.nickname
-    wx.showModal({
+    const r = await modal.confirm(this, {
+      theme: 'danger',
       title: '重置修改次数',
       content: '确定重置「' + nickName + '」的昵称修改次数吗？重置后可再修改' + C.NICK_CHANGE_LIMIT + '次。',
-      confirmText: '确定重置',
-      success: (r) => {
-        if (!r.confirm) return
-        this.doResetNickCount(openid)
-      }
+      confirmText: '确定重置'
     })
+    if (!r.confirm) return
+    this.doResetNickCount(openid)
   },
 
   async doResetNickCount(openid) {

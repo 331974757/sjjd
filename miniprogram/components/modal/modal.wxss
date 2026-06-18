@@ -1,0 +1,207 @@
+/* ========================================
+   美化弹窗组件 - 多主题样式
+   主题: default(蓝紫) / danger(红色) / success(绿色) / warning(橙色)
+   ======================================== */
+
+/* ===== 遮罩 ===== */
+/* 默认隐藏：仅当 visible=true 且有 modal-show 类时才显示，
+   双重保护防止 wx:if 渲染时机导致的空白弹窗闪现 */
+.modal-mask {
+  display: none;
+}
+.modal-mask.modal-show {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ===== 弹窗主体 ===== */
+.modal-box {
+  position: relative;
+  width: 580rpx;
+  background: #161b22;
+  border-radius: 24rpx;
+  padding: 56rpx 40rpx 36rpx;
+  animation: scaleIn 0.25s ease;
+  box-shadow: 0 16rpx 48rpx rgba(0,0,0,0.5);
+  overflow: hidden;
+}
+@keyframes scaleIn {
+  from { transform: scale(0.88); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+
+/* sheet 模式加宽 */
+.modal-box.sheet {
+  width: 620rpx;
+  padding: 40rpx 32rpx 24rpx;
+}
+
+/* ===== 主题顶部装饰条 ===== */
+.modal-accent-bar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 6rpx;
+}
+
+/* ---- default (蓝紫) ---- */
+.modal-theme-default .modal-accent-bar {
+  background: linear-gradient(90deg, #4f8cff, #7c5cfc, #a78bfa);
+}
+.modal-theme-default .btn-confirm {
+  background: linear-gradient(135deg, #4f8cff, #7c5cfc);
+  color: #fff;
+}
+
+/* ---- danger (红色) ---- */
+.modal-theme-danger .modal-accent-bar {
+  background: linear-gradient(90deg, #f85149, #da3633, #c62828);
+}
+.modal-theme-danger .btn-confirm {
+  background: linear-gradient(135deg, #f85149, #da3633);
+  color: #fff;
+}
+.modal-theme-danger .modal-title {
+  color: #ffa198;
+}
+
+/* ---- success (绿色) ---- */
+.modal-theme-success .modal-accent-bar {
+  background: linear-gradient(90deg, #3fb950, #2ea043, #238636);
+}
+.modal-theme-success .btn-confirm {
+  background: linear-gradient(135deg, #3fb950, #2ea043);
+  color: #fff;
+}
+.modal-theme-success .modal-title {
+  color: #7ee787;
+}
+
+/* ---- warning (橙色) ---- */
+.modal-theme-warning .modal-accent-bar {
+  background: linear-gradient(90deg, #d29922, #e3b341, #f0c44a);
+}
+.modal-theme-warning .btn-confirm {
+  background: linear-gradient(135deg, #d29922, #9e6a03);
+  color: #fff;
+}
+.modal-theme-warning .modal-title {
+  color: #f0c44a;
+}
+
+/* ===== 图标区 ===== */
+.modal-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16rpx;
+}
+.modal-icon-img {
+  width: 56rpx;
+  height: 56rpx;
+}
+
+/* ===== 标题 ===== */
+.modal-title {
+  display: block;
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #f0f6fc;
+  text-align: center;
+  margin-bottom: 16rpx;
+  letter-spacing: 2rpx;
+}
+
+/* ===== 正文 ===== */
+.modal-content {
+  display: block;
+  font-size: 28rpx;
+  color: #8b949e;
+  text-align: center;
+  line-height: 1.7;
+  margin-bottom: 32rpx;
+  white-space: pre-line;
+}
+
+/* ===== 按钮行 ===== */
+.modal-btns {
+  display: flex;
+  gap: 20rpx;
+}
+.modal-btn {
+  flex: 1;
+  height: 80rpx;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  border: none;
+}
+.modal-btn:active {
+  opacity: 0.75;
+  transform: scale(0.97);
+}
+.btn-cancel {
+  background: #21262d;
+  color: #8b949e;
+  border: 1rpx solid #30363d;
+}
+
+/* ===== 列表选择模式 (ActionSheet) ===== */
+.sheet-title {
+  margin-bottom: 24rpx;
+}
+.sheet-list {
+  margin-bottom: 16rpx;
+}
+.sheet-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 88rpx;
+  border-bottom: 1rpx solid #21262d;
+  font-size: 30rpx;
+  color: #c9d1d9;
+  border-radius: 12rpx;
+  transition: background 0.1s;
+}
+.sheet-item:active {
+  background: #1c2128;
+}
+.sheet-item:last-child {
+  border-bottom: none;
+}
+.sheet-item.destructive {
+  color: #f85149;
+}
+.sheet-icon {
+  margin-right: 12rpx;
+  font-size: 34rpx;
+}
+.sheet-cancel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 80rpx;
+  background: #21262d;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+  color: #8b949e;
+  font-weight: 600;
+  margin-top: 12rpx;
+}
+.sheet-cancel:active {
+  background: #30363d;
+}

@@ -5,6 +5,38 @@
   padding-bottom: 80rpx;
 }
 
+/* ===== 页面标题 ===== */
+.page-header {
+  padding: 40rpx 32rpx 36rpx;
+  text-align: center;
+  border-bottom: 2rpx solid #21262d;
+  margin-bottom: 24rpx;
+}
+.page-header-title {
+  display: inline-block;
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #f0f6fc;
+  letter-spacing: 6rpx;
+  position: relative;
+}
+.page-header-title::after {
+  content: '';
+  display: block;
+  width: 44rpx;
+  height: 5rpx;
+  border-radius: 3rpx;
+  background: linear-gradient(135deg, #4f8cff, #7c5cfc);
+  margin: 14rpx auto 0;
+}
+.page-header-sub {
+  display: block;
+  font-size: 24rpx;
+  color: #8b949e;
+  margin-top: 12rpx;
+  letter-spacing: 3rpx;
+}
+
 /* ===== 头像区 ===== */
 .avatar-section {
   display: flex;
@@ -199,3 +231,83 @@
 }
 
 /* 弹窗/段位/星数 → 见 app.wxss 公共样式 */
+
+/* ===== 可滑动段位选择 ===== */
+.rank-scroll {
+  width: 100%;
+  white-space: nowrap;
+}
+
+.rank-scroll-inner {
+  display: inline-flex;
+  flex-direction: row;
+  padding: 4rpx 0;
+}
+
+.rank-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  height: 56rpx;
+  padding: 0 24rpx;
+  margin-right: 16rpx;
+  border-radius: 28rpx;
+  background: rgba(255,255,255,0.06);
+  border: 2rpx solid rgba(255,255,255,0.12);
+  transition: all 0.2s;
+}
+
+.rank-chip-active {
+  background: linear-gradient(135deg, #d4a843, #e8c776);
+  border-color: #d4a843;
+}
+
+.rank-chip-text {
+  font-size: 24rpx;
+  color: #c9d1d9;
+  white-space: nowrap;
+}
+
+.rank-chip-active .rank-chip-text {
+  color: #0d1117;
+  font-weight: 600;
+}
+
+.rank-grid-inline {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.rank-grid-inline .rank-cell {
+  margin: 0 10rpx 14rpx 10rpx;
+}
+
+.star-row-inline {
+  margin-top: 8rpx;
+}
+
+.star-label-inline {
+  display: block;
+  font-size: 24rpx;
+  color: #8b949e;
+  margin-bottom: 16rpx;
+}
+
+.star-select-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 16rpx;
+}
+
+/* 星数小圆按钮覆盖 */
+.star-select-row .pm-circle {
+  width: 56rpx;
+  height: 56rpx;
+}
+
+.star-select-row .pm-circle .pm-num {
+  font-size: 24rpx;
+}

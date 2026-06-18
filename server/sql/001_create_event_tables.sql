@@ -13,13 +13,18 @@ USE dota2;
 CREATE TABLE IF NOT EXISTS `dota2_events` (
   `event_id`      varchar(64)   NOT NULL COMMENT '赛事ID（主键）',
   `event_name`    varchar(200)  DEFAULT NULL COMMENT '赛事名称',
+  `event_desc`    text          DEFAULT NULL COMMENT '赛事简介',
   `creator_id`    varchar(64)   DEFAULT NULL COMMENT '创建管理员ID（关联dota2_users.id）',
-  `event_status`  tinyint       DEFAULT NULL COMMENT '赛事状态：0创建中/1报名中/2报名截止/3分组锁定/4对战中/5已归档',
+  `event_status`  tinyint       DEFAULT NULL COMMENT '赛事状态：0创建中/1报名中/2报名截止/3分组锁定/4对战中/5已结束',
   `start_time`    bigint        DEFAULT NULL COMMENT '赛事开始时间戳',
   `signup_limit`  int           DEFAULT NULL COMMENT '报名人数上限（NULL=无限制）',
   `is_archived`   tinyint       DEFAULT 0 COMMENT '归档标记：0未归档/1已归档',
   `created_at`    bigint        DEFAULT NULL COMMENT '创建时间戳',
   `updated_at`    bigint        DEFAULT NULL COMMENT '更新时间戳',
+  `ended_by`      varchar(64)   DEFAULT NULL COMMENT '结束比赛操作人',
+  `ended_at`      bigint        DEFAULT NULL COMMENT '结束比赛时间戳',
+  `archived_by`   varchar(64)   DEFAULT NULL COMMENT '归档操作人',
+  `archived_at`   bigint        DEFAULT NULL COMMENT '归档时间戳',
   PRIMARY KEY (`event_id`),
   INDEX `idx_events_status` (`event_status`),
   INDEX `idx_events_archived` (`is_archived`)
@@ -36,6 +41,7 @@ CREATE TABLE IF NOT EXISTS `dota2_event_signup` (
   `signup_type`   tinyint       DEFAULT NULL COMMENT '报名方式：0自主报名/1管理员添加',
   `signup_status` tinyint       DEFAULT 1 COMMENT '报名状态：0无效/1有效',
   `created_at`    bigint        DEFAULT NULL COMMENT '报名时间戳',
+  `operator_id`   varchar(64)   DEFAULT NULL COMMENT '操作人ID（管理员代报时记录）',
   PRIMARY KEY (`signup_id`),
   UNIQUE INDEX `uk_event_player` (`event_id`, `player_id`),
   INDEX `idx_signup_event` (`event_id`)
@@ -73,6 +79,7 @@ CREATE TABLE IF NOT EXISTS `dota2_event_matches` (
   `match_status`  tinyint       DEFAULT 0 COMMENT '对战状态：0未开始/1进行中/2已结束',
   `judge_id`      varchar(64)   DEFAULT NULL COMMENT '判定管理员ID（关联dota2_users.id）',
   `judge_time`    bigint        DEFAULT NULL COMMENT '判定时间戳',
+  `battle_image`  varchar(500)  DEFAULT NULL COMMENT '对战结果图片URL',
   `created_at`    bigint        DEFAULT NULL COMMENT '创建时间戳',
   PRIMARY KEY (`match_id`),
   INDEX `idx_matches_event_round` (`event_id`, `round_num`)
@@ -111,28 +118,3 @@ CREATE TABLE IF NOT EXISTS `dota2_event_rules` (
   INDEX `idx_rules_event` (`event_id`),
   INDEX `idx_rules_status` (`rule_status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='赛事章程表';
-
--- ============================================================
--- 增量迁移（补字段）
--- 如果服务器上表已存在但缺少列，可手动执行以下语句
--- ============================================================
-
--- 1. 赛事主表：补 signup_limit（报名人数上限，INT，NULL=无限制）
--- ALTER TABLE `dota2_events` ADD COLUMN `signup_limit` int DEFAULT NULL COMMENT '报名人数上限（NULL=无限制）' AFTER `start_time`;
-
--- 2. 赛事主表：补 event_desc（赛事简介，TEXT）
--- ALTER TABLE `dota2_events` ADD COLUMN `event_desc` text DEFAULT NULL COMMENT '赛事简介' AFTER `event_name`;
-
--- 3. 赛事主表：补归档字段
--- ALTER TABLE `dota2_events` ADD COLUMN `archived_by` varchar(64) DEFAULT NULL COMMENT '归档操作人' AFTER `is_archived`;
--- ALTER TABLE `dota2_events` ADD COLUMN `archived_at` bigint DEFAULT NULL COMMENT '归档时间' AFTER `archived_by`;
-
--- 4. 赛事主表：补结束比赛字段
--- ALTER TABLE `dota2_events` ADD COLUMN `ended_by` varchar(64) DEFAULT NULL COMMENT '结束比赛操作人' AFTER `event_status`;
--- ALTER TABLE `dota2_events` ADD COLUMN `ended_at` bigint DEFAULT NULL COMMENT '结束比赛时间' AFTER `ended_by`;
-
--- 5. 报名表：补 operator_id（操作人ID）
--- ALTER TABLE `dota2_event_signup` ADD COLUMN `operator_id` varchar(64) DEFAULT NULL COMMENT '操作人ID' AFTER `created_at`;
-
--- 6. 对战表：补 battle_image（对战结果图片URL）
--- ALTER TABLE `dota2_event_matches` ADD COLUMN `battle_image` varchar(500) DEFAULT NULL COMMENT '对战结果图片URL' AFTER `judge_time`;

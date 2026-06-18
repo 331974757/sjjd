@@ -17,6 +17,7 @@
 
 const api = require('../../utils/api')
 const perm = require('../../utils/permission')
+const modal = require('../../utils/modal')
 
 Page({
   data: {
@@ -124,12 +125,13 @@ Page({
         // 非分组锁定/非对战中状态提示
         if (res.data.event_status !== 3 && res.data.event_status !== 4) {
           const map = { 0: '创建中', 1: '报名中', 2: '分组编队', 5: '名次归档' }
-          wx.showModal({
+          await modal.confirm(this, {
+            theme: 'warning',
             title: '无法操作',
             content: `赛事当前状态为「${map[res.data.event_status] || '未知'}」，仅分组锁定后/对战中可编排对阵`,
-            showCancel: false,
-            success: () => wx.navigateBack(),
+            showCancel: false
           })
+          wx.navigateBack()
         }
       }
     } catch (e) {
@@ -396,16 +398,14 @@ Page({
           msg += `，${byes.length} 队轮空`
         }
 
-        wx.showModal({
+        modal.confirm(this, {
+          theme: 'success',
           title: '对阵生成成功',
           content: msg,
           showCancel: false,
-          confirmText: '查看对战',
-          success: () => {
-            // 返回赛事详情页查看对战列表
-            wx.navigateBack()
-          },
+          confirmText: '查看对战'
         })
+        wx.navigateBack()
       } else {
         wx.showToast({ title: res.error || '生成失败', icon: 'none' })
       }
@@ -425,12 +425,9 @@ Page({
     }
 
     // 二次确认
-    const confirmRes = await new Promise(r => {
-      wx.showModal({
-        title: '自动匹配生成',
-        content: `将按MMR分值自动配对 ${teams.length} 支队伍，生成第${this.data.nextRound}轮对战。\n\n确认继续？`,
-        success: r,
-      })
+    const confirmRes = await modal.confirm(this, {
+      title: '自动匹配生成',
+      content: `将按MMR分值自动配对 ${teams.length} 支队伍，生成第${this.data.nextRound}轮对战。\n\n确认继续？`
     })
     if (!confirmRes.confirm) return
 
@@ -443,13 +440,14 @@ Page({
       this.setData({ generating: false })
 
       if (res.success) {
-        wx.showModal({
+        modal.confirm(this, {
+          theme: 'success',
           title: '自动配对完成',
           content: `第${res.data.roundNum}轮已生成，共 ${res.data.matchCount} 场对战。`,
           showCancel: false,
-          confirmText: '查看对战',
-          success: () => wx.navigateBack(),
+          confirmText: '查看对战'
         })
+        wx.navigateBack()
       } else {
         wx.showToast({ title: res.error || '生成失败', icon: 'none' })
       }

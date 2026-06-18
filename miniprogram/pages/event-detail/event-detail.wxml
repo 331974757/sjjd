@@ -1,5 +1,11 @@
 <!--pages/event-detail/event-detail.wxml-->
 <!--【赛事详情 - 阶段式Tab分栏重构版】5个Tab按业务流程排列，随赛事状态递进解锁-->
+<!-- 页面标题 -->
+<view class="page-header">
+  <text class="page-header-title">赛事详情</text>
+  <text class="page-header-sub">赛事全流程管理</text>
+</view>
+
 <view class="page">
 
   <!-- 加载中 -->
@@ -12,44 +18,51 @@
     <!-- ====== 赛事基本信息头部 ====== -->
     <view class="event-card">
       <view class="event-header">
-        <!-- 赛事名：admin 且非归档时可点击编辑 -->
+        <!-- 左侧：赛事名 + 编辑图标 -->
         <view class="event-name-row" wx:if="{{!editingName}}">
           <text class="event-name">{{event.event_name}}</text>
           <text class="edit-pencil" wx:if="{{isAdmin && !isArchived}}" bindtap="startEditName">✎</text>
         </view>
         <view class="event-name-row event-name-editing" wx:else>
           <input class="event-name-input" value="{{editNameValue}}" placeholder="赛事名称" bindinput="onEditNameInput" focus="{{true}}" maxlength="50"/>
-          <text class="edit-done" bindtap="confirmEditName">✓</text>
-          <text class="edit-cancel" bindtap="cancelEditName">✕</text>
+          <text class="edit-done" bindtap="confirmEditName">✓︎</text>
+          <text class="edit-cancel" bindtap="cancelEditName">✕︎</text>
         </view>
-        <view class="event-status {{event._statusClass}}">
-          <text>{{event._statusName}}</text>
-        </view>
-        <!-- 删除赛事（超管可见，对阵开始前可删除） -->
-        <view class="event-del-btn" wx:if="{{event.event_status < 4 && isSuperAdmin && !isArchived}}" bindtap="showCancelEvent">
-          <text>🗑</text>
+
+        <!-- 右侧区域：状态 + 删除组 + 刷新 -->
+        <view class="event-header-right">
+          <view class="event-status {{event._statusClass}}">
+            <text>{{event._statusName}}</text>
+          </view>
         </view>
         <!-- 刷新按钮 -->
         <view class="event-refresh" bindtap="onRefreshTap">
-          <text class="refresh-icon">⟳</text>
+          <image class="icon-img-sm" src="/images/icons/refresh.svg" mode="aspectFit"/>
         </view>
       </view>
-      <!-- 删除赛事提示 -->
-      <view class="event-del-hint" wx:if="{{event.event_status < 4 && isSuperAdmin && !isArchived}}">
-        <text>💡 对阵对战开始前可删除赛事</text>
-      </view>
+
       <view class="event-meta">
-        <view class="meta-item">
-          <text class="meta-label">比赛时间<text wx:if="{{isAdmin && !isArchived && event.event_status < 4}}" class="meta-edit-icon"> ✎</text></text>
-          <picker wx:if="{{isAdmin && !isArchived && event.event_status < 4}}" mode="multiSelector" range="{{editTimeRange}}" value="{{editTimeIndex}}" bindchange="onEditTimeChange" bindcolumnchange="onEditTimeColumnChange">
-            <view class="meta-value meta-time-editable">{{event._timeLabel}}</view>
-          </picker>
-          <text wx:else class="meta-value">{{event._timeLabel}}</text>
+        <view class="event-meta-left">
+          <view class="meta-item">
+            <text class="meta-label">比赛时间<text wx:if="{{isAdmin && !isArchived && event.event_status < 4}}" class="meta-edit-icon"> ✎</text></text>
+            <picker wx:if="{{isAdmin && !isArchived && event.event_status < 4}}" mode="multiSelector" range="{{editTimeRange}}" value="{{editTimeIndex}}" bindchange="onEditTimeChange" bindcolumnchange="onEditTimeColumnChange">
+              <view class="meta-value meta-time-editable">{{event._timeLabel}}</view>
+            </picker>
+            <text wx:else class="meta-value">{{event._timeLabel}}</text>
+          </view>
+          <!-- 报名人数：状态>0才显示，状态0时由按钮区提示上限 -->
+          <view wx:if="{{event.event_status > 0}}" class="meta-item {{isAdmin && !isArchived && event.event_status < 3 ? 'meta-clickable' : ''}}" bindtap="{{isAdmin && !isArchived && event.event_status < 3 ? 'showEditSignupLimit' : ''}}">
+            <text class="meta-label">已报名<text wx:if="{{isAdmin && !isArchived && event.event_status < 3}}" class="meta-edit-icon"> ✎</text></text>
+            <text class="meta-value meta-count">{{signupCount}}<text wx:if="{{event.signup_limit && event.signup_limit > 0}}">/{{event.signup_limit}}</text> 人</text>
+            <text class="meta-sub" wx:if="{{event.signup_limit && event.signup_limit > 0 && signupCount >= event.signup_limit}}">（已满）</text>
+          </view>
         </view>
-        <view wx:if="{{event.event_status > 0}}" class="meta-item {{isAdmin && !isArchived && event.event_status < 3 ? 'meta-clickable' : ''}}" bindtap="{{isAdmin && !isArchived && event.event_status < 3 ? 'showEditSignupLimit' : ''}}">
-          <text class="meta-label">已报名<text wx:if="{{isAdmin && !isArchived && event.event_status < 3}}" class="meta-edit-icon"> ✎</text></text>
-          <text class="meta-value meta-count">{{signupCount}}<text wx:if="{{event.signup_limit && event.signup_limit > 0}}">/{{event.signup_limit}}</text> 人</text>
-          <text class="meta-sub" wx:if="{{event.signup_limit && event.signup_limit > 0 && signupCount >= event.signup_limit}}">（已满）</text>
+        <!-- 删除入口：与比赛时间同列高度，右侧 -->
+        <view class="event-del-group" wx:if="{{event.event_status < 4 && isSuperAdmin && !isArchived}}">
+          <text class="event-del-hint-text">对阵前可删除</text>
+          <view class="event-del-btn" bindtap="showCancelEvent">
+            <image class="icon-img-sm" src="/images/icons/trash.svg" mode="aspectFit"/>
+          </view>
         </view>
       </view>
       <!-- 历史/归档只读提示 -->
@@ -88,12 +101,12 @@
         <view class="os-desc-editing" wx:else>
           <textarea class="os-desc-textarea" value="{{editDescValue}}" placeholder="请输入赛事简介..." bindinput="onEditDescInput" focus="{{true}}" auto-height maxlength="500"/>
           <view class="os-desc-actions">
-            <text class="edit-done" bindtap="confirmEditDesc">✓ 确认</text>
-            <text class="edit-cancel" bindtap="cancelEditDesc">✕ 取消</text>
+            <text class="edit-done" bindtap="confirmEditDesc">✓︎</text>
+            <text class="edit-cancel" bindtap="cancelEditDesc">✕︎</text>
           </view>
         </view>
         <text class="os-creator" wx:if="{{event.creator_nickname}}">创建人：{{event.creator_nickname}}</text>
-        <text class="os-time" wx:if="{{event.created_at}}">创建时间：{{event.created_at}}</text>
+        <text class="os-time" wx:if="{{event._createdAtText}}">{{event._createdAtText}}</text>
         <view class="os-archive-info" wx:if="{{isArchived}}">
           <text class="os-archive" wx:if="{{_archiveTimeText}}">{{_archiveTimeText}}</text>
           <text class="os-archive" wx:if="{{_archiveByText}}">{{_archiveByText}}</text>
@@ -106,7 +119,8 @@
         <button class="ova-btn ova-btn-start" bindtap="showStatusConfirm" loading="{{loading}}">
           📝 开始报名
         </button>
-        <text class="ova-hint">点击开启报名，设置人数上限后可让选手自助报名</text>
+        <text class="ova-hint" wx:if="{{!event.signup_limit || event.signup_limit <= 0}}">点击开启报名，可设置人数上限让选手自助报名</text>
+        <text class="ova-hint" wx:else>上限 {{event.signup_limit}} 人，点击确认即可开启</text>
       </view>
 
 
@@ -121,7 +135,7 @@
             wx:key="key"
           >
             <view class="ps-dot">
-              <text wx:if="{{item._done}}">✓</text>
+              <text wx:if="{{item._done}}">✓︎</text>
               <text wx:else>{{index + 1}}</text>
             </view>
             <view class="ps-line-right" wx:if="{{index < 5}}"></view>
@@ -181,7 +195,7 @@
       <view class="signup-admin-area" wx:if="{{actions.manage_signups.allowed && !isArchived}}">
         <view class="sa-search-bar">
           <input class="sa-search-input" placeholder="搜索选手昵称..." value="{{searchKeyword}}" bindinput="onSearchInput" />
-          <view class="sa-search-clear" wx:if="{{searchKeyword}}" bindtap="clearSearch">✕</view>
+          <view class="sa-search-clear" wx:if="{{searchKeyword}}" bindtap="clearSearch">✕︎</view>
         </view>
 
         <!-- 搜索结果 -->
@@ -227,7 +241,7 @@
             </view>
             <!-- 管理员剔除按钮 -->
             <view class="si-remove" wx:if="{{actions.manage_signups.allowed && !isArchived && event.event_status < 3}}" bindtap="showRemoveSignup" data-sid="{{item.signup_id}}">
-              <text>✕</text>
+              <text>✕︎</text>
             </view>
           </view>
         </view>
@@ -252,7 +266,7 @@
       <view class="tab2-bottom-signup" wx:if="{{!readonly && !isArchived}}">
         <button class="signup-btn btn-primary" wx:if="{{signupBtn.allowed && mySignupLoaded && (!mySignup || !mySignup.signedUp)}}" bindtap="doSignup" loading="{{loading}}">我要报名</button>
         <view class="signup-done" wx:if="{{mySignup && mySignup.signedUp}}">
-          <text class="done-icon">✓</text>
+          <text class="done-icon">✓︎</text>
           <text class="done-text">已报名</text>
           <button class="signup-btn btn-cancel" wx:if="{{cancelSignupBtn.allowed}}" bindtap="showCancelSignup">取消报名</button>
         </view>
@@ -315,7 +329,7 @@
               <text class="fa-pos" wx:if="{{item._posText}}">{{item._posText}}</text>
               <text class="fa-score">{{(item.calibrate_mmr || 0)}}分</text>
             </view>
-            <view class="fa-check" wx:if="{{selectedPlayerId === item.id}}"><text>✓</text></view>
+            <view class="fa-check" wx:if="{{selectedPlayerId === item.id}}"><text>✓︎</text></view>
           </view>
         </view>
         <view class="empty-state mini" wx:if="{{freeAgents.length === 0}}">
@@ -349,8 +363,8 @@
               <!-- 战队名：编辑模式 -->
               <block wx:if="{{_editingTeamId === item.team_id}}">
                 <input class="tc-name-input" value="{{_editTeamNameValue}}" placeholder="输入战队名" bindinput="onEditTeamNameInput" focus="{{true}}" maxlength="50"/>
-                <text class="tc-name-confirm" catchtap="confirmEditTeamName">✓</text>
-                <text class="tc-name-cancel" catchtap="cancelEditTeamName">✕</text>
+                <text class="tc-name-confirm" catchtap="confirmEditTeamName">✓︎</text>
+                <text class="tc-name-cancel" catchtap="cancelEditTeamName">✕︎</text>
               </block>
               <!-- 战队名：查看模式 -->
               <block wx:else>
@@ -458,7 +472,7 @@
               <text class="sbc-mmr">📊 均{{item.avgMmr || 0}}分</text>
             </view>
             <view class="sbc-check" wx:if="{{item._selected && battleRoundStatus !== 'fighting' && battleRoundStatus !== 'done'}}">
-              <text>✓</text>
+              <text>✓︎</text>
             </view>
           </view>
         </view>
@@ -502,7 +516,7 @@
           >
             <text class="rt-label">第{{item.roundNum}}轮</text>
             <text class="rt-progress">{{item.completedCount}}/{{item.matchCount}}</text>
-            <text class="rt-check" wx:if="{{item.allDone}}">✓</text>
+            <text class="rt-check" wx:if="{{item.allDone}}">✓︎</text>
           </view>
         </scroll-view>
       </view>
@@ -720,7 +734,7 @@
                 <text class="sbc-mmr">📊 均{{item.avgMmr || 0}}分</text>
               </view>
               <view class="sbc-check" wx:if="{{ranksEditing && _rankUsedTeamMap[item.teamId]}}">
-                <text>✓</text>
+                <text>✓︎</text>
               </view>
             </view>
           </view>
@@ -752,7 +766,7 @@
                       <text class="rsr-member" wx:for="{{item.members}}" wx:key="id" wx:for-item="m">{{m.isCaptain ? '👑' : '👤'}}{{m.nickName || '未知'}}</text>
                     </view>
                     <view class="rsr-clear-btn" catchtap="clearRankSlot" data-index="{{index}}">
-                      <text>✕ 清除</text>
+                      <text>✕︎ 清除</text>
                     </view>
                   </block>
                   <block wx:else>
@@ -768,7 +782,7 @@
                   <text wx:else class="rsr-rank-num">{{index + 1}}</text>
                 </view>
                 <text class="rsr-rank-label">{{index < 3 ? ['冠军', '亚军', '季军'][index] : '第' + (index + 1) + '名'}}</text>
-                <text class="rsr-rank-remove" wx:if="{{rankEditSlots.length > 1}}" bindtap="removeRankSlot" data-index="{{index}}">✕ 移除此名次</text>
+                <text class="rsr-rank-remove" wx:if="{{rankEditSlots.length > 1}}" bindtap="removeRankSlot" data-index="{{index}}">✕︎ 移除此名次</text>
               </view>
             </view>
 
@@ -849,29 +863,14 @@
     </view>
   </view>
 
-  <!-- 状态变更确认（含报名人数滚轮选择器） -->
+  <!-- 状态变更确认（截止报名等） -->
   <view class="modal-mask" wx:if="{{showStatusConfirm}}" catchtouchmove="preventMove">
     <view class="modal-box">
       <text class="modal-title">{{_confirmTitle}}</text>
-      <!-- 开启报名时显示人数选择器 -->
-      <block wx:if="{{targetStatus === 1}}">
-        <text class="modal-label">报名人数上限</text>
-        <picker mode="selector" range="{{signupLimitOptions}}" value="{{signupLimitIndex}}" bindchange="onSignupLimitPick">
-          <view class="limit-picker-row">
-            <text class="limit-picker-val">{{signupLimitOptions[signupLimitIndex]}}</text>
-            <text class="limit-picker-arrow">▼</text>
-          </view>
-        </picker>
-        <view class="limit-custom-row" wx:if="{{signupLimitOptions[signupLimitIndex] === '自定义'}}">
-          <input class="limit-custom-input" type="number" placeholder="输入人数" value="{{customSignupLimit}}" bindinput="onCustomLimitInput" />
-          <text class="limit-custom-unit">人</text>
-        </view>
-      </block>
-      <!-- 截止报名显示原提示 -->
-      <text class="modal-content" wx:else>{{_confirmMsg}}</text>
+      <text class="modal-content">{{_confirmMsg}}</text>
       <view class="modal-btns modal-btns-bottom">
         <view class="modal-btn btn-secondary" bindtap="hideStatusConfirm"><text>取消</text></view>
-        <view class="modal-btn btn-primary-confirm" bindtap="doChangeStatus"><text>确认{{targetStatus === 1 ? '开启报名' : (targetStatus === 2 ? '截止报名' : '')}}</text></view>
+        <view class="modal-btn btn-primary-confirm" bindtap="doChangeStatus"><text>确认截止报名</text></view>
       </view>
     </view>
   </view>
@@ -942,61 +941,49 @@
   </view>
 
   <!-- 修改报名人数上限弹窗 -->
-  <view class="slim-mask" wx:if="{{showSignupLimitModal}}" catchtouchmove="preventMove">
-    <view class="slim-modal" catchtap="">
-      <!-- 关闭按钮 -->
-      <view class="slim-close" bindtap="hideEditSignupLimit">
-        <text class="slim-close-icon">✕</text>
-      </view>
-      <text class="slim-title">修改报名人数上限</text>
+  <view class="modal-mask" wx:if="{{showSignupLimitModal}}" catchtouchmove="preventMove">
+    <view class="modal-box" catchtap="">
+      <text class="modal-title">修改报名人数上限</text>
 
       <!-- 当前报名人数 -->
-      <view class="slim-field">
-        <text class="slim-label">当前已报名 <text class="slim-count-num">{{signupCount}}</text> 人</text>
-      </view>
+      <text class="modal-content slim-count-hint">当前已报名 <text class="slim-count-num">{{signupCount}}</text> 人</text>
 
       <!-- 人数上限选择 -->
-      <view class="slim-field">
-        <text class="slim-label">设置人数上限</text>
-        <view class="slim-options">
-          <view class="slim-opt {{editSignupLimitVal === '10' ? 'slim-opt-active' : ''}}" bindtap="selectEditSignupLimit" data-val="10">
-            <text>10 人</text>
-          </view>
-          <view class="slim-opt {{editSignupLimitVal === '20' ? 'slim-opt-active' : ''}}" bindtap="selectEditSignupLimit" data-val="20">
-            <text>20 人</text>
-          </view>
-          <view class="slim-opt {{editSignupLimitVal === '30' ? 'slim-opt-active' : ''}}" bindtap="selectEditSignupLimit" data-val="30">
-            <text>30 人</text>
-          </view>
-          <view class="slim-opt {{editSignupLimitVal === '40' ? 'slim-opt-active' : ''}}" bindtap="selectEditSignupLimit" data-val="40">
-            <text>40 人</text>
-          </view>
-          <view class="slim-opt {{editSignupLimitVal === 'unlimited' ? 'slim-opt-active' : ''}}" bindtap="selectEditSignupLimit" data-val="unlimited">
-            <text>无限制</text>
-          </view>
-          <view class="slim-opt {{editSignupLimitVal === 'custom' ? 'slim-opt-active' : ''}}" bindtap="selectEditSignupLimit" data-val="custom">
-            <text>自定义</text>
-          </view>
+      <text class="modal-label">设置人数上限</text>
+      <!-- 第一行：无限制 10人 20人 -->
+      <view class="limit-pick-row">
+        <view class="limit-pick-opt {{editSignupLimitVal === 'unlimited' ? 'limit-pick-on' : ''}}" bindtap="selectEditSignupLimit" data-val="unlimited">
+          <text>无限制</text>
+        </view>
+        <view class="limit-pick-opt {{editSignupLimitVal === '10' ? 'limit-pick-on' : ''}}" bindtap="selectEditSignupLimit" data-val="10">
+          <text>10人</text>
+        </view>
+        <view class="limit-pick-opt {{editSignupLimitVal === '20' ? 'limit-pick-on' : ''}}" bindtap="selectEditSignupLimit" data-val="20">
+          <text>20人</text>
         </view>
       </view>
-
-      <!-- 自定义输入 -->
-      <view class="slim-field" wx:if="{{editSignupLimitVal === 'custom'}}">
-        <text class="slim-label">自定义人数</text>
-        <view class="slim-custom-row">
-          <input class="slim-input" type="number" placeholder="输入人数上限" value="{{editCustomSignupLimit}}" bindinput="onEditCustomLimitInput" />
-          <text class="slim-unit">人</text>
+      <!-- 第二行：30人 40人 自定义 -->
+      <view class="limit-pick-row">
+        <view class="limit-pick-opt {{editSignupLimitVal === '30' ? 'limit-pick-on' : ''}}" bindtap="selectEditSignupLimit" data-val="30">
+          <text>30人</text>
         </view>
+        <view class="limit-pick-opt {{editSignupLimitVal === '40' ? 'limit-pick-on' : ''}}" bindtap="selectEditSignupLimit" data-val="40">
+          <text>40人</text>
+        </view>
+        <view class="limit-pick-opt {{editSignupLimitVal === 'custom' ? 'limit-pick-on' : ''}}" bindtap="selectEditSignupLimit" data-val="custom">
+          <text>自定义</text>
+        </view>
+      </view>
+      <!-- 自定义输入（选中自定义时下方出现） -->
+      <view class="limit-pick-custom-row" wx:if="{{editSignupLimitVal === 'custom'}}">
+        <input class="limit-pick-input" type="number" placeholder="输入人数" value="{{editCustomSignupLimit}}" bindinput="onEditCustomLimitInput" />
+        <text class="limit-pick-unit">人</text>
       </view>
 
       <!-- 按钮行 -->
-      <view class="slim-btn-row">
-        <view class="slim-btn slim-btn-cancel" bindtap="hideEditSignupLimit">
-          <text>取消</text>
-        </view>
-        <view class="slim-btn slim-btn-confirm" bindtap="doUpdateSignupLimit">
-          <text>确认修改</text>
-        </view>
+      <view class="modal-btns modal-btns-bottom">
+        <view class="modal-btn btn-secondary" bindtap="hideEditSignupLimit"><text>取消</text></view>
+        <view class="modal-btn btn-primary-confirm" bindtap="doUpdateSignupLimit"><text>确认修改</text></view>
       </view>
     </view>
   </view>
@@ -1105,4 +1092,5 @@
     </view>
   </view>
 
+  <modal id="modal"></modal>
 </view>

@@ -16,6 +16,7 @@
 
 const api = require('../../utils/api')
 const perm = require('../../utils/permission')
+const modal = require('../../utils/modal')
 
 Page({
   data: {
@@ -38,6 +39,12 @@ Page({
     // 交互状态
     selectedPlayerId: '',   // 当前选中的自由选手ID
     saving: false,
+    // 分队参数行内编辑
+    showTeamCountEditor: false,
+    teamCountInput: '',
+    suggestedTeamCount: 0,
+    teamCountInfo: '',
+    autoAllocating: false,
   },
 
   // =====================================================
@@ -348,7 +355,7 @@ Page({
   /**
    * 删除队伍（释放队员到自由区）
    */
-  deleteTeam(e) {
+  async deleteTeam(e) {
     const teamId = e.currentTarget.dataset.teamId
     const team = this.data.teams.find(t => t.teamId === teamId)
     if (!team) return
@@ -359,20 +366,19 @@ Page({
       ? `删除「${team.teamName}」将释放 ${playerCount} 名队员到自由区，确认删除？`
       : `确认删除空队伍「${team.teamName}」？`
 
-    wx.showModal({
+    const r = await modal.confirm(this, {
+      theme: 'danger',
       title: '删除队伍',
-      content: confirmMsg,
-      success: (res) => {
-        if (!res.confirm) return
-
-        // 释放队员回自由区
-        const freePlayers = [...this.data.freePlayers, ...team.players]
-        const teams = this.data.teams.filter(t => t.teamId !== teamId)
-
-        this.setData({ teams, freePlayers, selectedPlayerId: '' })
-        wx.showToast({ title: '已删除', icon: 'success' })
-      }
+      content: confirmMsg
     })
+    if (!r.confirm) return
+
+    // 释放队员回自由区
+    const freePlayers = [...this.data.freePlayers, ...team.players]
+    const teams = this.data.teams.filter(t => t.teamId !== teamId)
+
+    this.setData({ teams, freePlayers, selectedPlayerId: '' })
+    wx.showToast({ title: '已删除', icon: 'success' })
   },
 
   // =====================================================
@@ -384,59 +390,63 @@ Page({
    * POST /api/events/:eventId/allocate-teams
    */
   async autoAllocate() {
-    // 二次确认（会覆盖当前编组）
+    // 二次确认（会覆盖当前编组）—— 确认/警告类，保留弹窗
     const hasExisting = this.data.teams.some(t => t.players.length > 0)
     const confirmMsg = hasExisting
       ? '自动分队将覆盖当前编组结果，是否继续？'
       : '自动分队将根据选手段位均衡分配，是否继续？'
 
-    const confirmRes = await new Promise(r => {
-      wx.showModal({
-        title: '自动分队',
-        content: confirmMsg,
-        success: r,
-      })
+    const confirmRes = await modal.confirm(this, {
+      title: '自动分队',
+      content: confirmMsg
     })
     if (!confirmRes.confirm) return
 
-    // 队伍数量确认
+    // 显示行内队伍数量编辑器
     const playerCount = this.data.freePlayers.length +
       this.data.teams.reduce((sum, t) => sum + t.players.length, 0)
     const defaultTeamCount = Math.max(1, Math.ceil(playerCount / 5))
 
-    const countRes = await new Promise(r => {
-      wx.showModal({
-        title: '分队参数',
-        content: `共计 ${playerCount} 名选手，建议 ${defaultTeamCount} 支队伍（每队约${Math.ceil(playerCount / defaultTeamCount)}人）。\n使用建议数量？\n\n（点「取消」可手动输入数量）`,
-        confirmText: '使用建议',
-        cancelText: '手动输入',
-        success: r,
-      })
+    this.setData({
+      showTeamCountEditor: true,
+      suggestedTeamCount: defaultTeamCount,
+      teamCountInput: String(defaultTeamCount),
+      teamCountInfo: `共计 ${playerCount} 名选手，建议 ${defaultTeamCount} 支队伍（每队约${Math.ceil(playerCount / defaultTeamCount)}人）`
     })
+  },
 
-    let teamCount = defaultTeamCount
-    if (!countRes.confirm) {
-      // 手动输入队伍数量
-      const inputRes = await new Promise(r => {
-        wx.showModal({
-          title: '输入队伍数量',
-          editable: true,
-          placeholderText: String(defaultTeamCount),
-          content: `共${playerCount}名选手，请输入队伍数量：`,
-          success: r,
-        })
-      })
-      if (!inputRes.confirm) return
-      const val = parseInt(inputRes.content)
-      if (isNaN(val) || val < 1) {
-        wx.showToast({ title: '队伍数量无效', icon: 'none' })
-        return
-      }
-      teamCount = val
+  // 行内输入变更
+  onTeamCountInput(e) {
+    this.setData({ teamCountInput: e.detail.value })
+  },
+
+  // 使用建议数量
+  useSuggestedTeamCount() {
+    const count = this.data.suggestedTeamCount
+    this.setData({ showTeamCountEditor: false })
+    this.doAutoAllocate(count)
+  },
+
+  // 确认自定义数量 ✓
+  confirmTeamCount() {
+    const val = parseInt(this.data.teamCountInput)
+    if (isNaN(val) || val < 1) {
+      wx.showToast({ title: '队伍数量无效，请输入≥1的整数', icon: 'none' })
+      return
     }
+    this.setData({ showTeamCountEditor: false })
+    this.doAutoAllocate(val)
+  },
 
-    // 调用后端
+  // 取消输入 ✗
+  cancelTeamCount() {
+    this.setData({ showTeamCountEditor: false })
+  },
+
+  // 执行自动分队
+  async doAutoAllocate(teamCount) {
     wx.showLoading({ title: '自动分队中...' })
+    this.setData({ autoAllocating: true })
     try {
       const res = await api.post(`/events/${this.data.eventId}/allocate-teams`, {
         teamCount,
@@ -446,7 +456,6 @@ Page({
       if (res.success) {
         const { teams, stats, warnings } = res.data
 
-        // 转为前端格式
         const formattedTeams = teams.map(t => ({
           teamId: 'temp_' + t.index + '_' + Date.now(),
           teamName: t.teamName,
@@ -460,7 +469,6 @@ Page({
           isNew: true,
         }))
 
-        // 释放所有选手回自由区（全量覆盖）
         const allFreePlayers = []
         this.setData({
           teams: formattedTeams,
@@ -470,7 +478,6 @@ Page({
 
         wx.hideLoading()
 
-        // 显示均衡度统计
         if (stats) {
           const info = [
             `共${teams.length}队 · ${res.data.totalPlayers}名选手`,
@@ -480,11 +487,12 @@ Page({
           if (warnings && warnings.length) {
             info.push(`⚠ ${warnings[0]}`)
           }
-          wx.showModal({
+          modal.confirm(this, {
+            theme: 'success',
             title: '分队完成',
             content: info.join('\n'),
             showCancel: false,
-            confirmText: '好的',
+            confirmText: '好的'
           })
         }
       } else {
@@ -495,6 +503,8 @@ Page({
       wx.hideLoading()
       console.error('[自动分队] 失败', e)
       wx.showToast({ title: '自动分队失败', icon: 'none' })
+    } finally {
+      this.setData({ autoAllocating: false })
     }
   },
 
@@ -569,15 +579,12 @@ Page({
    */
   async startMatch() {
     // 二次确认
-    const confirmRes = await new Promise(r => {
-      wx.showModal({
-        title: '开始比赛',
-        content: `确认开始比赛？\n\n这将永久锁定 ${this.data.teams.length} 支队伍的编组结果，锁定后无法修改。`,
-        confirmText: '确认开赛',
-        cancelText: '取消',
-        confirmColor: '#f85149',
-        success: r,
-      })
+    const confirmRes = await modal.confirm(this, {
+      theme: 'danger',
+      title: '开始比赛',
+      content: `确认开始比赛？\n\n这将永久锁定 ${this.data.teams.length} 支队伍的编组结果，锁定后无法修改。`,
+      confirmText: '确认开赛',
+      cancelText: '取消'
     })
     if (!confirmRes.confirm) return
 
@@ -589,17 +596,15 @@ Page({
       wx.hideLoading()
 
       if (res.success) {
-        wx.showModal({
+        modal.confirm(this, {
+          theme: 'success',
           title: '比赛开始！',
           content: `队伍已永久锁定，${res.data.teamCount} 支队伍进入对战阶段。`,
           showCancel: false,
-          confirmText: '知道了',
-          success: () => {
-            // 刷新状态
-            this.loadTeamData()
-            this.loadEventStatus()
-          }
+          confirmText: '知道了'
         })
+        this.loadTeamData()
+        this.loadEventStatus()
       } else {
         wx.showToast({ title: res.error || '操作失败', icon: 'none' })
       }

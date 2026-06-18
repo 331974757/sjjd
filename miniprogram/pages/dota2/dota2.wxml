@@ -12,22 +12,22 @@
     <view class="nav-title-line"></view>
   </view>
 
-  <!-- 🌐 全局工具栏：修改昵称 | 管理员 | 权限管理(仅超管) -->
+  <!-- 🌐 全局工具栏：刷新 | 修改昵称 | 管理员展示 | 权限管理(仅超管) -->
   <view class="global-toolbar">
+    <view class="gtb-btn" bindtap="onRefreshTap">
+      <image class="gtb-icon" src="/images/icons/refresh.svg" mode="aspectFit"/>
+    </view>
+    <view class="gtb-divider"></view>
     <view class="gtb-btn" bindtap="editNickname">
-      <text class="gtb-icon">🖋</text>
+      <image class="gtb-icon" src="/images/icons/edit.svg" mode="aspectFit"/>
     </view>
     <view class="gtb-divider"></view>
     <view class="gtb-btn" bindtap="showSuperAdminInfo">
-      <text class="gtb-icon">👤</text>
+      <image class="gtb-icon" src="/images/icons/person.svg" mode="aspectFit"/>
     </view>
     <view class="gtb-divider" wx:if="{{userRole === 'super_admin'}}"></view>
     <view class="gtb-btn gtb-btn-admin" wx:if="{{userRole === 'super_admin'}}" bindtap="goAdmin">
-      <text class="gtb-icon">🔑</text>
-    </view>
-    <view class="gtb-divider"></view>
-    <view class="gtb-btn" bindtap="onRefreshTap">
-      <text class="gtb-icon">⟳</text>
+      <image class="gtb-icon" src="/images/icons/shield.svg" mode="aspectFit"/>
     </view>
   </view>
 
@@ -100,11 +100,17 @@
         <view class="tbtn-sort {{sortFilter === 'rank-desc' ? 'sort-desc' : 'sort-asc'}}" bindtap="onSortToggle">
           <text>段位</text><text class="sort-arrow">{{sortFilter === 'rank-desc' ? '↓' : '↑'}}</text>
         </view>
-        <view class="tbtn-reset" bindtap="resetFilters">✕</view>
+        <view class="tbtn-reset" bindtap="resetFilters">
+          <image class="icon-img" src="/images/icons/reset.svg" mode="aspectFit"/>
+        </view>
       </view>
       <view class="action-right">
-        <view class="tbtn-icon chart-btn {{showChart ? 'chart-active' : ''}}" bindtap="toggleChart">◔</view>
-        <view class="tbtn-icon" wx:if="{{isAdmin}}" bindtap="showAdminMenu">⚙</view>
+        <view class="tbtn-icon chart-btn {{showChart ? 'chart-active' : ''}}" bindtap="toggleChart">
+          <image class="icon-img" src="/images/icons/pie.svg" mode="aspectFit"/>
+        </view>
+        <view class="tbtn-icon" wx:if="{{isAdmin}}" bindtap="showAdminMenu">
+          <image class="icon-img" src="/images/icons/cog.svg" mode="aspectFit"/>
+        </view>
       </view>
     </view>
 
@@ -112,7 +118,6 @@
     <view class="chart-section" wx:if="{{showChart}}">
       <view class="chart-header">
         <text class="chart-title">段位分布</text>
-        <text class="chart-close" bindtap="closeChart">✕</text>
       </view>
       <view class="chart-body">
         <canvas type="2d" id="rankPieCanvas" class="pie-canvas" style="width:360rpx;height:360rpx;"></canvas>
@@ -428,7 +433,8 @@
       <!-- 报名人数上限（可选） -->
       <view class="ecm-field">
         <text class="ecm-label">报名人数上限 <text class="ecm-note">(可选)</text></text>
-        <view class="ecm-limit-options">
+        <!-- 第一行：无限制 10人 20人 -->
+        <view class="ecm-limit-row">
           <view class="ecm-limit-opt {{createEventLimit === 0 ? 'ecm-limit-on' : ''}}" bindtap="pickEventLimit" data-val="0">
             <text>无限制</text>
           </view>
@@ -438,19 +444,23 @@
           <view class="ecm-limit-opt {{createEventLimit === 20 ? 'ecm-limit-on' : ''}}" bindtap="pickEventLimit" data-val="20">
             <text>20人</text>
           </view>
+        </view>
+        <!-- 第二行：30人 40人 自定义 -->
+        <view class="ecm-limit-row ecm-limit-row2">
           <view class="ecm-limit-opt {{createEventLimit === 30 ? 'ecm-limit-on' : ''}}" bindtap="pickEventLimit" data-val="30">
             <text>30人</text>
           </view>
           <view class="ecm-limit-opt {{createEventLimit === 40 ? 'ecm-limit-on' : ''}}" bindtap="pickEventLimit" data-val="40">
             <text>40人</text>
           </view>
+          <view class="ecm-limit-opt {{createEventLimit === -1 ? 'ecm-limit-on' : ''}}" bindtap="pickEventLimit" data-val="-1">
+            <text>自定义</text>
+          </view>
         </view>
+        <!-- 自定义输入（选中自定义时下方出现） -->
         <view class="ecm-limit-custom-row" wx:if="{{createEventLimit === -1}}">
-          <input class="ecm-limit-input" type="number" placeholder="自定义" value="{{createEventLimitCustom}}" bindinput="onCreateEventLimitCustomInput" />
+          <input class="ecm-limit-input" type="number" placeholder="输入人数" value="{{createEventLimitCustom}}" bindinput="onCreateEventLimitCustomInput" />
           <text class="ecm-limit-unit">人</text>
-        </view>
-        <view class="ecm-limit-opt ecm-limit-custom-btn {{createEventLimit === -1 ? 'ecm-limit-on' : ''}}" bindtap="pickEventLimit" data-val="-1" wx:if="{{createEventLimit !== -1}}">
-          <text>自定义</text>
         </view>
       </view>
 
@@ -503,4 +513,5 @@
       </view>
     </view>
   </view>
+  <modal id="modal"></modal>
 </view>

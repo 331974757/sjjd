@@ -1,5 +1,8 @@
 {
-  "navigationBarTitleText": "批量导入",
+  "navigationBarTitleText": "",
   "navigationBarBackgroundColor": "#0d1117",
-  "navigationBarTextStyle": "white"
+  "navigationBarTextStyle": "white",
+  "usingComponents": {
+    "modal": "/components/modal/modal"
+  }
 }
