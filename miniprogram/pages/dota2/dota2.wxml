@@ -12,6 +12,24 @@
     <view class="nav-title-line"></view>
   </view>
 
+  <!-- 🌐 全局工具栏：昵称修改 | 管理员展示 | 权限管理(仅超管) -->
+  <view class="global-toolbar">
+    <view class="gtb-btn" bindtap="editNickname">
+      <text class="gtb-icon">🖋</text>
+      <text class="gtb-label">修改昵称</text>
+    </view>
+    <view class="gtb-divider"></view>
+    <view class="gtb-btn" bindtap="showSuperAdminInfo">
+      <text class="gtb-icon">👤</text>
+      <text class="gtb-label">管理员</text>
+    </view>
+    <view class="gtb-divider" wx:if="{{userRole === 'super_admin'}}"></view>
+    <view class="gtb-btn gtb-btn-admin" wx:if="{{userRole === 'super_admin'}}" bindtap="goAdmin">
+      <text class="gtb-icon">⚙</text>
+      <text class="gtb-label">权限管理</text>
+    </view>
+  </view>
+
   <!-- 游戏切换标签（主导航） -->
   <view class="game-tabs">
     <view class="game-tab {{currentGame === 'dota2' ? 'tab-active' : ''}}" bindtap="switchGame" data-game="dota2">
@@ -30,24 +48,6 @@
 
   <!-- ====== Dota2 区域 ====== -->
   <block wx:if="{{currentGame === 'dota2'}}">
-
-    <!-- 🌐 全局工具栏：昵称修改 | 管理员展示 | 权限管理(仅超管) -->
-    <view class="global-toolbar">
-      <view class="gtb-btn" bindtap="editNickname">
-        <text class="gtb-icon">🖋</text>
-        <text class="gtb-label">修改昵称</text>
-      </view>
-      <view class="gtb-divider"></view>
-      <view class="gtb-btn" bindtap="showSuperAdminInfo">
-        <text class="gtb-icon">👤</text>
-        <text class="gtb-label">管理员</text>
-      </view>
-      <view class="gtb-divider" wx:if="{{userRole === 'super_admin'}}"></view>
-      <view class="gtb-btn gtb-btn-admin" wx:if="{{userRole === 'super_admin'}}" bindtap="goAdmin">
-        <text class="gtb-icon">⚙</text>
-        <text class="gtb-label">权限管理</text>
-      </view>
-    </view>
 
     <!-- 子分页栏 -->
     <view class="sub-tabs">
