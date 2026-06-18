@@ -31,6 +31,24 @@
   <!-- ====== Dota2 区域 ====== -->
   <block wx:if="{{currentGame === 'dota2'}}">
 
+    <!-- 🌐 全局工具栏：昵称修改 | 管理员展示 | 权限管理 -->
+    <view class="global-toolbar">
+      <view class="gtb-btn" bindtap="editNickname">
+        <text class="gtb-icon">🖋</text>
+        <text class="gtb-label">修改昵称</text>
+      </view>
+      <view class="gtb-divider"></view>
+      <view class="gtb-btn" bindtap="showSuperAdminInfo">
+        <text class="gtb-icon">👤</text>
+        <text class="gtb-label">管理员</text>
+      </view>
+      <view class="gtb-divider" wx:if="{{isAdmin}}"></view>
+      <view class="gtb-btn gtb-btn-admin" wx:if="{{isAdmin}}" bindtap="showAdminMenu">
+        <text class="gtb-icon">⚙</text>
+        <text class="gtb-label">{{userRole === 'super_admin' ? '权限管理' : '管理菜单'}}</text>
+      </view>
+    </view>
+
     <!-- 子分页栏 -->
     <view class="sub-tabs">
       <view class="sub-tab {{subTab === 'profile' ? 'sub-active' : ''}}" bindtap="switchSubTab" data-tab="profile">
@@ -88,9 +106,6 @@
       </view>
       <view class="action-right">
         <view class="tbtn-icon chart-btn {{showChart ? 'chart-active' : ''}}" bindtap="toggleChart">◔</view>
-        <view class="tbtn-icon" bindtap="showSuperAdminInfo">👤︎</view>
-        <view class="tbtn-icon" bindtap="editNickname">🖋</view>
-        <view class="tbtn-icon" wx:if="{{isAdmin}}" bindtap="showAdminMenu">⚙</view>
       </view>
     </view>
 
