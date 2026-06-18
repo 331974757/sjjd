@@ -310,6 +310,10 @@ Page({
 
       // 更新 Tab 解锁状态
       this._updateTabLocks()
+      // 【修复】从历史赛事进入时，默认显示赛事概览
+      if (this.data.fromHistory) {
+        this._switchToTab('overview')
+      }
       // 进入页面时默认跳转到最新可用环节（如报名管理阶段则直接定位到报名管理）
       const latestUnlocked = [...this.data.tabs].reverse().find(t => !t._locked)
       if (latestUnlocked && latestUnlocked.key !== this.data.activeTab) {
