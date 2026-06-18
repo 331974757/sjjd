@@ -14,6 +14,7 @@ Page({
     gameId: '',
     rankIndex: -1,
     rankStars: 0,
+    calibrateMmr: '',       // 实际天梯分(可选)
     rankDisplay: '请选择核准段位',
     selectedPos: { 1: false, 2: false, 3: false, 4: false, 5: false },
     signupPos: { 1: false, 2: false, 3: false, 4: false, 5: false },
@@ -77,6 +78,7 @@ Page({
           url: uploadUrl,
           filePath: tempPath,
           name: 'file',
+          header: api.getUploadHeaders(),
           success: (uploadRes) => {
             try {
               const data = JSON.parse(uploadRes.data)
@@ -235,6 +237,7 @@ Page({
         gameId: gameId,
         calibrateRankName: rankTitle,
         calibrateRankStar: this.data.rankStars,
+        calibrateMmr: this.data.calibrateMmr ? parseInt(this.data.calibrateMmr) : null,
         goodAtPositions: goodAtPositions,
         signupPosition: signupPosition
       })
@@ -260,7 +263,8 @@ Page({
   // 通知首页下次 onShow 时刷新数据
   _notifyHomeRefresh() {
     const pages = getCurrentPages()
-    const homePage = pages[pages.length - 2]
+    // 【修复】使用 find 查找首页，避免硬编码索引
+    const homePage = pages.find(p => p.route && p.route.indexOf('pages/dota2/dota2') !== -1)
     if (homePage && homePage.loadAllPlayers) {
       homePage._needsReload = true
     }

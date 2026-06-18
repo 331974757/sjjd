@@ -3,6 +3,7 @@ const perm = require('../../utils/permission.js')
 const R = require('../../utils/rank-utils.js')
 const C = require('../../utils/constants.js')
 const api = require('../../utils/api.js')
+const dt = require('../../utils/datetime-picker.js')
 const pad2 = n => String(n).padStart(2, '0')
 
 const RANK_ORDER = R.RANK_ORDER
@@ -62,12 +63,17 @@ Page({
     eventLoadingMore: false,     // 加载更多中
     historySearchText: '',       // 历史赛事搜索关键词
     historySearchTimer: null,    // 搜索防抖定时器
-    eventStatusMap: { 0: '创建中', 1: '报名中', 2: '分组编队', 3: '分组锁定', 4: '对战中', 5: '名次归档' },
+    eventStatusMap: perm.STATUS_NAMES,  // 【修复】使用共享常量，避免硬编码不一致
     // 【赛事创建】弹窗相关数据
     showCreateModal: false,       // 是否显示新建赛事弹窗
     createEventName: '',          // 赛事名称输入
-    createEventDate: '',          // 开始日期（YYYY-MM-DD）
     createEventDesc: '',          // 赛事简介输入
+    createEventLimit: 0,            // 报名人数上限(0=无限制, -1=自定义)
+    createEventLimitCustom: '',     // 自定义人数输入值
+    // 日期时间多列选择器
+    createDateTimeRange: [],
+    createDateTimeIndex: [0, 0, 0, 12, 0],
+    createDateTimeText: '',
   },
 
   onLoad(options) {
@@ -143,11 +149,11 @@ Page({
 
   // 点击管理栏弹出说明
   async showSuperAdminInfo() {
-    wx.showLoading({ title: '查询中...' })
     if (this.data.superAdminNames.length === 0) {
+      wx.showLoading({ title: '查询中...' })
       await this.loadSuperAdminInfo()
+      wx.hideLoading()
     }
-    wx.hideLoading()
     this.setData({ showAdminModal: true })
   },
   closeAdminModal() {
@@ -322,11 +328,16 @@ Page({
   },
 
   onPullDownRefresh() {
-    this.loadAllPlayers().then(() => {
+    const tab = this.data.subTab
+    if (tab === 'profile') {
+      this.loadAllPlayers().then(() => wx.stopPullDownRefresh()).catch(() => wx.stopPullDownRefresh())
+    } else if (tab === 'rules') {
+      this.loadRuleEvents().then(() => wx.stopPullDownRefresh()).catch(() => wx.stopPullDownRefresh())
+    } else if (tab === 'history') {
+      this.loadEvents(true).then(() => wx.stopPullDownRefresh()).catch(() => wx.stopPullDownRefresh())
+    } else {
       wx.stopPullDownRefresh()
-    }).catch(() => {
-      wx.stopPullDownRefresh()
-    })
+    }
   },
 
   // 滚到底部加载更多
@@ -504,8 +515,7 @@ Page({
       }
     } catch (e) {
       console.error('[赛事章程] 加载失败', e)
-      // 【OPT-P1修复】失败后也标记已尝试，允许后续切换tab时重试
-      this.setData({ rulesLoaded: false })
+      // 【OPT-P1修复】失败后保持未加载状态，允许后续切换tab或下拉重试
     } finally {
       this.setData({ rulesLoading: false })
     }
@@ -601,7 +611,10 @@ Page({
   // 格式化赛事时间
   formatEventTime(ts) {
     if (!ts) return '待定'
-    const d = new Date(parseInt(ts))
+    const ms = parseInt(ts)
+    if (isNaN(ms) || ms <= 0) return '待定'
+    const d = new Date(ms)
+    if (isNaN(d.getTime())) return '待定'
     return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes())
   },
 
@@ -704,12 +717,16 @@ Page({
 
   // ⚙ 管理员菜单（导入/导出/批量删除/管理员设置）
   showAdminMenu() {
+    const isSuper = this.data.userRole === 'super_admin'
+    const items = ['批量导入', '批量导出']
+    if (isSuper) items.push('批量删除选手')
     wx.showActionSheet({
-      itemList: ['批量导入', '批量导出', '批量删除选手'],
+      itemList: items,
       success: (res) => {
-        if (res.tapIndex === 0) { this.goImport() }
-        else if (res.tapIndex === 1) { this.doExport() }
-        else if (res.tapIndex === 2) { this.toggleDeleteMode() }
+        const action = items[res.tapIndex]
+        if (action === '批量导入') { this.goImport() }
+        else if (action === '批量导出') { this.doExport() }
+        else if (action === '批量删除选手') { this.toggleDeleteMode() }
       }
     })
   },
@@ -880,12 +897,25 @@ Page({
    * 打开「新建赛事」弹窗
    * 仅管理员端可见调用入口，普通用户不会触发
    */
+  /**
+   * 【初始化日期时间选择器】
+   */
+  _initCreateDateTimePicker() {
+    const now = new Date()
+    const range = dt.buildRange({ refYear: now.getFullYear(), yearSpan: 3, selYear: now.getFullYear(), selMonth: now.getMonth() + 1 })
+    const idx = dt.buildIndex(Date.now() + 3600000, now.getFullYear())  // 默认1小时后
+    const text = dt.toDisplayText(range, idx)
+    this.setData({ createDateTimeRange: range, createDateTimeIndex: idx, createDateTimeText: text })
+  },
+
   showCreateEventModal() {
+    this._initCreateDateTimePicker()
     this.setData({
       showCreateModal: true,
       createEventName: '',
-      createEventDate: '',
-      createEventDesc: ''
+      createEventDesc: '',
+      createEventLimit: 0,
+      createEventLimitCustom: ''
     })
   },
 
@@ -896,8 +926,10 @@ Page({
     this.setData({
       showCreateModal: false,
       createEventName: '',
-      createEventDate: '',
-      createEventDesc: ''
+      createEventDesc: '',
+      createEventLimit: 0,
+      createEventLimitCustom: '',
+      createDateTimeText: ''
     })
   },
 
@@ -909,10 +941,21 @@ Page({
   },
 
   /**
-   * 开始日期选择绑定（mode="date" 返回 "YYYY-MM-DD" 字符串）
+   * 日期时间选择器：列滚动时动态调整日数
    */
-  onCreateEventDateChange(e) {
-    this.setData({ createEventDate: e.detail.value })
+  onCreateDateTimeColumnChange(e) {
+    const { column, value } = e.detail
+    const result = dt.onColumnChange(this.data.createDateTimeRange, this.data.createDateTimeIndex, column, value)
+    this.setData({ createDateTimeRange: result.range, createDateTimeIndex: result.idx })
+  },
+
+  /**
+   * 日期时间选择器确认 → 更新显示文本
+   */
+  onCreateDateTimeChange(e) {
+    const idx = e.detail.value
+    const text = dt.toDisplayText(this.data.createDateTimeRange, idx)
+    this.setData({ createDateTimeIndex: idx, createDateTimeText: text })
   },
 
   /**
@@ -920,6 +963,24 @@ Page({
    */
   onCreateEventDescInput(e) {
     this.setData({ createEventDesc: e.detail.value })
+  },
+
+  /**
+   * 报名人数上限选项点击
+   */
+  pickEventLimit(e) {
+    var val = parseInt(e.currentTarget.dataset.val)
+    this.setData({ createEventLimit: val })
+    if (val !== -1) {
+      this.setData({ createEventLimitCustom: '' })
+    }
+  },
+
+  /**
+   * 自定义人数输入绑定
+   */
+  onCreateEventLimitCustomInput(e) {
+    this.setData({ createEventLimitCustom: e.detail.value })
   },
 
   /**
@@ -946,16 +1007,25 @@ Page({
       return
     }
 
-    // ── 【构造请求参数】日期 → 毫秒时间戳 ──
+    // ── 【构造请求参数】日期时间选择器 → 毫秒时间戳 ──
     var startTime = null
-    var dateStr = this.data.createEventDate
-    if (dateStr) {
-      // 将 YYYY-MM-DD 转为当天 00:00:00 的时间戳
-      startTime = new Date(dateStr.replace(/-/g, '/') + ' 00:00:00').getTime()
+    if (this.data.createDateTimeRange.length > 0 && this.data.createDateTimeIndex.length > 0) {
+      startTime = dt.toTimestamp(this.data.createDateTimeRange, this.data.createDateTimeIndex)
       if (isNaN(startTime)) startTime = null
     }
 
     var desc = (this.data.createEventDesc || '').trim()
+
+    // 报名人数上限处理
+    var signupLimit = null
+    if (this.data.createEventLimit > 0) {
+      signupLimit = this.data.createEventLimit
+    } else if (this.data.createEventLimit === -1 && this.data.createEventLimitCustom) {
+      var custom = parseInt(this.data.createEventLimitCustom)
+      if (!isNaN(custom) && custom > 0) {
+        signupLimit = custom
+      }
+    }
 
     wx.showLoading({ title: '创建中...', mask: true })
 
@@ -964,7 +1034,8 @@ Page({
       var res = await api.post('/events', {
         event_name: name,
         start_time: startTime,
-        event_desc: desc || undefined
+        event_desc: desc || undefined,
+        signup_limit: signupLimit
       })
 
       wx.hideLoading()

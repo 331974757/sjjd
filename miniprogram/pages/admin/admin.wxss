@@ -247,6 +247,18 @@
   color: #415a77;
 }
 
+.toggle-loading {
+  background-color: rgba(119, 141, 169, 0.04);
+  border: 1rpx solid rgba(119, 141, 169, 0.1);
+  color: #8b949e !important;
+  opacity: 0.6;
+}
+
+.user-nick.unregistered {
+  color: #484f58;
+  font-style: italic;
+}
+
 /* Pagination */
 .pagination {
   display: flex;

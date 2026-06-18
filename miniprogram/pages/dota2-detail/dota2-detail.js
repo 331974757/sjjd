@@ -79,11 +79,12 @@ Page({
         wx.showLoading({ title: '上传中...' })
         const app = getApp()
         const openid = app.globalData.openid || ''
-        const uploadUrl = api.API_BASE + '/upload' + (openid ? '?openid=' + openid : '')
+        const uploadUrl = api.API_BASE + '/upload' + (openid ? '?openid=' + encodeURIComponent(openid) : '')
         wx.uploadFile({
           url: uploadUrl,
           filePath: tempPath,
           name: 'file',
+          header: api.getUploadHeaders(),
           success: (uploadRes) => {
             try {
               const data = JSON.parse(uploadRes.data)
@@ -111,19 +112,30 @@ Page({
     const field = e.currentTarget.dataset.field
     const currentVal = this.data.player[field] || ''
 
+    // 天梯分使用 number 类型输入
+    const isNumberField = field === 'calibrateMmr'
+
     wx.showModal({
       title: '修改' + getFieldLabel(field),
       editable: true,
-      placeholderText: '请输入' + getFieldLabel(field),
-      content: currentVal,
+      placeholderText: isNumberField ? '请输入整数天梯分' : ('请输入' + getFieldLabel(field)),
+      content: String(currentVal),
       success: (res) => {
         if (res.confirm && res.content !== undefined) {
-          const val = res.content.trim()
-          if (!val) {
+          let val = res.content.trim()
+          if (!val && !isNumberField) {
             wx.showToast({ title: getFieldLabel(field) + '不能为空', icon: 'none' })
             return
           }
-          if (val === currentVal) return
+          // 天梯分：空值允许清空，非空时转为数字
+          if (isNumberField) {
+            val = val ? parseInt(val) : null
+            if (val !== null && (isNaN(val) || val < 0 || val > 20000)) {
+              wx.showToast({ title: '请输入有效的天梯分（0-20000）', icon: 'none' })
+              return
+            }
+          }
+          if (String(val) === String(currentVal)) return
           this.updateField(field, val)
         }
       }
@@ -368,7 +380,8 @@ function getFieldLabel(field) {
   const labels = {
     wxNickname: '微信群昵称',
     steamId: 'Steam ID',
-    gameId: 'Dota2游戏昵称'
+    gameId: 'Dota2游戏昵称',
+    calibrateMmr: '天梯分'
   }
   return labels[field] || field
 }

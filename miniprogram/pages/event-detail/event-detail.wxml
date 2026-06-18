@@ -214,7 +214,7 @@
         </view>
         <view class="signup-list" wx:if="{{signups.length > 0}}">
           <view class="signup-item" wx:for="{{signups}}" wx:key="signup_id">
-            <image class="si-avatar" src="{{item.avatar_url || '/assets/default-avatar.png'}}" mode="aspectFill" />
+            <image class="si-avatar" src="{{item.avatar_url || ''}}" mode="aspectFill" />
             <view class="si-info">
               <view class="si-name-row">
                 <text class="si-name">{{item.wx_nickname || '未知选手'}}</text>
@@ -306,7 +306,7 @@
             bindtap="{{actions.manage_teams.allowed && !isArchived && event.event_status < 4 ? 'selectFreeAgent' : ''}}"
             data-player-id="{{item.id}}"
           >
-            <image class="fa-avatar" src="{{item.avatar_url || '/images/default-avatar.png'}}" mode="aspectFill" wx:if="{{item.avatar_url}}"/>
+            <image class="fa-avatar" src="{{item.avatar_url || ''}}" mode="aspectFill" />
             <view class="fa-info">
               <text class="fa-name">{{item.wx_nickname || item.nickName || '未知'}}</text>
               <text class="fa-rank">{{item.calibrate_rank_name || '未定段'}}{{item.calibrate_rank_star ? ' '+item.calibrate_rank_star+'★' : ''}}</text>
@@ -383,7 +383,7 @@
                 wx:key="id"
                 wx:for-item="m"
               >
-                <image class="tcm-avatar" src="{{m.avatar_url || '/images/default-avatar.png'}}" mode="aspectFill" wx:if="{{m.avatar_url}}"/>
+                <image class="tcm-avatar" src="{{m.avatar_url || ''}}" mode="aspectFill" />
                 <view class="tcm-info">
                   <text class="tcm-name">{{m.wx_nickname || m.nickName || '未知'}}</text>
                   <text class="tcm-rank">{{m.calibrate_rank_name || m.calibrate_rank_label || '未定段'}}{{m.calibrate_rank_star ? ' '+m.calibrate_rank_star+'★' : ''}}</text>
@@ -411,9 +411,12 @@
         </view>
       </view>
 
-      <!-- 只读提示 -->
-      <view class="team-readonly-tip" wx:if="{{event.event_status >= 4 || isArchived}}">
-        <text>🔒 {{isArchived ? '赛事已归档，队伍信息为只读' : '对战中，队伍信息为只读状态'}}</text>
+      <!-- 只读提示（状态≠编辑中） -->
+      <view class="team-readonly-tip" wx:if="{{event.event_status !== 2 && (event.event_status >= 3 || isArchived)}}">
+        <text wx:if="{{isArchived}}">🔒 赛事已归档，队伍信息为只读</text>
+        <text wx:elif="{{event.event_status === 4}}">🔒 对战中，队伍信息为只读状态</text>
+        <text wx:elif="{{event.event_status === 3}}">🔒 分组已锁定，队伍不可修改</text>
+        <text wx:else>🔒 队伍信息为只读状态</text>
       </view>
     </view>
 
@@ -804,9 +807,13 @@
               </view>
             </view>
           </scroll-view>
-          <view class="rank-empty" wx:if="{{ranks.length === 0}}">
+          <view class="rank-empty" wx:if="{{ranks.length === 0 && !ranksLoading}}">
             <text class="rank-empty-icon">🏆</text>
-            <text class="rank-empty-text">{{readonly ? '本次赛事未设置名次' : (isArchived ? '未记录名次' : '尚未设定名次')}}</text>
+            <text class="rank-empty-text">{{readonly ? '本次赛事未设置名次' : (isArchived ? '未记录名次' : (event.event_status < 5 ? '比赛结束后可设定名次' : '尚未设定名次'))}}</text>
+          </view>
+          <view class="rank-empty" wx:if="{{ranksLoading}}">
+            <text class="rank-empty-icon">⏳</text>
+            <text class="rank-empty-text">加载中...</text>
           </view>
 
           <view class="archive-btn-area" wx:if="{{actions.archive_event.allowed}}">
@@ -864,7 +871,7 @@
       <text class="modal-content" wx:else>{{_confirmMsg}}</text>
       <view class="modal-btns modal-btns-bottom">
         <view class="modal-btn btn-secondary" bindtap="hideStatusConfirm"><text>取消</text></view>
-        <view class="modal-btn btn-primary-confirm" bindtap="doChangeStatus"><text>确认{{targetStatus === 1 ? '开启报名' : ''}}</text></view>
+        <view class="modal-btn btn-primary-confirm" bindtap="doChangeStatus"><text>确认{{targetStatus === 1 ? '开启报名' : (targetStatus === 2 ? '截止报名' : '')}}</text></view>
       </view>
     </view>
   </view>

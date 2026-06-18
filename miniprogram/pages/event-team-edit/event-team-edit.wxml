@@ -52,7 +52,7 @@
           bindtap="{{canEdit ? 'selectPlayer' : ''}}"
           data-player-id="{{item.id}}"
         >
-          <image class="chip-avatar" src="{{item.avatar_url || '/images/default-avatar.png'}}" mode="aspectFill" />
+          <image class="chip-avatar" src="{{item.avatar_url || ''}}" mode="aspectFill" />
           <view class="chip-info">
             <text class="chip-name">{{item.wx_nickname || '未知'}}</text>
             <text class="chip-rank">{{item.calibrate_rank_name || '无段位'}} {{item.calibrate_rank_star ? item.calibrate_rank_star + '★' : ''}}</text>
@@ -120,7 +120,7 @@
             wx:for-index="pi"
             wx:key="id"
           >
-            <image class="tpc-avatar" src="{{player.avatar_url || '/images/default-avatar.png'}}" mode="aspectFill" />
+            <image class="tpc-avatar" src="{{player.avatar_url || ''}}" mode="aspectFill" />
             <view class="tpc-info">
               <text class="tpc-name">{{player.wx_nickname || '未知'}}</text>
               <text class="tpc-rank">{{player.calibrate_rank_name || ''}}</text>

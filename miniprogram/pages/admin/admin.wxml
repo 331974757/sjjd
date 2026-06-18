@@ -4,18 +4,18 @@
   <!-- 所有用户列表 -->
   <view class="section">
     <view class="section-title">
-      <text>用户权限管理</text>
+      <text>权限管理</text>
       <view class="section-title-right">
         <view class="admin-refresh" bindtap="onRefreshTap">
           <text class="refresh-icon">⟳</text>
         </view>
-        <text class="user-count">{{keyword ? _filteredTotal + '/' + _filteredTotal : _filteredTotal}} 人</text>
+        <text class="user-count">{{keyword ? _filteredTotal : allUsers.length}} 人</text>
       </view>
     </view>
 
     <!-- 搜索栏 -->
     <view class="search-bar">
-      <input class="search-input" placeholder="搜索昵称" value="{{keyword}}" bindinput="onKeywordInput" />
+      <input class="search-input" placeholder="搜索昵称或OpenID" value="{{keyword}}" bindinput="onKeywordInput" />
       <view class="search-clear" wx:if="{{keyword}}" bindtap="onClearKeyword">
         <text>✕</text>
       </view>
@@ -33,7 +33,7 @@
           <view class="user-badge {{item.role === 'super_admin' ? 'badge-super' : (item.role === 'admin' ? 'badge-admin' : 'badge-user')}}">
             <text>{{item.role === 'super_admin' ? '超' : (item.role === 'admin' ? '管' : '普')}}</text>
           </view>
-          <text class="user-nick">{{item.nickName || '未命名用户'}}</text>
+          <text class="user-nick {{item.nickName ? '' : 'unregistered'}}">{{item.nickName || '未注册'}}</text>
           <text class="user-me" wx:if="{{item.isMe}}">（我）</text>
           <view class="nick-count-info" wx:if="{{item.nickName && isSuperAdmin && item.role !== 'admin' && item.role !== 'super_admin'}}">
             <text class="nick-count-text">已改{{item.nickChangeCount}}次</text>
@@ -51,21 +51,21 @@
           </view>
           <view
             wx:if="{{isSuperAdmin}}"
-            class="toggle-btn {{item.isMe ? 'toggle-disabled' : (item.role === 'super_admin' ? 'toggle-super' : (item.role === 'admin' ? 'toggle-off' : 'toggle-on'))}}"
-            bindtap="toggleAdmin"
+            class="toggle-btn {{_operating ? 'toggle-loading' : ''}} {{item.isMe ? 'toggle-disabled' : (item.role === 'super_admin' ? 'toggle-super' : (item.role === 'admin' ? 'toggle-off' : 'toggle-on'))}}"
+            bindtap="{{_operating ? '' : 'toggleAdmin'}}"
             data-openid="{{item.openid}}"
             data-role="{{item.role}}"
             data-isme="{{item.isMe}}"
             data-nickname="{{item.nickName}}"
           >
-            <text>{{item.isMe ? '不可操作' : (item.role === 'admin' || item.role === 'super_admin' ? '调整权限' : '设置权限')}}</text>
+            <text>{{_operating ? '操作中...' : (item.isMe ? '不可操作' : (item.role === 'super_admin' ? '超管权限' : (item.role === 'admin' ? '取消权限' : '设置权限')))}}</text>
           </view>
         </view>
       </view>
 
       <view class="empty-state" wx:if="{{users.length === 0 && !loading}}">
-        <text class="empty-text">暂无可管理的用户</text>
-        <text class="empty-hint">仅已修改昵称的用户会出现在此列表中</text>
+        <text class="empty-text">{{keyword ? '未找到匹配的用户' : '暂无用户数据'}}</text>
+        <text class="empty-hint">{{keyword ? '请尝试其他关键词' : '其他用户打开小程序后会自动注册并出现在这里'}}</text>
       </view>
 
       <!-- 翻页按钮 -->

@@ -50,6 +50,12 @@
       </view>
     </view>
 
+    <!-- 实际天梯分（可选） -->
+    <view class="form-group">
+      <text class="form-label">实际天梯分 <text class="optional">(可选)</text></text>
+      <input class="form-input" placeholder="如填写实际天梯分则分队时优先使用" value="{{calibrateMmr}}" bindinput="onInput" data-field="calibrateMmr" type="number" />
+    </view>
+
     <!-- 擅长游戏位置（多选圆形按钮） -->
     <view class="form-group">
       <text class="form-label">擅长游戏位置</text>

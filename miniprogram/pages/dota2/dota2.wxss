@@ -1161,7 +1161,11 @@
 /* =====【第8轮新增】历史赛事搜索栏 ===== */
 .history-search-bar {
   padding: 6rpx 0 20rpx;
+}
+
+.history-search-wrap {
   position: relative;
+  height: 72rpx;
 }
 
 .history-search-input {
@@ -1226,6 +1230,21 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   margin-right: 16rpx;
+}
+
+.hcard-desc {
+  margin-bottom: 12rpx;
+}
+
+.hdesc-text {
+  font-size: 24rpx;
+  color: #6e7681;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.5;
 }
 
 .hcard-status {
@@ -1502,6 +1521,12 @@
   color: #f85149;
 }
 
+.ecm-note {
+  color: #8b949e;
+  font-weight: 400;
+  font-size: 22rpx;
+}
+
 /* 单行输入框 */
 .ecm-input {
   width: 100%;
@@ -1597,4 +1622,62 @@
 .ecm-btn-confirm:active {
   background: linear-gradient(135deg, #1a5dcc, #154aa3);
   transform: scale(0.96);
+}
+
+/* 报名人数上限选项 */
+.ecm-limit-options {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-bottom: 12rpx;
+}
+
+.ecm-limit-opt {
+  flex: 1;
+  min-width: 120rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12rpx;
+  background-color: rgba(255, 255, 255, 0.04);
+  border: 1rpx solid rgba(255, 255, 255, 0.08);
+  font-size: 24rpx;
+  color: #8b949e;
+  transition: all 0.15s;
+}
+.ecm-limit-opt:active {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.ecm-limit-on {
+  background-color: rgba(31, 111, 235, 0.15) !important;
+  border-color: rgba(31, 111, 235, 0.4) !important;
+  color: #58a6ff !important;
+  font-weight: 600 !important;
+}
+
+.ecm-limit-custom-row {
+  display: flex;
+  align-items: center;
+  margin-top: 10rpx;
+  gap: 12rpx;
+}
+
+.ecm-limit-input {
+  flex: 1;
+  height: 64rpx;
+  padding: 0 20rpx;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1rpx solid rgba(31, 111, 235, 0.4);
+  border-radius: 12rpx;
+  color: #e6edf3;
+  font-size: 28rpx;
+  box-sizing: border-box;
+}
+
+.ecm-limit-unit {
+  font-size: 24rpx;
+  color: #8b949e;
 }

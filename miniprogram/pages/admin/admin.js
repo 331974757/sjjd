@@ -15,7 +15,8 @@ Page({
     totalPages: 0,      // 总页数
     loading: true,
     _filteredTotal: 0,  // 筛选后总数
-    _filtered: []       // 筛选后的全量列表（内存缓存）
+    _filtered: [],       // 筛选后的全量列表（内存缓存）
+    _operating: false     // 操作锁（防止重复提交）
   },
 
   async onLoad() {
@@ -31,8 +32,9 @@ Page({
     this.loadAll()
   },
 
-  /** 手动刷新按钮 */
+  /** 手动刷新按钮（带并发锁，防止重复请求） */
   async onRefreshTap() {
+    if (this.data.loading) return
     wx.showLoading({ title: '刷新中...', mask: true })
     try {
       await this.loadAll()
@@ -51,7 +53,9 @@ Page({
       try {
         const app = getApp()
         openid = await app.getOpenId()
-      } catch (e) {}
+      } catch (e) {
+        console.warn('[admin] 获取openid失败', e)
+      }
 
       wx.showLoading({ title: '加载用户列表...' })
       const res = await api.get('/users')
@@ -62,10 +66,9 @@ Page({
         return {
           _id: u._id,
           openid: u.openid,
-          displayName: u.nickName || '未命名用户',
           role: u.role,
           nickName: u.nickName || '',
-          isMe: u.openid === openid,
+          isMe: !!(openid && u.openid === openid),
           createdAt: u.createdAt,
           nickChangeCount: u.nickChangeCount || 0
         }
@@ -98,13 +101,20 @@ Page({
     this.filterUsers()
   },
 
-  // 公共筛选方法：仅显示已改过昵称的用户
+  // 公共筛选方法：显示所有用户（优先显示有昵称的）并支持关键词搜索
   _getFiltered() {
-    let list = this.data.allUsers.filter(u => !!u.nickName)
+    // 【修复】不直接排序 allUsers（会修改 data 原数组），创建副本排序
+    let list = [...this.data.allUsers].sort((a, b) => {
+      // 有昵称的排前面
+      if (a.nickName && !b.nickName) return -1;
+      if (!a.nickName && b.nickName) return 1;
+      return 0;
+    });
     const kw = this.data.keyword.toLowerCase()
     if (kw) {
       list = list.filter(u => {
-        return u.nickName.toLowerCase().indexOf(kw) !== -1
+        return (u.nickName || '').toLowerCase().indexOf(kw) !== -1
+          || (u.openid || '').toLowerCase().indexOf(kw) !== -1
       })
     }
     return list
@@ -145,6 +155,7 @@ Page({
 
   // 切换权限（仅超级管理员可操作，ActionSheet 多选）
   toggleAdmin(e) {
+    if (this.data._operating) return
     const openid = e.currentTarget.dataset.openid
     const role = e.currentTarget.dataset.role
     const isMe = e.currentTarget.dataset.isme
@@ -203,60 +214,32 @@ Page({
     })
   },
 
-  async doSetAdmin(openid) {
+  // 【重构】统一角色修改方法，消除4个方法的重复代码
+  async _doSetRole(openid, role, label) {
+    this.setData({ _operating: true })
     wx.showLoading({ title: '设置中...' })
     try {
-      const res = await api.put('/users/' + openid + '/role', { role: 'admin', operatorOpenid: this.data.myOpenId })
+      const res = await api.put('/users/' + openid + '/role', { role: role, operatorOpenid: this.data.myOpenId })
       wx.hideLoading()
-      wx.showToast({ title: res.success ? '已设为管理员' : (res.message || '失败'), icon: res.success ? 'success' : 'none' })
+      const text = res.success ? '已' + label : (res.message || '失败')
+      wx.showToast({ title: text, icon: res.success ? 'success' : 'none' })
       if (res.success) this.loadAll()
     } catch (e) {
       wx.hideLoading()
       wx.showToast({ title: '操作失败', icon: 'none' })
+    } finally {
+      this.setData({ _operating: false })
     }
   },
 
-  async doRemoveAdmin(openid) {
-    wx.showLoading({ title: '操作中...' })
-    try {
-      const res = await api.put('/users/' + openid + '/role', { role: 'user', operatorOpenid: this.data.myOpenId })
-      wx.hideLoading()
-      wx.showToast({ title: res.success ? '已取消管理员' : (res.message || '失败'), icon: res.success ? 'success' : 'none' })
-      if (res.success) this.loadAll()
-    } catch (e) {
-      wx.hideLoading()
-      wx.showToast({ title: '操作失败', icon: 'none' })
-    }
-  },
-
-  async doSetSuperAdmin(openid) {
-    wx.showLoading({ title: '设置中...' })
-    try {
-      const res = await api.put('/users/' + openid + '/role', { role: 'super_admin', operatorOpenid: this.data.myOpenId })
-      wx.hideLoading()
-      wx.showToast({ title: res.success ? '已设为超级管理员' : (res.message || '失败'), icon: res.success ? 'success' : 'none' })
-      if (res.success) this.loadAll()
-    } catch (e) {
-      wx.hideLoading()
-      wx.showToast({ title: '操作失败', icon: 'none' })
-    }
-  },
-
-  async doRemoveSuperAdmin(openid) {
-    wx.showLoading({ title: '操作中...' })
-    try {
-      const res = await api.put('/users/' + openid + '/role', { role: 'user', operatorOpenid: this.data.myOpenId })
-      wx.hideLoading()
-      wx.showToast({ title: res.success ? '已取消超级管理员' : (res.message || '失败'), icon: res.success ? 'success' : 'none' })
-      if (res.success) this.loadAll()
-    } catch (e) {
-      wx.hideLoading()
-      wx.showToast({ title: '操作失败', icon: 'none' })
-    }
-  },
+  doSetAdmin(openid) { return this._doSetRole(openid, 'admin', '设为管理员') },
+  doRemoveAdmin(openid) { return this._doSetRole(openid, 'user', '取消管理员') },
+  doSetSuperAdmin(openid) { return this._doSetRole(openid, 'super_admin', '设为超级管理员') },
+  doRemoveSuperAdmin(openid) { return this._doSetRole(openid, 'user', '取消超级管理员') },
 
   // 重置昵称修改次数（仅超级管理员可操作）
   resetNickCount(e) {
+    if (this.data._operating) return
     const openid = e.currentTarget.dataset.openid
     const nickName = e.currentTarget.dataset.nickname
     wx.showModal({
@@ -271,6 +254,7 @@ Page({
   },
 
   async doResetNickCount(openid) {
+    this.setData({ _operating: true })
     wx.showLoading({ title: '重置中...' })
     try {
       const res = await api.put('/users/' + openid + '/reset-nickcount')
@@ -280,6 +264,8 @@ Page({
     } catch (e) {
       wx.hideLoading()
       wx.showToast({ title: '操作失败', icon: 'none' })
+    } finally {
+      this.setData({ _operating: false })
     }
   }
 })

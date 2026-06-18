@@ -20,7 +20,7 @@
 
   <!-- CSV 列格式说明 -->
   <view class="template-section">
-    <text class="section-title">文件列格式（共7列，标红为必填）</text>
+    <text class="section-title">文件列格式（共8列，标红为必填）</text>
     <view class="column-list">
       <view class="column-item" wx:for="{{columns}}" wx:key="field">
         <text class="column-idx">{{index + 1}}</text>

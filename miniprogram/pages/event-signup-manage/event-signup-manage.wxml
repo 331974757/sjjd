@@ -26,7 +26,7 @@
 
       <view class="signup-list" wx:if="{{signups.length > 0}}">
         <view class="signup-item" wx:for="{{signups}}" wx:key="signup_id">
-          <image class="si-avatar" src="{{item.avatar_url || '/assets/default-avatar.png'}}" mode="aspectFill" />
+          <image class="si-avatar" src="{{item.avatar_url || ''}}" mode="aspectFill" />
           <view class="si-info">
             <view class="si-name-row">
               <text class="si-name">{{item.wx_nickname || '未知选手'}}</text>
@@ -95,7 +95,7 @@
             <text class="check-mark" wx:elif="{{selectedPlayers[item.id]}}">✓</text>
             <text class="check-empty" wx:else>○</text>
           </view>
-          <image class="ri-avatar" src="{{item.avatar_url || '/assets/default-avatar.png'}}" mode="aspectFill" />
+          <image class="ri-avatar" src="{{item.avatar_url || ''}}" mode="aspectFill" />
           <view class="ri-info">
             <text class="ri-name">{{item.wx_nickname || '未知'}}</text>
             <text class="ri-rank">{{item.calibrate_rank_name || '未定段'}}{{item.calibrate_rank_star > 0 ? ' ' + item.calibrate_rank_star + '★' : ''}}</text>

@@ -227,14 +227,16 @@
     <view class="event-list-page" wx:if="{{subTab === 'history'}}">
       <!-- 搜索栏 -->
       <view class="history-search-bar">
-        <input
-          class="history-search-input"
-          placeholder="搜索历史赛事名称"
-          value="{{historySearchText}}"
-          bindinput="onHistorySearchInput"
-          bindconfirm="onHistorySearchConfirm"
-        />
-        <view class="history-search-clear" wx:if="{{historySearchText}}" bindtap="clearHistorySearch">✕</view>
+        <view class="history-search-wrap">
+          <input
+            class="history-search-input"
+            placeholder="搜索历史赛事名称"
+            value="{{historySearchText}}"
+            bindinput="onHistorySearchInput"
+            bindconfirm="onHistorySearchConfirm"
+          />
+          <view class="history-search-clear" wx:if="{{historySearchText}}" bindtap="clearHistorySearch">✕</view>
+        </view>
       </view>
 
       <!-- 加载中 -->
@@ -259,6 +261,11 @@
             </view>
           </view>
 
+          <!-- 赛事简介（有则显示） -->
+          <view class="hcard-desc" wx:if="{{item.event_desc}}">
+            <text class="hdesc-text">{{item.event_desc}}</text>
+          </view>
+
           <!-- 赛事基本信息行 -->
           <view class="hcard-meta">
             <view class="hcard-meta-item">
@@ -268,6 +275,10 @@
             <view class="hcard-meta-item">
               <text class="hmeta-icon">👥</text>
               <text class="hmeta-text">{{item._signupCount || 0}} 人参赛</text>
+            </view>
+            <view class="hcard-meta-item" wx:if="{{item.archived_at}}">
+              <text class="hmeta-icon">📦</text>
+              <text class="hmeta-text">已归档</text>
             </view>
           </view>
 
@@ -412,6 +423,35 @@
           maxlength="200"
           auto-height
         />
+      </view>
+
+      <!-- 报名人数上限（可选） -->
+      <view class="ecm-field">
+        <text class="ecm-label">报名人数上限 <text class="ecm-note">(可选)</text></text>
+        <view class="ecm-limit-options">
+          <view class="ecm-limit-opt {{createEventLimit === 0 ? 'ecm-limit-on' : ''}}" bindtap="pickEventLimit" data-val="0">
+            <text>无限制</text>
+          </view>
+          <view class="ecm-limit-opt {{createEventLimit === 10 ? 'ecm-limit-on' : ''}}" bindtap="pickEventLimit" data-val="10">
+            <text>10人</text>
+          </view>
+          <view class="ecm-limit-opt {{createEventLimit === 20 ? 'ecm-limit-on' : ''}}" bindtap="pickEventLimit" data-val="20">
+            <text>20人</text>
+          </view>
+          <view class="ecm-limit-opt {{createEventLimit === 30 ? 'ecm-limit-on' : ''}}" bindtap="pickEventLimit" data-val="30">
+            <text>30人</text>
+          </view>
+          <view class="ecm-limit-opt {{createEventLimit === 40 ? 'ecm-limit-on' : ''}}" bindtap="pickEventLimit" data-val="40">
+            <text>40人</text>
+          </view>
+        </view>
+        <view class="ecm-limit-custom-row" wx:if="{{createEventLimit === -1}}">
+          <input class="ecm-limit-input" type="number" placeholder="自定义" value="{{createEventLimitCustom}}" bindinput="onCreateEventLimitCustomInput" />
+          <text class="ecm-limit-unit">人</text>
+        </view>
+        <view class="ecm-limit-opt ecm-limit-custom-btn {{createEventLimit === -1 ? 'ecm-limit-on' : ''}}" bindtap="pickEventLimit" data-val="-1" wx:if="{{createEventLimit !== -1}}">
+          <text>自定义</text>
+        </view>
       </view>
 
       <!-- 按钮行 -->

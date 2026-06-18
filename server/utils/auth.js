@@ -1,6 +1,6 @@
 /**
  * ============================================================
- * 【第9轮】统一权限/状态/归档中间件
+ * 统一权限/状态/归档中间件
  * server/utils/auth.js
  *
  * 使用方式（在 server/index.js 中）：
@@ -33,9 +33,7 @@ function init(mysqlPool, roleFn) {
   getCallerRoleFn = roleFn;
 }
 
-// ════════════════════════════════════════════════════════════
 // 一、角色常量
-// ════════════════════════════════════════════════════════════
 
 const ROLES = {
   SUPER_ADMIN: 'super_admin',
@@ -43,9 +41,7 @@ const ROLES = {
   USER: 'user',
 };
 
-// ════════════════════════════════════════════════════════════
 // 二、赛事状态常量
-// ════════════════════════════════════════════════════════════
 
 const STATUS = {
   CREATING: 0,          // 创建中
@@ -53,7 +49,7 @@ const STATUS = {
   SIGNUP_CLOSED: 2,     // 报名截止
   TEAMS_LOCKED: 3,      // 分组锁定
   BATTLE_ACTIVE: 4,     // 对战中
-  FINISHED: 5,          // 已归档(event_status层面)
+  FINISHED: 5,          // 名次归档(event_status层面，比赛结束可设名次；is_archived=1才是正式归档)
 };
 
 const STATUS_NAMES = {
@@ -62,15 +58,13 @@ const STATUS_NAMES = {
   2: '分组编队',
   3: '分组锁定',
   4: '对战中',
-  5: '已归档',
+  5: '名次归档',
 };
 
-// ════════════════════════════════════════════════════════════
 // 三、状态流转规则（严格正向顺序 0→1→2→3→4→5）
-// ════════════════════════════════════════════════════════════
 
 /**
- * 【状态机核心】校验状态流转合法性
+ * 校验状态流转合法性
  * @returns {{ valid: boolean, error: string }}
  */
 function validateStatusTransition(currentStatus, targetStatus) {
@@ -87,7 +81,7 @@ function validateStatusTransition(currentStatus, targetStatus) {
 }
 
 /**
- * 【状态机】获取某状态下允许的操作清单
+ * 获取某状态下允许的操作清单
  * @returns {string[]} 允许的操作类型列表
  */
 function getAllowedActions(eventStatus, isArchived) {
@@ -120,15 +114,13 @@ function getAllowedActions(eventStatus, isArchived) {
   return actions;
 }
 
-// ════════════════════════════════════════════════════════════
 // 四、底层工具函数
-// ════════════════════════════════════════════════════════════
 
 /**
- * 从请求中提取 openid
+ * 从请求中提取 JWT 认证的 openid（仅信任中间件注入，不 fallback 到 query/body）
  */
 function extractOpenid(req) {
-  return req.query.openid || (req.body && req.body.openid) || '';
+  return (req && req._openid) || '';
 }
 
 /**
@@ -156,12 +148,10 @@ async function getEvent(eventId) {
   return rows.length ? rows[0] : null;
 }
 
-// ════════════════════════════════════════════════════════════
 // 五、Express 中间件（可直接 app.use / 路由级别挂载）
-// ════════════════════════════════════════════════════════════
 
 /**
- * 【中间件】断言管理员（admin 或 super_admin）
+ * 断言管理员（admin 或 super_admin）
  * 适用模块：选手档案/赛事章程/历史赛事 的所有管理操作
  */
 async function requireAdmin(req, res, next) {
@@ -173,7 +163,7 @@ async function requireAdmin(req, res, next) {
 }
 
 /**
- * 【中间件】断言超级管理员（仅 super_admin）
+ * 断言超级管理员（仅 super_admin）
  * 适用：管理员账号管理、删除未归档赛事、全局配置修改
  */
 async function requireSuperAdmin(req, res, next) {
@@ -185,7 +175,7 @@ async function requireSuperAdmin(req, res, next) {
 }
 
 /**
- * 【中间件】断言赛事在「报名中」状态（status=1）
+ * 断言赛事在「报名中」状态（status=1）
  * 适用：用户自主报名、取消报名
  */
 async function requireSignupOpen(req, res, next) {
@@ -208,7 +198,7 @@ async function requireSignupOpen(req, res, next) {
 }
 
 /**
- * 【中间件】断言赛事队伍可编辑（status=2 或 3）
+ * 断言赛事队伍可编辑（status=2 或 3）
  * 适用：队伍编组、自动分队、删除队伍
  */
 async function requireTeamEditable(req, res, next) {
@@ -231,7 +221,7 @@ async function requireTeamEditable(req, res, next) {
 }
 
 /**
- * 【中间件】断言赛事在「对战中」状态（status=4）
+ * 断言赛事在「对战中」状态（status=4）
  * 适用：生成对战、胜负判定、进入下一轮、结束比赛
  */
 async function requireBattleActive(req, res, next) {
@@ -244,10 +234,9 @@ async function requireBattleActive(req, res, next) {
     return res.status(400).json({ success: false, error: '赛事已归档，所有对战数据不可修改' });
   }
   if (event.event_status !== STATUS.BATTLE_ACTIVE) {
-    const map = { 0: '创建中', 1: '报名中', 2: '报名截止', 3: '分组锁定', 5: '已归档' };
     return res.status(400).json({
       success: false,
-      error: `赛事当前状态为「${map[event.event_status] || '未知'}」，非对战阶段不可操作`
+      error: `赛事当前状态为「${STATUS_NAMES[event.event_status] || '未知'}」，非对战阶段不可操作`
     });
   }
   req._event = event;
@@ -255,7 +244,7 @@ async function requireBattleActive(req, res, next) {
 }
 
 /**
- * 【中间件】断言赛事未归档（通用只读拦截）
+ * 断言赛事未归档（通用只读拦截）
  * 适用：名次设定、其他需检查 archives 的操作
  */
 async function requireNotArchived(req, res, next) {
@@ -271,7 +260,7 @@ async function requireNotArchived(req, res, next) {
 }
 
 /**
- * 【组合中间件】管理员 + 未归档
+ * 管理员 + 未归档
  * 适用：赛事编辑、状态变更等需要管理员权限且未被归档的操作
  */
 async function requireAdminNotArchived(req, res, next) {
@@ -292,7 +281,7 @@ async function requireAdminNotArchived(req, res, next) {
 }
 
 /**
- * 【组合中间件】管理员 + 可报名阶段
+ * 管理员 + 可报名阶段
  * 适用：管理员添加报名（可在报名中/报名截止状态操作）
  */
 async function requireAdminSignupManage(req, res, next) {
@@ -313,7 +302,7 @@ async function requireAdminSignupManage(req, res, next) {
 }
 
 /**
- * 【组合中间件】管理员 + 可设名次（status=5 且未归档）
+ * 管理员 + 可设名次（status=5 且未归档）
  * 适用：名次设置
  */
 async function requireAdminCanSetRank(req, res, next) {
@@ -333,9 +322,7 @@ async function requireAdminCanSetRank(req, res, next) {
   next();
 }
 
-// ════════════════════════════════════════════════════════════
-// 六、手动调用版工具函数（用于需要自定义错误处理的场景）
-// ════════════════════════════════════════════════════════════
+// 六、手动调用版工具函数
 
 /**
  * 检查是否管理员（返回布尔，不发送响应）
@@ -422,15 +409,12 @@ async function validateBattleEvent(eventId) {
     return { valid: false, error: '赛事已归档，所有对战数据不可修改', event };
   }
   if (event.event_status !== STATUS.BATTLE_ACTIVE) {
-    const map = { 0: '创建中', 1: '报名中', 2: '报名截止', 3: '分组锁定', 5: '已归档' };
-    return { valid: false, error: `赛事当前状态为「${map[event.event_status] || '未知'}」，非对战阶段不可操作`, event };
+    return { valid: false, error: `赛事当前状态为「${STATUS_NAMES[event.event_status] || '未知'}」，非对战阶段不可操作`, event };
   }
   return { valid: true, error: '', event };
 }
 
-// ════════════════════════════════════════════════════════════
 // 七、接口权限对照表（文档用途）
-// ════════════════════════════════════════════════════════════
 
 /**
  * 完整接口权限矩阵
@@ -439,9 +423,8 @@ async function validateBattleEvent(eventId) {
 const PERMISSION_MATRIX = [
   // ─── 赛事管理 ───
   { method: 'GET',    path: '/api/events',                      roles: ['user','admin','super_admin'], status: null,      note: '赛事列表' },
-  { method: 'GET',    path: '/api/events/archived',             roles: ['user','admin','super_admin'], status: null,      note: '【R8】已归档赛事列表' },
+  { method: 'GET',    path: '/api/events/archived',             roles: ['user','admin','super_admin'], status: null,      note: '已归档赛事列表' },
   { method: 'GET',    path: '/api/events/:eventId',             roles: ['user','admin','super_admin'], status: null,      note: '赛事详情' },
-  { method: 'GET',    path: '/api/events/:eventId/full',        roles: ['user','admin','super_admin'], status: null,      note: '【R8】全量数据' },
   { method: 'POST',   path: '/api/events',                      roles: ['admin','super_admin'],          status: null,      note: '创建赛事' },
   { method: 'PUT',    path: '/api/events/:eventId',             roles: ['admin','super_admin'],          status: 'any',     note: '编辑赛事（归档拦截）' },
   { method: 'PUT',    path: '/api/events/:eventId/status',      roles: ['admin','super_admin'],          status: 'sequential', note: '状态变更（严格顺序）' },
@@ -454,6 +437,7 @@ const PERMISSION_MATRIX = [
   { method: 'POST',   path: '/api/events/:eventId/signups/admin', roles: ['admin','super_admin'],       status: 'any',     note: '管理员添加报名' },
   { method: 'POST',   path: '/api/events/:eventId/signups/batch', roles: ['admin','super_admin'],       status: 'any',     note: '批量添加报名' },
   { method: 'DELETE', path: '/api/events/:eventId/signups/:signupId', roles: ['user','admin','super_admin'], status: '0,1,2',  note: '取消报名（管理员赛事未分组前均可删除，普通用户仅报名中）' },
+  { method: 'GET',    path: '/api/events/:eventId/signups/ids', roles: ['user','admin','super_admin'],   status: null,      note: '获取报名选手ID列表' },
   { method: 'GET',    path: '/api/search/players',              roles: ['user','admin','super_admin'],   status: null,      note: '选手搜索' },
 
   // ─── 队伍管理 ───
@@ -500,7 +484,7 @@ const PERMISSION_MATRIX = [
   { method: 'POST',   path: '/api/players/import',              roles: ['admin','super_admin'],          status: null,      note: 'JSON批量导入' },
   { method: 'POST',   path: '/api/players/import/xlsx',         roles: ['admin','super_admin'],          status: null,      note: 'XLSX导入' },
   { method: 'GET',    path: '/api/players/export/all',          roles: ['admin','super_admin'],          status: null,      note: '导出全部' },
-  { method: 'POST',   path: '/api/upload',                      roles: ['admin','super_admin'],          status: null,      note: '头像上传' },
+  { method: 'POST',   path: '/api/upload',                      roles: ['user','admin','super_admin'],   status: null,      note: '头像上传' },
 
   // ─── 用户管理 ───
   { method: 'GET',    path: '/api/users/me',                    roles: ['user','admin','super_admin'],   status: null,      note: '当前用户信息' },
@@ -511,22 +495,13 @@ const PERMISSION_MATRIX = [
 ];
 
 /**
- * 获取 admin 与 super_admin 权限完全一致的接口列表
- * （用于验证第8轮权限规则：三个模块两类管理员权限一致）
+ * 获取 admin 与 super_admin 权限平等的接口列表
+ * （即 roles 数组中同时包含 admin 和 super_admin，两者权限一致）
  */
 function getAdminEqualInterfaces() {
-  return PERMISSION_MATRIX
-    .filter(item => {
-      const r = item.roles;
-      return r.includes('admin') && r.includes('super_admin') && !(
-        r.length === 1 || (r.length === 2 && r.includes('admin') && r.includes('super_admin'))
-      );
-    })
-    .filter(item => {
-      // 排除仅 super_admin 的接口
-      const r = item.roles;
-      return !(r.length === 1 && r[0] === 'super_admin');
-    });
+  return PERMISSION_MATRIX.filter(item => 
+    item.roles.includes('admin') && item.roles.includes('super_admin')
+  );
 }
 
 /**
@@ -538,9 +513,7 @@ function getSuperAdminOnlyInterfaces() {
   );
 }
 
-// ════════════════════════════════════════════════════════════
 // 八、导出
-// ════════════════════════════════════════════════════════════
 
 module.exports = {
   // 初始化

@@ -121,12 +121,12 @@ Page({
           eventName: res.data.event_name || '',
           eventStatus: res.data.event_status,
         })
-        // 非对战中状态提示
-        if (res.data.event_status !== 4) {
-          const map = { 0: '创建中', 1: '报名中', 2: '分组编队', 3: '分组锁定', 5: '名次归档' }
+        // 非分组锁定/非对战中状态提示
+        if (res.data.event_status !== 3 && res.data.event_status !== 4) {
+          const map = { 0: '创建中', 1: '报名中', 2: '分组编队', 5: '名次归档' }
           wx.showModal({
             title: '无法操作',
-            content: `赛事当前状态为「${map[res.data.event_status] || '未知'}」，仅对战中可编排对阵`,
+            content: `赛事当前状态为「${map[res.data.event_status] || '未知'}」，仅分组锁定后/对战中可编排对阵`,
             showCancel: false,
             success: () => wx.navigateBack(),
           })
@@ -295,7 +295,7 @@ Page({
   // 自动匹配（快捷按钮）
   // =====================================================
 
-  /** 自动匹配：按MMR从近到远两两配对 */
+  /** 自动匹配：按MMR从近到远两两配对（前端预览，最终由后端自动配对算法处理） */
   autoMatch() {
     const { teams } = this.data
     if (teams.length < 2) {

@@ -90,11 +90,24 @@ async function request(options) {
   })
 }
 
+/** 获取 wx.uploadFile 所需的认证 headers（含 JWT） */
+function getUploadHeaders() {
+  var headers = {}
+  var token = getToken()
+  if (token) {
+    headers['Authorization'] = 'Bearer ' + token
+  }
+  return headers
+}
+
 module.exports = {
   get: (url, data) => request({ url, method: 'GET', data }),
   post: (url, data) => request({ url, method: 'POST', data }),
   put: (url, data) => request({ url, method: 'PUT', data }),
   del: (url, data) => request({ url, method: 'DELETE', data }),
+  getUploadHeaders: getUploadHeaders,
+  getOpenId: getOpenId,
+  getToken: getToken,
   clearCache() {
     _openidCache = null;
     _openidFetched = false;

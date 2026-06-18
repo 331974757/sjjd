@@ -3,14 +3,14 @@
  * DOTA2 段位分值计算工具 - 独立模块
  * ============================================================
  *
- * 【用途】将选手段位信息（calibrate_rank_sort + calibrate_rank_star）
+ * 将选手段位信息（calibrate_rank_sort + calibrate_rank_star）
  *         转换为可用于分队均衡计算的等效 MMR 分数。
  *
- * 【使用方式】
+ * 使用方式
  *   const { getScore, RANK_CONFIG } = require('./utils/rank-score');
  *   const score = getScore(player);  // player 需含 calibrate_rank_sort, calibrate_rank_star, calibrate_mmr
  *
- * 【设计说明】
+ * 设计说明
  *   - 内置 2026 年 DOTA2 官方段位体系配置表，后续若版本数值调整，只需修改本文件
  *   - 分值计算优先级：实际 MMR > 0 直接用 → 否则按段位+星级公式推算等效分
  *   - 冠绝一世（rank_sort=8/80）无星级概念，默认取 6000 分
@@ -108,18 +108,16 @@ const RANK_CONFIG = Object.freeze({
   },
 });
 
-// ============================================================
 // 分数计算
-// ============================================================
 
 /**
  * 获取单个选手用于分队计算的分值
  *
- * 【优先级】
- *   1. calibrate_mmr > 0 → 直接使用（最精准，实战/天梯分）
+ * 优先级
+ *   1. calibrate_mmr > 0 → 直接使用
  *   2. calibrate_mmr 为空/等于0 → 按 rank_sort + rank_star 公式推算等效分
  *
- * 【公式】
+ * 公式
  *   先锋~超凡入圣（rank_sort 1-7）：
  *     equivalentMMR = RANK_CONFIG[rankSort].baseScore + (star - 1) × stepPerStar
  *
@@ -246,9 +244,7 @@ function getRankConfigTable() {
   }));
 }
 
-// ============================================================
 // 导出
-// ============================================================
 
 module.exports = {
   RANK_CONFIG,

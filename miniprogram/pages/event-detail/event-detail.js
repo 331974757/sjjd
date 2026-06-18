@@ -20,6 +20,46 @@ function formatPosition(p) {
   return pos + '号位'
 }
 
+/** 统一选手数据规范化：填充中文段位名 + 等效MMR + 位置文本 */
+function normalizePlayer(p) {
+  const rankName = R.normalizeRankName(p.calibrate_rank_name)
+  return {
+    ...p,
+    calibrate_rank_name: rankName,
+    _posText: formatPosition(p),
+    calibrate_mmr: R.calcEquivalentMmr(rankName, p.calibrate_rank_star, p.calibrate_mmr)
+  }
+}
+
+/** 统一自由选手规范化：填充ID */
+function normalizeFreeAgent(p) {
+  const np = normalizePlayer(p)
+  return { ...np, id: p.id || p.player_id || p._id || '' }
+}
+
+/** 统一队伍数据规范化：展开members、解析队长、计算统计 */
+function normalizeTeamItem(t, calcStatsFn, canEditNameFn) {
+  const rawMembers = (t.members || t.players || []).map(normalizePlayer)
+  const cid = t.captain_id || t.captainId || ''
+  let cname = t.captain_name || (t.captain ? t.captain.wx_nickname : '') || ''
+  if (!cname && cid && rawMembers.length > 0) {
+    const found = rawMembers.find(m => String(m.id || m.player_id || m._id) === String(cid))
+    cname = found ? (found.wx_nickname || found.nickName || '') : ''
+  }
+  const stats = calcStatsFn(rawMembers)
+  const teamObj = {
+    team_id: t.team_id || t.teamId || '',
+    team_name: t.team_name || t.teamName || '未命名',
+    captain_id: cid,
+    captain_name: cname,
+    members: rawMembers,
+    players: rawMembers,
+    ...stats
+  }
+  teamObj._canEditName = canEditNameFn(teamObj)
+  return teamObj
+}
+
 // 工具：数字补零
 const pad = n => String(n).padStart(2, '0')
 
@@ -42,7 +82,7 @@ Page({
       { key: 'overview', label: '赛事概览', unlockStatus: 0 },
       { key: 'signups', label: '报名管理', unlockStatus: 1 },
       { key: 'teams', label: '分组编组', unlockStatus: 2 },
-      { key: 'matches', label: '对阵对战', unlockStatus: 4 },
+      { key: 'matches', label: '对阵对战', unlockStatus: 3 },
       { key: 'ranks', label: '名次归档', unlockStatus: 5 }
     ],
     activeTab: 'overview',
@@ -109,6 +149,7 @@ Page({
     dragData: null,        // 拖拽数据
     showTeamCountModal: false,  // 自动分队-输入组数弹窗
     autoTeamCount: '',          // 用户输入的组数
+    autoTeamSuggestion: '',     // 建议组数
     selectedPlayerId: '',       // 当前选中的自由选手ID
     // 战队名编辑
     _editingTeamId: '',         // 正在编辑名称的队伍ID
@@ -126,7 +167,7 @@ Page({
     battlePairs: [],             // 本轮配对 [{teamA:{}, teamB:{}}]
     battleMatches: [],           // 本轮已生成的对战记录
     battleRoundHasMatches: false, // 本轮是否已有对战记录
-    battleRoundStatus: '',       // 本轮状态: 'draft'|'fighting'|'done'
+    battleRoundStatus: '',       // 本轮状态: 'select'|'pairing'|'fighting'|'done'
     // —— 操作状态 ——
     battleLoading: false,
     battlePairing: false,        // 正在配对中
@@ -157,6 +198,7 @@ Page({
     _archiveTimeText: '',
     _archiveByText: '',
     ranks: [],
+    ranksLoading: false,
     rankEditSlots: [],           // [{rankNum, teamId, teamName, captainName, members:[{id,nickName}]}]
     rankTeamCards: [],           // 上方队伍展示区 [{teamId, teamName, captainName, wins}]
     _rankUsedTeamMap: {},        // 预计算的已用队伍映射 { teamId: true }
@@ -381,8 +423,13 @@ Page({
     switch (tabKey) {
       case 'overview':
         // 赛事概览需要报名计数 + mySignup 判断"已报名"/"立即报名"状态
+        // 如果赛事已结束，同时预加载名次数据供概览统计
         this._updateActions()
-        await Promise.all([this.loadSignups(), this.loadMySignup()])
+        const overviewTasks = [this.loadSignups(), this.loadMySignup()]
+        if (this.data.event && this.data.event.event_status >= 5) {
+          overviewTasks.push(this.loadRanks())
+        }
+        await Promise.all(overviewTasks)
         break
       case 'signups':
         await Promise.all([this.loadSignups(), this.loadMySignup()])
@@ -394,7 +441,9 @@ Page({
         await this.loadBattleData()
         break
       case 'ranks':
+        this.setData({ ranksLoading: true })
         await Promise.all([this.loadRanks(), this.loadRankTeamCards()])
+        this.setData({ ranksLoading: false })
         break
     }
   },
@@ -949,7 +998,10 @@ Page({
     if (this._searchTimer) clearTimeout(this._searchTimer)
     this._searchTimer = setTimeout(() => this._doSearch(), 300)
   },
-  clearSearch() { this.setData({ searchKeyword: '', searchResults: [] }) },
+  clearSearch() {
+    if (this._searchTimer) { clearTimeout(this._searchTimer); this._searchTimer = null }
+    this.setData({ searchKeyword: '', searchResults: [] })
+  },
 
   async _doSearch() {
     const kw = this.data.searchKeyword.trim()
@@ -1054,42 +1106,12 @@ Page({
       this.setData({ teamsLoading: false })
       if (res.success) {
         let teams = (res.data && res.data.teams) ? res.data.teams : []
-        let freeAgents = (res.data && res.data.free_agents) ? res.data.free_agents
-          : ((res.data && res.data.freePlayers) ? res.data.freePlayers : [])
+        let freeAgents = (res.data && res.data.freePlayers) ? res.data.freePlayers : []
 
-        // 兼容后端返回 members 和 players 两种字段名
-        // 前台展示：有实际MMR用实际，否则按段位+星级推算等效分
-        // 标准化所有选手的段位名为中文，并填充等效MMR
-        const normPlayer = m => ({ ...m, calibrate_rank_name: R.normalizeRankName(m.calibrate_rank_name), _posText: formatPosition(m), calibrate_mmr: R.calcEquivalentMmr(R.normalizeRankName(m.calibrate_rank_name), m.calibrate_rank_star, m.calibrate_mmr) })
-        teams = teams.map(t => {
-          const rawMembers = (t.members || t.players || []).map(normPlayer)
-          const cid = t.captain_id || t.captainId || ''
-          // 队长昵称：优先 captain_name → captain.wx_nickname → 从队员列表匹配 → 空
-          let cname = t.captain_name || (t.captain ? t.captain.wx_nickname : '') || ''
-          if (!cname && cid && rawMembers.length > 0) {
-            const found = rawMembers.find(m => String(m.id || m.player_id || m._id) === String(cid))
-            cname = found ? (found.wx_nickname || found.nickName || '') : ''
-          }
-          const stats = this._calcTeamStats(rawMembers)
-          // 判断当前用户是否可编辑此战队名
-          const teamObj = {
-            team_id: t.team_id || t.teamId || '',
-            team_name: t.team_name || t.teamName || '未命名',
-            captain_id: cid,
-            captain_name: cname,
-            members: rawMembers,
-            players: rawMembers,
-            ...stats
-          }
-          teamObj._canEditName = this._canEditTeamName(teamObj)
-          return teamObj
-        })
+        teams = teams.map(t => normalizeTeamItem(t, this._calcTeamStats, this._canEditTeamName.bind(this)))
 
         // 自由选手：保留完整字段，确保 id 存在，并标准化段位名
-        freeAgents = freeAgents.map(normPlayer).map(p => ({
-          ...p,
-          id: p.id || p.player_id || p._id || ''
-        })).filter(p => p.id)
+        freeAgents = freeAgents.map(normalizeFreeAgent).filter(p => p.id)
 
         this.setData({ teams: this._normalizeTeams(teams), freeAgents, selectedPlayerId: '', teamsDirty: false })
       }
@@ -1376,8 +1398,8 @@ Page({
     // 前端校验
     for (const team of this.data.teams) {
       const members = team.members || team.players || []
-      if (members.length === 0) {
-        wx.showToast({ title: '「' + team.team_name + '」没有队员', icon: 'none' }); return
+      if (members.length < 5) {
+        wx.showToast({ title: '「' + team.team_name + '」至少需要5名队员，当前仅' + members.length + '人', icon: 'none' }); return
       }
       if (!team.captain_id) {
         wx.showToast({ title: '「' + team.team_name + '」未指定队长', icon: 'none' }); return
@@ -1450,35 +1472,17 @@ Page({
       this.setData({ allocating: false })
       if (res.success) {
         let teams = (res.data && res.data.teams) ? res.data.teams : []
-        let freeAgents = (res.data && res.data.free_agents) ? res.data.free_agents : []
+        let freeAgents = (res.data && res.data.freePlayers) ? res.data.freePlayers : []
 
-        // 规范化队伍数据，匹配 Tab3 渲染格式
-        const normM = m => ({ ...m, calibrate_rank_name: R.normalizeRankName(m.calibrate_rank_name), _posText: formatPosition(m), calibrate_mmr: R.calcEquivalentMmr(R.normalizeRankName(m.calibrate_rank_name), m.calibrate_rank_star, m.calibrate_mmr) })
-        teams = teams.map((t, i) => {
-          const members = (t.players || t.members || []).map(normM)
-          const cid = t.captainId || t.captain_id || ''
-          let cname = t.captainName || t.captain_name || (t.captain ? (t.captain.wx_nickname || '') : '') || ''
-          if (!cname && cid && members.length > 0) {
-            const found = members.find(m => String(m.id || m.player_id || m._id) === String(cid))
-            cname = found ? (found.wx_nickname || found.nickName || '') : ''
-          }
-          const stats = this._calcTeamStats(members)
-          return {
-            team_id: 'alloc_' + (i + 1) + '_' + Date.now(),
-            team_name: t.teamName || t.team_name || ('战队' + (i + 1)),
-            captain_id: cid,
-            captain_name: cname,
-            members,
-            players: members,
-            isNew: true,
-            ...stats
-          }
-        })
+        // 规范化队伍数据，使用统一 helper + 分配临时ID
+        teams = teams.map((t, i) => ({
+          ...normalizeTeamItem(t, this._calcTeamStats, this._canEditTeamName.bind(this)),
+          team_id: 'alloc_' + (i + 1) + '_' + Date.now(),
+          team_name: t.teamName || t.team_name || ('战队' + (i + 1)),
+          isNew: true
+        }))
         // 规范化自由选手
-        freeAgents = freeAgents.map(normM).map(p => ({
-          ...p,
-          id: p.id || p.player_id || p._id || ''
-        })).filter(p => p.id)
+        freeAgents = freeAgents.map(normalizeFreeAgent).filter(p => p.id)
 
         this.setData({ teams: this._normalizeTeams(teams), freeAgents, selectedPlayerId: '', teamsDirty: true })
         wx.showToast({ title: '自动分队完成（共' + count + '组）', icon: 'success' })
@@ -1535,7 +1539,8 @@ Page({
 
   // ================================================================
   //  Tab4: 对阵对战（积分榜模式）
-  //  模式: select(选队配对) → pairing(调整分组) → fighting(判定胜负) → done
+  //  模式: select(选队配对) → pairing(调整分组+生成确认) → fighting(判定胜负) → done
+
   // ================================================================
 
   // 兜底：如果后端未返回 avgMmr，用 totalMmr / memberCount 前端计算
@@ -1576,7 +1581,7 @@ Page({
       const nextRn = rn > 0 ? rn : 1
       this.setData({
         battleRounds: rounds, battleRound: rn, battleRoundNum: nextRn, battleAllDone: allDone,
-        battleRoundHasMatches: false, battleRoundStatus: '',
+        battleRoundHasMatches: false, battleRoundStatus: 'select',
         battleMatches: [], battlePairs: [], battleSelectedIds: [],
         battleLoading: false
       })
@@ -1793,7 +1798,7 @@ Page({
       return
     }
 
-    const newTeam = battleScoreboard.find(t => t.teamId == newTeamId)
+    const newTeam = battleScoreboard.find(t => String(t.teamId) === String(newTeamId))
     if (!newTeam) {
       this.setData({ showSwapModal: false })
       wx.showToast({ title: '队伍不存在', icon: 'none' })
@@ -2256,12 +2261,9 @@ Page({
 
   async startEditRanks() {
     if (!this.data.isAdmin) return
-    // 加载队伍详情
-    await this.loadTeamsForRank()
-    // 加载队伍卡片
-    await this.loadRankTeamCards()
-    // 加载已有名次
-    await this.loadRanks()
+    this.setData({ ranksLoading: true })
+    // 并行加载队伍详情+队伍卡片+已有名次
+    await Promise.all([this.loadTeamsForRank(), this.loadRankTeamCards(), this.loadRanks()])
 
     const existingRanks = this.data.ranks || []
     const baseCount = existingRanks.length > 0 ? existingRanks.length : 3
@@ -2295,7 +2297,7 @@ Page({
 
     const usedMap = {}
     slots.forEach(s => { if (s.teamId) usedMap[s.teamId] = true })
-    this.setData({ ranksEditing: true, rankEditSlots: slots, _rankUsedTeamMap: usedMap, rankSelectedTeamId: '' })
+    this.setData({ ranksEditing: true, ranksLoading: false, rankEditSlots: slots, _rankUsedTeamMap: usedMap, rankSelectedTeamId: '' })
   },
 
   cancelEditRanks() {
@@ -2390,6 +2392,7 @@ Page({
 
   addMoreRankSlots() {
     const slots = [...this.data.rankEditSlots]
+    if (slots.length >= 20) { wx.showToast({ title: '最多设置20个名次', icon: 'none' }); return }
     const next = slots.length + 1
     slots.push({ rankNum: next, teamId: '', teamName: '', captainName: '', label: '第' + next + '名', members: [] })
     this.setData({ rankEditSlots: slots })

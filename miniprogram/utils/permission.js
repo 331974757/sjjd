@@ -91,11 +91,13 @@ function getRole() {
         }
         _rolePromise = null
         resolve(role)
-      }).catch(() => {
+      }).catch((err) => {
+        console.error('[perm] getRole API 失败:', err && err.message)
         _rolePromise = null
         resolve('user')
       })
     } catch (e) {
+      console.error('[perm] getRole 异常:', e && e.message)
       _rolePromise = null
       resolve('user')
     }
@@ -122,6 +124,16 @@ function setCache(role) {
   _saveRoleToStorage(role)
 }
 
+// 【权限变更后调用】强制清除所有层级的角色缓存，下次查询将重新调API获取最新角色
+function clearCache() {
+  roleCache = null
+  _rolePromise = null
+  try {
+    wx.removeStorageSync(STORAGE_ROLE_KEY)
+    wx.removeStorageSync(STORAGE_ROLE_TIME_KEY)
+  } catch (e) {}
+}
+
 // ============================================================
 // 【第9轮新增】赛事状态常量和操作权限映射
 // ============================================================
@@ -135,7 +147,7 @@ const EVENT_STATUS = {
   SIGNUP_CLOSED: 2,   // 分组编队
   TEAMS_LOCKED: 3,    // 分组锁定
   BATTLE_ACTIVE: 4,   // 对战中
-  FINISHED: 5,        // 已归档(event_status)
+  FINISHED: 5,        // 名次归档(event_status层面，比赛结束可设名次；is_archived=1才是正式归档)
 };
 
 /**
@@ -255,8 +267,8 @@ function checkAction(action, options) {
     // ─── 管理员：对战管理 ───
     case 'manage_matches':
       if (!isAdmin) return { allowed: false, disabled: true, reason: '仅管理员可操作' };
-      // 队伍锁定后(status=3)即可选队/配对/生成对战；开赛后(status=4)正式对战
-      if (status !== EVENT_STATUS.TEAMS_LOCKED && status !== EVENT_STATUS.BATTLE_ACTIVE) {
+      // 仅对战中(status=4)可操作对战（生成对战/判定胜负/下一轮/结束比赛）
+      if (status !== EVENT_STATUS.BATTLE_ACTIVE) {
         return { allowed: false, disabled: true, reason: `「${STATUS_NAMES[status] || '未知'}」阶段不可操作对战` };
       }
       return { allowed: true, disabled: false, reason: '' };
@@ -354,6 +366,7 @@ module.exports = {
   getNickName: getNickName,
   saveNickName: saveNickName,
   setCache: setCache,
+  clearCache: clearCache,
   // 【第9轮新增】
   EVENT_STATUS,
   STATUS_NAMES,

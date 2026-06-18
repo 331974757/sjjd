@@ -7,15 +7,16 @@
 const { Client } = require('ssh2');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 // ======== 服务器配置 ========
 const SERVER = {
   host: process.env.SERVER_HOST || 'localhost',
   port: 22,
   username: process.env.SERVER_USER || 'root',
-  // 优先使用 SSH 密钥，没有则用环境变量密码
-  privateKey: fs.existsSync(process.env.HOME + '/.ssh/id_rsa') 
-    ? fs.readFileSync(process.env.HOME + '/.ssh/id_rsa') 
+  // 优先使用 SSH 密钥，没有则用环境变量密码（跨平台兼容）
+  privateKey: fs.existsSync(path.join(os.homedir(), '.ssh', 'id_rsa'))
+    ? fs.readFileSync(path.join(os.homedir(), '.ssh', 'id_rsa'))
     : undefined,
   password: process.env.SERVER_PASSWORD || undefined
 };

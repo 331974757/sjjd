@@ -71,6 +71,12 @@
   font-size: 28rpx;
 }
 
+.optional {
+  color: #8b949e;
+  font-size: 24rpx;
+  font-weight: 400;
+}
+
 .form-input {
   width: 100%;
   height: 88rpx;

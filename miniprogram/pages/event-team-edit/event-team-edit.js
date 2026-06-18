@@ -58,8 +58,9 @@ Page({
 
   onShow() {
     // 每次进入刷新数据（编辑后返回可看到更新）
+    // loading=true 可能是初次加载未完成，跳过刷新避免重复请求
     if (this.data.eventId && !this.data.loading) {
-      // 【BUG-P5修复】同步刷新赛事状态，确保 canEdit 不滞后
+      // 【P5修复】同步刷新赛事状态，确保 canEdit 不滞后
       this.loadEventStatus()
       this.loadTeamData()
     }
@@ -96,6 +97,8 @@ Page({
     } catch (e) {
       console.error('[队伍编组] 初始化失败', e)
       wx.showToast({ title: '加载失败', icon: 'none' })
+      // 不阻塞后续 onShow 刷新
+      this.setData({ loading: false })
     }
   },
 
@@ -134,8 +137,20 @@ Page({
       const res = await api.get(`/events/${this.data.eventId}/teams`)
       if (res.success) {
         const { teams, freePlayers, eventStatus } = res.data
+
+        // 【修复】规范化队伍数据：API返回snake_case(team_id/team_name/total_mmr)，前端统一使用camelCase
+        const normalizedTeams = (teams || []).map(t => ({
+          teamId: t.team_id || t.teamId || '',
+          teamName: t.team_name || t.teamName || '未命名',
+          captain_id: t.captain_id || t.captainId || '',
+          captain: t.captain || null,
+          players: t.players || [],
+          playerIds: (t.players || []).map(p => p.id),
+          totalMmr: t.total_mmr || t.totalMmr || 0,
+        }))
+
         this.setData({
-          teams: teams || [],
+          teams: normalizedTeams,
           freePlayers: freePlayers || [],
           eventStatus: eventStatus || this.data.eventStatus,
           selectedPlayerId: '', // 清空选中
@@ -144,7 +159,7 @@ Page({
 
         // 首次加载时保存快照
         if (this.data.originalTeams.length === 0) {
-          this.setData({ originalTeams: JSON.parse(JSON.stringify(teams || [])) })
+          this.setData({ originalTeams: JSON.parse(JSON.stringify(normalizedTeams)) })
         }
       } else {
         this.setData({ loading: false })
@@ -257,7 +272,8 @@ Page({
 
     this.setData({ teams })
 
-    const isRemoving = teams.find(t => t.teamId === teamId)?.captain?.id === playerId
+    // 【修复】取消队长后 captain 为 null，所以 captain?.id !== playerId 才是移除操作
+    const isRemoving = teams.find(t => t.teamId === teamId)?.captain?.id !== playerId
     wx.showToast({
       title: isRemoving ? '已取消队长' : '已设为队长',
       icon: 'success',
@@ -491,18 +507,18 @@ Page({
    * POST /api/events/:eventId/teams/batch
    */
   async saveTeams() {
-    // 【前端校验】每队必须有队长且队长在队员列表中
+    // 【前端校验】每队至少5人 + 必须有队长且队长在队员列表中
     for (const team of this.data.teams) {
+      if (team.players.length < 5) {
+        wx.showToast({ title: `「${team.teamName}」至少需要5名队员，当前仅${team.players.length}人`, icon: 'none' })
+        return
+      }
       if (!team.captain || !team.captain_id) {
         wx.showToast({ title: `「${team.teamName}」未指定队长`, icon: 'none' })
         return
       }
       if (!team.players.some(p => p.id === team.captain_id)) {
         wx.showToast({ title: `「${team.teamName}」队长不在队员中`, icon: 'none' })
-        return
-      }
-      if (team.players.length === 0) {
-        wx.showToast({ title: `「${team.teamName}」没有队员`, icon: 'none' })
         return
       }
     }

@@ -7,12 +7,13 @@ const COLUMN_MAP = [
   { name: 'Dota2游戏昵称', field: 'gameId', required: true, hint: '' },
   { name: '核准段位', field: 'calibrateRankName', required: false, hint: '' },
   { name: '核准星数', field: 'calibrateRankStar', required: false, hint: '填写数字' },
+  { name: '实际天梯分', field: 'calibrateMmr', required: false, hint: '填写整数' },
   { name: '擅长游戏位置', field: 'goodAtPositions', required: false, hint: '填1~5数字，逗号分隔' },
   { name: '比赛报名位置', field: 'signupPosition', required: false, hint: '填1~5数字，逗号分隔' }
 ]
 
-const TEMPLATE_HEADER = '微信群昵称\tSteam ID\tDota2游戏昵称\t核准段位\t核准星数\t擅长游戏位置\t比赛报名位置'
-const TEMPLATE_ROW = '示例选手\t123456789\tDota2示例昵称\t统帅\t3\t1,2,3\t1'
+const TEMPLATE_HEADER = '微信群昵称\tSteam ID\tDota2游戏昵称\t核准段位\t核准星数\t实际天梯分\t擅长游戏位置\t比赛报名位置'
+const TEMPLATE_ROW = '示例选手\t123456789\tDota2示例昵称\t统帅\t3\t3500\t1,2,3\t1'
 
 Page({
   async onLoad() {
@@ -231,6 +232,7 @@ Page({
         gameId: row.gameId,
         calibrateRankName: row.calibrateRankName,
         calibrateRankStar: row.calibrateRankStar,
+        calibrateMmr: row.calibrateMmr,
         goodAtPositions: row.goodAtPositions,
         signupPosition: row.signupPosition
       }
@@ -281,6 +283,7 @@ Page({
       url: uploadUrl,
       filePath: this.data.filePath,
       name: 'file',
+      header: api.getUploadHeaders(),
       success: (uploadRes) => {
         wx.hideLoading()
         try {
@@ -315,7 +318,8 @@ Page({
   // 通知首页下次 onShow 时刷新数据
   _notifyHomeRefresh() {
     const pages = getCurrentPages()
-    const homePage = pages[pages.length - 2]
+    // 【修复】使用 find 查找首页，避免硬编码索引
+    const homePage = pages.find(p => p.route && p.route.indexOf('pages/dota2/dota2') !== -1)
     if (homePage && homePage.loadAllPlayers) {
       homePage._needsReload = true
     }
@@ -335,6 +339,15 @@ const validateAndFormat = (row, rowNum) => {
   const signupPos = parsePositions(row.signupPosition)
   const signupText = signupPos.length > 0 ? signupPos.join(',') : ''
 
+  // 天梯分校验：可选字段，有值时需为合法整数
+  let mmr = null
+  if (row.calibrateMmr !== undefined && row.calibrateMmr !== '') {
+    const parsedMmr = parseInt(row.calibrateMmr)
+    if (!isNaN(parsedMmr) && parsedMmr >= 0 && parsedMmr <= 20000) {
+      mmr = parsedMmr
+    }
+  }
+
   return {
     data: {
       wxNickname: wxNickname,
@@ -342,6 +355,7 @@ const validateAndFormat = (row, rowNum) => {
       gameId: gameId,
       calibrateRankName: String(row.calibrateRankName || '').trim(),
       calibrateRankStar: Number(row.calibrateRankStar) || 0,
+      calibrateMmr: mmr,
       goodAtPositions: positions,
       signupPosition: signupPos,
       positionsText: positionsText,

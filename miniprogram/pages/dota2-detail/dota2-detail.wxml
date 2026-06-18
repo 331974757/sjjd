@@ -2,7 +2,7 @@
 <view class="detail-page">
   <!-- 头像区 -->
   <view class="avatar-section" wx:if="{{player}}">
-    <image class="detail-avatar" src="{{player.avatarUrl || '/assets/default-avatar.png'}}" mode="aspectFill" bindtap="changeAvatar" />
+    <image class="detail-avatar" src="{{player.avatarUrl || ''}}" mode="aspectFill" bindtap="changeAvatar" />
     <text class="avatar-tip" wx:if="{{canEditAll || canEditOwn}}">点击更换头像</text>
   </view>
 
@@ -47,6 +47,17 @@
         <text class="field-val rank-gold">{{player.calibrateRankLabel || player.calibrateRankName || '核准中'}}{{!player.calibrateRankLabel && player.calibrateRankStar > 0 ? ' ' + player.calibrateRankStar + '★' : ''}}</text>
       </view>
       <view class="field-edit" wx:if="{{canEditAll}}" bindtap="editRankTitle">
+        <text class="edit-icon">✎</text>
+      </view>
+    </view>
+
+    <!-- 实际天梯分 -->
+    <view class="field-row">
+      <view class="field-info">
+        <text class="field-label">实际天梯分</text>
+        <text class="field-val dim">{{player.calibrateMmr || '未设置'}}</text>
+      </view>
+      <view class="field-edit" wx:if="{{canEditAll}}" bindtap="editField" data-field="calibrateMmr">
         <text class="edit-icon">✎</text>
       </view>
     </view>

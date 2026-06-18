@@ -3,21 +3,25 @@
  * DOTA2 段位分值均衡分队算法 - 独立工具函数
  * ============================================================
  *
- * 【依赖】server/utils/rank-score.js（段位分值计算）
+ * 依赖 server/utils/rank-score.js（段位分值计算）
  *
- * 【使用方式】
+ * 使用方式
  *   const { allocateTeams } = require('./utils/team-allocation');
  *   const result = allocateTeams(playerList, teamCount, forceRules, config);
  *
- * 【设计思路】
+ * 设计思路（2026-06-18 重构：优先全局战力均衡）
  *   1. 分值预处理：调用 rank-score.getScore() 为每位选手计算最终分值
  *      （优先 calibrate_mmr > 0，否则按 rank_sort + rank_star 推算等效分）
  *   2. 强制规则：mustSameTeam → 打包虚拟选手；mustNotSameTeam → 冲突表
- *   3. 轮选分配：按分值降序 → 轮选分配 → 禁同队跳过冲突队伍
- *   4. 位置补全：每队必须1-5号位齐全，缺失时跨队交换（MMR差值≤阈值）
- *   5. 输出：队伍结果 + 均衡度统计 + 警告
+ *      强制规则优先级最高，高于战力均衡与位置分配
+ *   3. 轮选分配：按分值降序 → 轮选分配 → 禁同队跳过冲突队伍（蛇形分配）
+ *   4. 全局均衡优化：以队伍平均分最小差值为目标，迭代贪心交换
+ *      优先保证各队人均分数趋于一致（首要目标）
+ *   5. 位置补全：在战力均衡前提下微调补齐1-5号位；
+ *      若破坏均衡则保留现状，不强行打乱
+ *   6. 输出：队伍结果 + 均衡度统计 + 警告
  *
- * 【数据契约】入参 playerList 字段对应 dota2_players 表：
+ * 入参 playerList 字段对应 dota2_players 表：
  *   id, calibrate_mmr, calibrate_rank_sort, calibrate_rank_star,
  *   calibrate_rank_name, good_at_positions, wx_nickname
  * ============================================================
@@ -33,11 +37,17 @@ const ALL_POSITIONS = [1, 2, 3, 4, 5];
 /** 默认每队核心人数（不含替补，替补不占用强制位置名额） */
 const CORE_SIZE = 5;
 
-/** 位置补全换人时单次分值差值容忍上限（默认500分） */
-const DEFAULT_SWAP_TOLERANCE = 500;
+/** 位置补全换人时单次分值差值容忍上限 */
+const DEFAULT_SWAP_TOLERANCE = 200;
 
 /** 位置补全最大尝试轮数 */
-const MAX_SWAP_ROUNDS = 3;
+const MAX_SWAP_ROUNDS = 2;
+
+/** 全局均衡优化最大迭代次数 */
+const BALANCE_MAX_ITERATIONS = 100;
+
+/** 位置补全时队伍平均分最大涨幅比例 */
+const POSITION_SWAP_AVG_INCREASE_RATIO = 0.08; // 8%
 
 
 // ---------- 辅助函数 ----------
@@ -69,10 +79,14 @@ function stdDev(values) {
   return Math.sqrt(variance);
 }
 
+/** 计算队伍平均分 */
+function getTeamAvgScore(team) {
+  if (team.members.length === 0) return 0;
+  return Math.round(team.members.reduce((sum, p) => sum + p._score, 0) / team.members.length);
+}
 
-// ============================================================
+
 // 核心算法入口
-// ============================================================
 
 /**
  * 段位分值均衡分队主函数
@@ -148,7 +162,11 @@ function allocateTeams(playerList, teamCount, forceRules = {}, config = {}) {
   // === 第3步：轮选分配 ===
   let teams = snakeDraft(players, teamCount, forceGroups, antigroups, warnings);
 
-  // === 第4步：位置补全微调（如果启用了位置强制校验） ===
+  // === 第4步：全局均衡优化（首要目标：队伍平均分尽可能接近） ===
+  const balanceResult = balanceOptimize(teams, antigroups, warnings);
+  teams = balanceResult.teams;
+
+  // === 第5步：位置补全微调（以不破坏均衡为前提） ===
   let swapCount = 0;
   if (cfg.positionRequired) {
     const swapResult = positionSwap(teams, warnings, cfg.swapTolerance);
@@ -156,12 +174,13 @@ function allocateTeams(playerList, teamCount, forceRules = {}, config = {}) {
     swapCount = swapResult.swapCount;
   }
 
-  // === 第5步：生成最终输出 ===
+  // === 第6步：生成最终输出 ===
   const finalTeams = buildTeamOutput(teams, players);
   const balanceInfo = computeBalance(finalTeams, {
     swapCount,
     scoreSourceCount,
     positionRequired: cfg.positionRequired,
+    balanceIterations: balanceResult.iterations,   // 均衡优化迭代次数
   });
 
   return {
@@ -172,9 +191,7 @@ function allocateTeams(playerList, teamCount, forceRules = {}, config = {}) {
 }
 
 
-// ============================================================
 // 第2步：构建强制约束
-// ============================================================
 
 /**
  * 将 mustSameTeam / mustNotSameTeam 预处理为内部使用的分组结构
@@ -238,14 +255,12 @@ function buildForceConstraints(players, forceRules, playerMap, warnings) {
 }
 
 
-// ============================================================
 // 第3步：轮选分配（Serpentine Draft，均衡分队核心）
-// ============================================================
 
 /**
  * 轮选分配算法
  *
- * 【原理】
+ * 原理
  *   所有选手/虚拟组按分值降序排列后，按轮选方向逐一分配：
  *     第1轮：队1 → 队2 → ... → 队N（正序）
  *     第2轮：队N → 队N-1 → ... → 队1（逆序）
@@ -253,7 +268,7 @@ function buildForceConstraints(players, forceRules, playerMap, warnings) {
  *   优点：高分选手分散到不同队伍，低分选手补充到有高分的队伍，
  *         保证各队总分尽可能接近。
  *
- * 【强制规则集成】
+ * 强制规则集成
  *   - mustSameTeam 组：打包为"虚拟单元"，取组内平均分参与排序
  *   - mustNotSameTeam：分配当前单元时，跳过冲突队伍
  *   - 极端情况所有队都冲突：硬塞到总分最低的队伍
@@ -387,22 +402,131 @@ function getTeamScore(team) {
 }
 
 
-// ============================================================
-// 第4步：位置补全微调（Position Swap）
-// ============================================================
+// 第4步：全局均衡优化（Balance Optimize）
+
+/**
+ * 以队伍平均分最小差值为目标，迭代贪心交换优化全局战力均衡
+ *
+ * 原理
+ *   蛇形分配后队伍总分已大致均衡，但个体分值差异可能导致平均分仍有偏差。
+ *   本阶段遍历所有队伍对，尝试找到一对选手交换，使队伍平均分标准差（stdDev）最小化。
+ *   采用贪心爬山法：每轮找到全局最佳交换对，执行后重新评估，直到收敛。
+ *
+ * 约束
+ *   - 遵守 mustNotSameTeam 禁同队规则（不把冲突选手换入对方队伍）
+ *   - 不拆散 mustSameTeam 组（同队选手已在同一队伍，交换不影响）
+ *   - 最多迭代 BALANCE_MAX_ITERATIONS 次，防止死循环
+ *
+ * @param {Object[]} teams      - 蛇形分配后的队伍列表
+ * @param {Set}      antigroups - 禁同队集合
+ * @param {string[]} warnings   - 警告输出
+ * @returns {{ teams, iterations }}
+ */
+function balanceOptimize(teams, antigroups, warnings) {
+  let iterations = 0;
+  let improved = true;
+
+  while (improved && iterations < BALANCE_MAX_ITERATIONS) {
+    improved = false;
+    iterations++;
+
+    // 计算当前各队平均分及标准差
+    const currentAvgs = teams.map(t => getTeamAvgScore(t));
+    let currentStdDev = stdDev(currentAvgs);
+
+    // 遍历所有队伍对 (i, j)
+    for (let i = 0; i < teams.length - 1; i++) {
+      for (let j = i + 1; j < teams.length; j++) {
+        if (teams[i].members.length === 0 || teams[j].members.length === 0) continue;
+
+        let bestSwap = null;
+        let bestStdDev = currentStdDev;
+
+        // 尝试队伍i与队伍j的所有选手对
+        for (let ai = 0; ai < teams[i].members.length; ai++) {
+          const pa = teams[i].members[ai];
+
+          for (let bj = 0; bj < teams[j].members.length; bj++) {
+            const pb = teams[j].members[bj];
+
+            // 跳过同分交换（无意义）
+            if (pa._score === pb._score) continue;
+
+            // 检查禁同队：pa换入队伍j是否冲突
+            let hasConflict = false;
+            for (const m of teams[j].members) {
+              if (m.id === pb.id) continue;
+              if (antigroups.has(`${pa.id}|${m.id}`)) { hasConflict = true; break; }
+            }
+            if (hasConflict) continue;
+
+            // 检查禁同队：pb换入队伍i是否冲突
+            for (const m of teams[i].members) {
+              if (m.id === pa.id) continue;
+              if (antigroups.has(`${pb.id}|${m.id}`)) { hasConflict = true; break; }
+            }
+            if (hasConflict) continue;
+
+            // 模拟交换：计算新平均分
+            const newScoreA = getTeamScore(teams[i]) - pa._score + pb._score;
+            const newScoreB = getTeamScore(teams[j]) - pb._score + pa._score;
+            const newAvgA = Math.round(newScoreA / teams[i].members.length);
+            const newAvgB = Math.round(newScoreB / teams[j].members.length);
+
+            // 构建新的平均分数组并计算标准差
+            const newAvgs = [...currentAvgs];
+            newAvgs[i] = newAvgA;
+            newAvgs[j] = newAvgB;
+            const newStdDev = stdDev(newAvgs);
+
+            // 找到使标准差更小的交换
+            if (newStdDev < bestStdDev - 0.001) {
+              bestStdDev = newStdDev;
+              bestSwap = { i, j, ai, bj, newAvgs };
+            }
+          }
+        }
+
+        // 执行最佳交换（仅在stdDev确实减小时）
+        if (bestSwap && bestSwap.newAvgs) {
+          const newBestStdDev = stdDev(bestSwap.newAvgs);
+          if (newBestStdDev < currentStdDev - 0.001) {
+            const temp = teams[i].members[bestSwap.ai];
+            teams[i].members[bestSwap.ai] = teams[j].members[bestSwap.bj];
+            teams[j].members[bestSwap.bj] = temp;
+
+            // 更新当前标准差，继续下一对检查
+            currentStdDev = newBestStdDev;
+            // 同步更新 currentAvgs 供后续队伍对使用
+            currentAvgs[i] = bestSwap.newAvgs[i];
+            currentAvgs[j] = bestSwap.newAvgs[j];
+            improved = true;
+          }
+        }
+      }
+    }
+  }
+
+  return { teams, iterations };
+}
+
+
+// 第5步：位置补全微调（Position Swap，平衡保护版）
 
 /**
  * 跨队交换选手，补全每队缺失的 Dota2 标准位置
  *
- * 【策略】
+ * 策略（2026-06-18 修改：平衡优先）
  *   遍历每支队伍 → 检测缺失的 1-5 号位 →
  *   从其他队伍找一个能补位、且换出后不会造成对方缺位的选手 →
- *   在 MMR 差值最小时执行交换
+ *   在 MMR 差值最小 + 不破坏全局均衡 时执行交换
  *
- * 【约束】
+ * 约束
  *   - 不拆散 mustSameTeam 组
- *   - 单次交换分值差 ≤ swapTolerance
- *   - 最多尝试 MAX_SWAP_ROUNDS 轮，达到稳定状态即退出
+ *   - 单次交换分值差 ≤ swapTolerance（默认200，更严格）
+ *   - 交换后队伍平均分标准差增幅 ≤ POSITION_SWAP_AVG_INCREASE_RATIO（8%）
+ *   - 最多尝试 MAX_SWAP_ROUNDS 轮（默认2轮），达到稳定状态即退出
+ *   - 若因选手位置重叠无法完美补齐所有位置，保留现状不强行打乱
  *
  * @returns {{ teams, swapCount }}
  */
@@ -460,17 +584,25 @@ function getMissingPositions(members) {
 /**
  * 为 needTeam 的缺失位置 needPos，找全局最优交换方案
  *
- * 【找法】
+ * 找法
  *   遍历 needTeam 每个成员作为 toPlayer（被换出者）
  *     → 遍历其他队每个成员作为 fromPlayer（换入者，必须擅长 needPos）
  *       → 检查 fromPlayer 被换走后，原队伍位置覆盖不恶化
  *       → MMR 差值越小越好，且必须 ≤ swapTolerance
+ *       → 模拟交换后的平均分，检查是否破坏全局均衡
  *
  * @returns {{ fromTeam, fromPlayer, toPlayer } | null}
  */
 function findBestSwap(needTeam, needPos, allTeams, needTeamMissing, swapTolerance) {
   let best = null;
   let bestScoreDiff = Infinity;
+
+  // 记录交换前全局均衡指标，用于交换后对比
+  const preSwapAvgs = allTeams.map(t => getTeamAvgScore(t));
+  const preSwapStdDev = stdDev(preSwapAvgs);
+  const preSwapMaxDiff = preSwapAvgs.length > 1
+    ? Math.max(...preSwapAvgs) - Math.min(...preSwapAvgs)
+    : 0;
 
   for (const toPlayer of needTeam.members) {
     // toPlayer 覆盖了 needTeam 其他缺失位置 → 跳过（避免拆东墙补西墙）
@@ -496,10 +628,39 @@ function findBestSwap(needTeam, needPos, allTeams, needTeamMissing, swapToleranc
 
         // 分值差值计算
         const scoreDiff = Math.abs(fromPlayer._score - toPlayer._score);
-        if (scoreDiff < bestScoreDiff && scoreDiff <= swapTolerance) {
-          bestScoreDiff = scoreDiff;
-          best = { fromTeam, fromPlayer, toPlayer };
+        if (scoreDiff >= bestScoreDiff || scoreDiff > swapTolerance) continue;
+
+        // 均衡守卫：模拟交换后检查队伍平均分是否破坏均衡
+        const needTeamIdx = allTeams.findIndex(t => t.index === needTeam.index);
+        const fromTeamIdx = allTeams.findIndex(t => t.index === fromTeam.index);
+
+        // 计算交换后的新平均分
+        const newNeedAvg = Math.round(
+          (getTeamScore(needTeam) - toPlayer._score + fromPlayer._score) / needTeam.members.length
+        );
+        const newFromAvg = Math.round(
+          (getTeamScore(fromTeam) - fromPlayer._score + toPlayer._score) / fromTeam.members.length
+        );
+
+        const newAvgs = [...preSwapAvgs];
+        newAvgs[needTeamIdx] = newNeedAvg;
+        newAvgs[fromTeamIdx] = newFromAvg;
+
+        const newStdDev = stdDev(newAvgs);
+        const newMaxDiff = Math.max(...newAvgs) - Math.min(...newAvgs);
+
+        // 均衡检查：标准差或最大差值增幅超过阈值则拒绝
+        if (preSwapStdDev > 0) {
+          const stdDevIncrease = (newStdDev - preSwapStdDev) / preSwapStdDev;
+          if (stdDevIncrease > POSITION_SWAP_AVG_INCREASE_RATIO) continue;
         }
+        if (preSwapMaxDiff > 0) {
+          const maxDiffIncrease = (newMaxDiff - preSwapMaxDiff) / preSwapMaxDiff;
+          if (maxDiffIncrease > POSITION_SWAP_AVG_INCREASE_RATIO) continue;
+        }
+
+        bestScoreDiff = scoreDiff;
+        best = { fromTeam, fromPlayer, toPlayer };
       }
     }
   }
@@ -519,9 +680,7 @@ function executeSwap(needTeam, swapInfo) {
 }
 
 
-// ============================================================
-// 第5步：生成最终输出
-// ============================================================
+// 第6步：生成最终输出
 
 /**
  * 构建每支队伍的输出对象
@@ -586,11 +745,12 @@ function buildTeamOutput(teams, allPlayers) {
  * @param {number} meta.swapCount - 位置补全交换次数
  * @param {Object} meta.scoreSourceCount - 分值来源统计
  * @param {boolean} meta.positionRequired - 是否启用了位置校验
+ * @param {number} meta.balanceIterations - 均衡优化迭代次数
  */
 function computeBalance(finalTeams, meta) {
   const scores = finalTeams.map(t => t.totalScore);
   const memberCounts = finalTeams.map(t => t.memberCount);
-  const { swapCount, scoreSourceCount, positionRequired } = meta;
+  const { swapCount, scoreSourceCount, positionRequired, balanceIterations } = meta;
 
   if (scores.length === 0) return null;
 
@@ -629,6 +789,7 @@ function computeBalance(finalTeams, meta) {
     swapCount,     // 位置补全交换次数
     scoreSource: scoreSourceCount, // 分值来源分布
     positionRequired,
+    balanceIterations: balanceIterations || 0,  // 均衡优化迭代次数
   };
 }
 
@@ -641,9 +802,7 @@ function gradeBalance(maxDiff, stdDev) {
 }
 
 
-// ============================================================
 // 导出
-// ============================================================
 
 module.exports = {
   allocateTeams,
@@ -651,6 +810,8 @@ module.exports = {
   parsePositions,
   getMissingPositions,
   getTeamScore,
+  getTeamAvgScore,
+  balanceOptimize,
   stdDev,
   ALL_POSITIONS,
   CORE_SIZE,
