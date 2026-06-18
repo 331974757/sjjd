@@ -25,6 +25,10 @@
     <view class="gtb-btn gtb-btn-admin" wx:if="{{userRole === 'super_admin'}}" bindtap="goAdmin">
       <text class="gtb-icon">🔑</text>
     </view>
+    <view class="gtb-divider"></view>
+    <view class="gtb-btn" bindtap="onRefreshTap">
+      <text class="gtb-icon">⟳</text>
+    </view>
   </view>
 
   <!-- 游戏切换标签（主导航） -->
@@ -37,9 +41,6 @@
     </view>
     <view class="game-plus" bindtap="onGamePlusTap">
       <text class="plus-icon">+</text>
-    </view>
-    <view class="game-refresh" bindtap="onRefreshTap">
-      <text class="refresh-icon">⟳</text>
     </view>
   </view>
 

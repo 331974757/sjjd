@@ -216,33 +216,6 @@
   line-height: 1;
 }
 
-/* 刷新按钮 */
-.game-refresh {
-  width: 44rpx;
-  height: 44rpx;
-  border-radius: 22rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: rgba(255, 255, 255, 0.04);
-  border: 1rpx solid rgba(255, 255, 255, 0.08);
-  flex-shrink: 0;
-  margin-left: auto;
-  transition: all 0.15s ease;
-}
-
-.game-refresh:active {
-  background-color: rgba(31, 111, 235, 0.3);
-  transform: scale(0.92);
-}
-
-.refresh-icon {
-  font-size: 30rpx;
-  color: #8b949e;
-  font-weight: 300;
-  line-height: 1;
-}
-
 /* ===== 搜索栏 ===== */
 .search-bar {
   padding: 6rpx 36rpx 10rpx;
