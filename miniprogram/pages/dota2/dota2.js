@@ -704,16 +704,12 @@ Page({
 
   // ⚙ 管理员菜单（导入/导出/批量删除/管理员设置）
   showAdminMenu() {
-    const isSuper = this.data.userRole === 'super_admin'
-    const items = ['批量导入', '批量导出', '批量删除选手']
-    if (isSuper) items.push('权限管理')
     wx.showActionSheet({
-      itemList: items,
+      itemList: ['批量导入', '批量导出', '批量删除选手'],
       success: (res) => {
         if (res.tapIndex === 0) { this.goImport() }
         else if (res.tapIndex === 1) { this.doExport() }
         else if (res.tapIndex === 2) { this.toggleDeleteMode() }
-        else if (res.tapIndex === 3) { this.goAdmin() }
       }
     })
   },
