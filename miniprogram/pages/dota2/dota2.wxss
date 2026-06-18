@@ -1331,7 +1331,15 @@
   display: flex;
   flex-direction: row;
   align-items: center;
+}
+
+.hp-left {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
   gap: 8rpx;
+  flex: 1;
+  min-width: 0;
 }
 
 .hp-medal {
@@ -1347,6 +1355,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   flex-shrink: 1;
+  min-width: 0;
 }
 
 .hp-record {

@@ -297,10 +297,12 @@
             >
               <view class="hp-info">
                 <view class="hp-name-row">
-                  <text class="hp-medal">
-                    {{rank.rankNum === 1 ? '🥇' : rank.rankNum === 2 ? '🥈' : '🥉'}}
-                  </text>
-                  <text class="hp-team-name">{{rank.teamName}}</text>
+                  <view class="hp-left">
+                    <text class="hp-medal">
+                      {{rank.rankNum === 1 ? '🥇' : rank.rankNum === 2 ? '🥈' : '🥉'}}
+                    </text>
+                    <text class="hp-team-name">{{rank.teamName}}</text>
+                  </view>
                   <text class="hp-record">{{rank.wins || 0}} 胜 · {{rank.losses || 0}} 负</text>
                 </view>
                 <view class="hp-members" wx:if="{{rank.members.length > 0}}">
