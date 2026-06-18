@@ -161,6 +161,7 @@ Page({
     battleRound: 0,              // 当前轮次编号
     battleRoundNum: 0,           // 当前轮次（用于生成下一轮）
     battleAllDone: false,        // 所有轮次全部完成
+    battleIsLatestRound: false,  // 当前轮是否为最新轮（控制操作按钮显示）
     // —— 队伍积分榜 ——
     battleScoreboard: [],        // 所有队伍积分榜 [{teamId, teamName, captainName, score, wins, losses, totalMmr}]
     battleSelectedIds: [],       // 本轮选中参战的队伍ID
@@ -312,6 +313,10 @@ Page({
       // 进入页面时默认跳转到最新可用环节（如报名管理阶段则直接定位到报名管理）
       const latestUnlocked = [...this.data.tabs].reverse().find(t => !t._locked)
       if (latestUnlocked && latestUnlocked.key !== this.data.activeTab) {
+        // 重置对战状态，确保 loadBattleData 走到最新轮次而非保留旧数据
+        if (latestUnlocked.key === 'matches') {
+          this.setData({ battleRound: 0, battleMatches: [] })
+        }
         this._switchToTab(latestUnlocked.key)
       }
       // 解析权限
@@ -432,10 +437,10 @@ Page({
   async _loadTabData(tabKey) {
     switch (tabKey) {
       case 'overview':
-        // 赛事概览需要报名计数 + mySignup 判断"已报名"/"立即报名"状态
+        // 赛事概览需要报名计数 + 队伍数 + mySignup 判断"已报名"/"立即报名"状态
         // 如果赛事已结束，同时预加载名次数据供概览统计
         this._updateActions()
-        const overviewTasks = [this.loadSignups(), this.loadMySignup()]
+        const overviewTasks = [this.loadSignups(), this.loadMySignup(), this.loadTeams()]
         if (this.data.event && this.data.event.event_status >= 5) {
           overviewTasks.push(this.loadRanks())
         }
@@ -462,6 +467,11 @@ Page({
   async _refreshTabData() {
     this._updateTabLocks()
     this._updateActions()
+    // 正在上传截图时跳过对战数据全量刷新，避免 battleRound 被重置
+    if (this._isUploading && this.data.activeTab === 'matches') {
+      this._isUploading = false
+      return
+    }
     await this._loadTabData(this.data.activeTab)
   },
 
@@ -1579,6 +1589,12 @@ Page({
     return item;
   },
 
+  // 判断当前轮次是否为最新轮（有无更新的轮次存在）
+  _isLatestRound(round, rounds) {
+    if (!rounds || rounds.length === 0) return true
+    return !rounds.some(r => r.roundNum > round)
+  },
+
   // ============ 加载对战数据（积分榜+轮次+当前轮对战） ============
   async loadBattleData() {
     this.setData({ battleLoading: true })
@@ -1599,11 +1615,13 @@ Page({
         curRound = roundsRes.data.currentRound || 0
         allDone = rounds.length > 0 && rounds.every(r => r.allDone)
       }
-      // 确定当前轮次
-      const rn = curRound || (rounds.length > 0 ? rounds[rounds.length - 1].roundNum : 0)
+      // 确定当前轮次：如果用户已选定某轮（battleRound>0），保留该轮次不跳转
+      const keepRound = this.data.battleRound > 0
+      const rn = keepRound ? this.data.battleRound : (curRound || (rounds.length > 0 ? rounds[rounds.length - 1].roundNum : 0))
       const nextRn = rn > 0 ? rn : 1
       this.setData({
         battleRounds: rounds, battleRound: rn, battleRoundNum: nextRn, battleAllDone: allDone,
+        battleIsLatestRound: this._isLatestRound(rn, rounds),
         battleRoundHasMatches: false, battleRoundStatus: 'select',
         battleMatches: [], battlePairs: [], battleSelectedIds: [],
         battleLoading: false
@@ -1631,8 +1649,10 @@ Page({
           return {
             ...m,
             team_a_score: a.wins || 0,
+            team_a_avg_mmr: a.avgMmr || m.team_a_avg_mmr || 0,
             team_a_captain: a.captainName || '',
             team_b_score: b.wins || 0,
+            team_b_avg_mmr: b.avgMmr || m.team_b_avg_mmr || 0,
             team_b_captain: b.captainName || '',
             battle_image: m.battle_image ? (m.battle_image.startsWith('http') ? m.battle_image : 'https://congqin.online' + m.battle_image) : ''
           }
@@ -1648,10 +1668,15 @@ Page({
           else if (anyFighting || !allDraft) status = 'fighting'
           else status = 'pairing'
         }
+        // 下一轮是否已有对战（影响上一轮是否还能「结束比赛」）
+        const nextRoundData = this.data.battleRounds.find(r => r.roundNum === round + 1)
+        const _nextRoundHasMatches = nextRoundData ? (nextRoundData.matchCount > 0) : false
         this.setData({
           battleMatches: matches,
           battleRoundHasMatches: hasMatches,
-          battleRoundStatus: status
+          battleRoundStatus: status,
+          _isRoundDone: status === 'done',
+          _nextRoundHasMatches
         })
         // 根据状态回填选中ID，同步 _selected 标记 + 对战信息
         if (hasMatches) {
@@ -1671,12 +1696,13 @@ Page({
   },
 
   // 切换轮次
-  switchRound(e) {
+  async switchRound(e) {
     const round = parseInt(e.currentTarget.dataset.round)
     if (!round) return
-    this.setData({ battleRound: round, battleRoundStatus: '', battleMatches: [], battlePairs: [] })
+    this.setData({ battleRound: round, battleRoundStatus: '', battleMatches: [], battlePairs: [],
+      battleIsLatestRound: this._isLatestRound(round, this.data.battleRounds) })
     this._syncBattleSelected([])
-    this.loadRoundMatches(round)
+    await this.loadRoundMatches(round)
   },
 
   // ============ 选队配对 ============
@@ -2075,12 +2101,14 @@ Page({
       const res = await api.post('/events/' + this.data.eventId + '/matches/generate', payload)
       if (res.success) {
         let newRound = res.data.roundNum
-        this.setData({ battleRound: newRound, battleRoundNum: newRound + 1, battlePairs: [] })
+        this.setData({ battleRound: newRound, battleRoundNum: newRound + 1, battlePairs: [],
+          battleIsLatestRound: true })
         await this.loadRoundMatches(newRound)
         // 刷新轮次信息
         const roundsRes = await api.get('/events/' + this.data.eventId + '/matches/rounds')
         if (roundsRes.success) {
-          this.setData({ battleRounds: roundsRes.data.rounds || [] })
+          const rds = roundsRes.data.rounds || []
+          this.setData({ battleRounds: rds, battleIsLatestRound: this._isLatestRound(newRound, rds) })
         }
         // 生成后自动开战，跳过「开战」步骤
         const startRes = await api.put('/events/' + this.data.eventId + '/matches/round/' + newRound + '/start')
@@ -2130,7 +2158,8 @@ Page({
         const rds = roundsRes.data.rounds || []
         const cur = roundsRes.data.currentRound || 0
         const allD = rds.length > 0 && rds.every(r => r.allDone)
-        this.setData({ battleRounds: rds, battleRound: cur, battleRoundNum: cur > 0 ? cur : 1, battleAllDone: allD })
+        this.setData({ battleRounds: rds, battleRound: cur, battleRoundNum: cur > 0 ? cur : 1, battleAllDone: allD,
+          battleIsLatestRound: this._isLatestRound(cur, rds) })
       }
     } catch (e) {
       this.setData({ battleDeleting: false })
@@ -2236,6 +2265,8 @@ Page({
     if (!this._canUploadMatchImage(match)) {
       return
     }
+    // 标记正在上传，避免 onShow 触发 loadBattleData 重置当前轮次
+    this._isUploading = true
     const that = this
     wx.chooseImage({
       count: 1,
@@ -2244,6 +2275,9 @@ Page({
       success(res) {
         const tempPath = res.tempFilePaths[0]
         that._doUploadMatchImage(matchId, tempPath)
+      },
+      fail() {
+        that._isUploading = false
       }
     })
   },
@@ -2292,6 +2326,7 @@ Page({
     } catch (e) {
       wx.hideLoading()
       wx.showToast({ title: '上传失败', icon: 'none' })
+      this._isUploading = false
     }
   },
 
@@ -2368,7 +2403,8 @@ Page({
           }
           this.setData({
             battleRounds: rds, battleRound: nextRound, battleRoundNum: nextRound,
-            battleAllDone: false, battleRoundStatus: 'select', battleRoundHasMatches: false,
+            battleAllDone: false, battleIsLatestRound: true,
+            battleRoundStatus: 'select', battleRoundHasMatches: false,
             battleMatches: [], battlePairs: []
           })
           this._syncBattleSelected([])
@@ -2476,6 +2512,7 @@ Page({
           teamId: existing.team_id,
           teamName: existing.team_name || '',
           captainName: existing.captain_name || '',
+          avgMmr: existing.avg_mmr || 0,
           label: '第' + n + '名（' + (defaultNames[n - 1] || '第' + n + '名') + '）',
           members
         })
@@ -2513,6 +2550,7 @@ Page({
         slots[idx].teamId = ''
         slots[idx].teamName = ''
         slots[idx].captainName = ''
+        slots[idx].avgMmr = 0
         slots[idx].members = []
       }
       const usedMap = {}
@@ -2536,6 +2574,7 @@ Page({
     slots[emptyIndex].teamId = teamId
     slots[emptyIndex].teamName = card.teamName
     slots[emptyIndex].captainName = card.captainName
+    slots[emptyIndex].avgMmr = card.avgMmr || 0
     slots[emptyIndex].members = members
 
     const usedMap = {}
@@ -2564,6 +2603,7 @@ Page({
     slots[index].teamId = rankSelectedTeamId
     slots[index].teamName = card.teamName
     slots[index].captainName = card.captainName
+    slots[index].avgMmr = card.avgMmr || 0
     slots[index].members = members
     const usedMap = {}
     slots.forEach(s => { if (s.teamId) usedMap[s.teamId] = true })
@@ -2577,6 +2617,7 @@ Page({
     slots[index].teamId = ''
     slots[index].teamName = ''
     slots[index].captainName = ''
+    slots[index].avgMmr = 0
     slots[index].members = []
     const usedMap = {}
     slots.forEach(s => { if (s.teamId) usedMap[s.teamId] = true })

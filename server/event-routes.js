@@ -246,20 +246,73 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
       let rankMap = {};
       if (eventIds.length > 0) {
         const [allRanks] = await pool.query(
-          `SELECT r.event_id, r.rank_num, r.team_id, t.team_name, t.total_mmr
+          `SELECT r.event_id, r.rank_num, r.team_id, t.team_name, t.total_mmr, t.player_ids, t.captain_id
            FROM dota2_event_ranks_his r
            LEFT JOIN dota2_event_teams_his t ON r.team_id COLLATE utf8mb4_unicode_ci = t.team_id COLLATE utf8mb4_unicode_ci
            WHERE r.event_id IN (?) AND r.rank_num <= 3
            ORDER BY r.event_id, r.rank_num ASC`,
           [eventIds]
         );
+
+        // 收集队员ID批量查昵称
+        const rankAllPlayerIds = new Set();
+        allRanks.forEach(r => {
+          try { const ids = JSON.parse(r.player_ids || '[]'); ids.forEach(id => rankAllPlayerIds.add(id)); } catch (_) {}
+          if (r.captain_id) rankAllPlayerIds.add(r.captain_id);
+        });
+        const rankPlayerMap = {};
+        if (rankAllPlayerIds.size > 0) {
+          const rankPlayers = await getPlayersByIds(pool, [...rankAllPlayerIds]);
+          rankPlayers.forEach(p => { rankPlayerMap[p.id] = p.wx_nickname || ''; });
+        }
+
+        // 统计这些赛事的队伍胜负
+        const [arcWinRows] = await pool.query(
+          `SELECT winner_id, COUNT(*) as wins
+           FROM dota2_event_matches_his
+           WHERE event_id IN (?) AND match_status = 2 AND winner_id IS NOT NULL
+           GROUP BY winner_id`,
+          [eventIds]
+        );
+        const arcWinMap = {};
+        (arcWinRows || []).forEach(r => { arcWinMap[r.winner_id] = r.wins; });
+
+        const [arcPlayRows] = await pool.query(
+          `SELECT team_id, COUNT(*) as total
+           FROM (
+             SELECT team_a_id as team_id FROM dota2_event_matches_his WHERE event_id IN (?) AND match_status = 2
+             UNION ALL
+             SELECT team_b_id as team_id FROM dota2_event_matches_his WHERE event_id IN (?) AND match_status = 2
+           ) t
+           GROUP BY team_id`,
+          [eventIds, eventIds]
+        );
+        const arcPlayMap = {};
+        (arcPlayRows || []).forEach(r => { arcPlayMap[r.team_id] = r.total; });
+
         // 按 event_id 分组
         for (const rank of allRanks) {
           if (!rankMap[rank.event_id]) rankMap[rank.event_id] = [];
+          let members = [];
+          try {
+            const ids = JSON.parse(rank.player_ids || '[]');
+            members = ids.map(id => ({
+              id,
+              nickName: rankPlayerMap[id] || '',
+              isCaptain: id === rank.captain_id
+            }));
+            members.sort((a, b) => (b.isCaptain ? 1 : 0) - (a.isCaptain ? 1 : 0));
+          } catch (_) {}
+          const wins = arcWinMap[rank.team_id] || 0;
+          const totalPlayed = arcPlayMap[rank.team_id] || 0;
           rankMap[rank.event_id].push({
             rankNum: rank.rank_num,
             teamId: rank.team_id,
             teamName: rank.team_name || '未知队伍',
+            captainName: rankPlayerMap[rank.captain_id] || '',
+            members,
+            wins,
+            losses: Math.max(0, totalPlayed - wins),
             totalMmr: rank.total_mmr || 0
           });
         }
@@ -2788,6 +2841,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
       const isArchived = event.is_archived === 1;
       const ranksTable = tableFor('dota2_event_ranks', isArchived);
       const teamsTable = tableFor('dota2_event_teams', isArchived);
+      const matchesTable = tableFor('dota2_event_matches', isArchived);
 
       const [rows] = await pool.query(
         `SELECT r.*, t.team_name, t.total_mmr, t.player_ids, t.captain_id
@@ -2796,6 +2850,30 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
          WHERE r.event_id = ? ORDER BY r.rank_num ASC`,
         [eventId]
       );
+
+      // 统计每队的胜负场次
+      const [winRows] = await pool.query(
+        `SELECT winner_id, COUNT(*) as wins
+         FROM ${matchesTable}
+         WHERE event_id = ? AND match_status = 2 AND winner_id IS NOT NULL
+         GROUP BY winner_id`,
+        [eventId]
+      );
+      const winMap = {};
+      (winRows || []).forEach(r => { winMap[r.winner_id] = r.wins; });
+
+      const [playRows] = await pool.query(
+        `SELECT team_id, COUNT(*) as total
+         FROM (
+           SELECT team_a_id as team_id FROM ${matchesTable} WHERE event_id = ? AND match_status = 2
+           UNION ALL
+           SELECT team_b_id as team_id FROM ${matchesTable} WHERE event_id = ? AND match_status = 2
+         ) t
+         GROUP BY team_id`,
+        [eventId, eventId]
+      );
+      const playMap = {};
+      (playRows || []).forEach(r => { playMap[r.team_id] = r.total; });
 
       // 收集所有队员ID，批量查询昵称
       const allPlayerIds = new Set();
@@ -2834,6 +2912,8 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
         const avgMmr = memberCount > 0 && row.total_mmr
           ? Math.round(row.total_mmr / memberCount)
           : 0;
+        const wins = winMap[row.team_id] || 0;
+        const totalPlayed = playMap[row.team_id] || 0;
         return {
           rank_id: row.rank_id,
           event_id: row.event_id,
@@ -2845,6 +2925,8 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
           member_count: memberCount,
           captain_name: captainName,
           members,
+          wins,
+          losses: Math.max(0, totalPlayed - wins),
           operator_nickname: operatorNickMap.get(row.operator_id) || '',
           created_at: row.created_at
         };

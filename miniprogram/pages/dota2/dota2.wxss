@@ -1301,11 +1301,9 @@
 
 .hpodium-item {
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  padding: 12rpx 16rpx;
+  flex-direction: column;
+  padding: 14rpx 16rpx;
   border-radius: 12rpx;
-  gap: 12rpx;
 }
 
 /* 金银铜配色 */
@@ -1324,8 +1322,20 @@
   border: 1rpx solid rgba(205, 127, 50, 0.15);
 }
 
+.hp-info {
+  width: 100%;
+  min-width: 0;
+}
+
+.hp-name-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8rpx;
+}
+
 .hp-medal {
-  font-size: 36rpx;
+  font-size: 30rpx;
   flex-shrink: 0;
 }
 
@@ -1336,6 +1346,39 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex-shrink: 1;
+}
+
+.hp-record {
+  font-size: 20rpx;
+  color: #8b949e;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.hp-members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6rpx;
+  margin-top: 6rpx;
+}
+
+.hp-member {
+  font-size: 18rpx;
+  color: #8b949e;
+  background: rgba(255,255,255,0.04);
+  padding: 2rpx 8rpx;
+  border-radius: 4rpx;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hp-member.hp-captain {
+  color: #d4a03a;
+  background: rgba(212,160,58,0.08);
 }
 
 /* 无排名提示 */

@@ -605,6 +605,17 @@
   font-weight: 600;
 }
 
+/* 已归档（最后一步激活=归档成功）- 绿 */
+.ps-archived .ps-dot {
+  background: rgba(39,174,96,0.2);
+  border-color: #2ea043;
+  color: #2ea043;
+}
+.ps-archived .ps-label {
+  color: #2ea043;
+  font-weight: 600;
+}
+
 /* ===== 快捷跳转按钮（单按钮，根据赛事阶段动态显示） ===== */
 .overview-jump {
   margin-bottom: 24rpx;
@@ -2313,9 +2324,22 @@
   margin-bottom: 4rpx;
 }
 .rsr-team-captain {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8rpx;
+}
+.rsr-team-captain-tag {
   font-size: 22rpx;
   color: #d4a03a;
-  margin-bottom: 8rpx;
+}
+.rsr-team-avg {
+  font-size: 20rpx;
+  color: #58a6ff;
+  background: rgba(88,166,255,0.08);
+  padding: 2rpx 8rpx;
+  border-radius: 6rpx;
 }
 .rsr-members {
   display: flex;
@@ -2324,11 +2348,17 @@
   margin-bottom: 4rpx;
 }
 .rsr-member {
+  width: 45%;
+  box-sizing: border-box;
   font-size: 20rpx;
   color: #8b949e;
   background: rgba(255,255,255,0.04);
   padding: 2rpx 10rpx;
   border-radius: 6rpx;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .rsr-clear-btn {
   position: absolute;
@@ -2510,25 +2540,56 @@
   min-width: 0;
 }
 
+.rank-team-name-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
 .rank-team-name {
   font-size: 30rpx;
   color: #e6edf3;
   font-weight: 700;
   line-height: 1.3;
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .rank-item.rank-gold .rank-team-name   { color: #ffe082; }
 .rank-item.rank-silver .rank-team-name { color: #d6d6d6; }
 .rank-item.rank-bronze .rank-team-name { color: #e0b88a; }
 
+.rank-team-captain-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6rpx;
+}
 .rank-team-captain-name {
   display: inline-block;
   font-size: 22rpx;
   color: #d4a03a;
-  margin-top: 6rpx;
   padding: 2rpx 12rpx;
   background: rgba(212,160,58,0.08);
   border-radius: 8rpx;
+}
+.rank-team-avg {
+  font-size: 20rpx;
+  color: #58a6ff;
+  background: rgba(88,166,255,0.08);
+  padding: 2rpx 8rpx;
+  border-radius: 6rpx;
+}
+.rank-record-text {
+  font-size: 20rpx;
+  color: #8b949e;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .rank-members-row {
@@ -2539,12 +2600,18 @@
 }
 
 .rank-member-tag {
+  width: calc(50% - 4rpx);
+  box-sizing: border-box;
   font-size: 20rpx;
   color: #8b949e;
   background: rgba(255,255,255,0.05);
-  padding: 4rpx 12rpx;
+  padding: 4rpx 8rpx;
   border-radius: 20rpx;
   border: 1rpx solid rgba(255,255,255,0.04);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .rank-team-mmr {
@@ -2928,14 +2995,20 @@
 
 .jo-name {
   display: block;
-  font-size: 26rpx;
+  font-size: 24rpx;
   color: #e6edf3;
   font-weight: 600;
+}
+.jo-captain {
+  display: block;
+  font-size: 20rpx;
+  color: #8b949e;
+  margin-top: 4rpx;
 }
 .jo-mmr {
   display: block;
   font-size: 22rpx;
-  color: #8b949e;
+  color: #58a6ff;
   margin-top: 6rpx;
 }
 
@@ -2998,6 +3071,11 @@
   font-size: 22rpx;
   color: #3fb950;
   font-weight: 600;
+}
+.sti-mmr {
+  font-size: 20rpx;
+  color: #8b949e;
+  margin-top: 2rpx;
 }
 
 .sti-captain {

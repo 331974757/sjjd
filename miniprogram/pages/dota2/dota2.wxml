@@ -295,10 +295,18 @@
               wx:key="rankNum"
               wx:for-item="rank"
             >
-              <text class="hp-medal">
-                {{rank.rankNum === 1 ? '🥇' : rank.rankNum === 2 ? '🥈' : '🥉'}}
-              </text>
-              <text class="hp-team-name">{{rank.teamName}}</text>
+              <view class="hp-info">
+                <view class="hp-name-row">
+                  <text class="hp-medal">
+                    {{rank.rankNum === 1 ? '🥇' : rank.rankNum === 2 ? '🥈' : '🥉'}}
+                  </text>
+                  <text class="hp-team-name">{{rank.teamName}}</text>
+                  <text class="hp-record">{{rank.wins || 0}} 胜 · {{rank.losses || 0}} 负</text>
+                </view>
+                <view class="hp-members" wx:if="{{rank.members.length > 0}}">
+                  <text class="hp-member {{m.isCaptain ? 'hp-captain' : ''}}" wx:for="{{rank.members}}" wx:key="id" wx:for-item="m">{{m.isCaptain ? '👑 ' : ''}}{{m.nickName || ''}}</text>
+                </view>
+              </view>
             </view>
           </view>
 

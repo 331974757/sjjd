@@ -130,7 +130,7 @@
         <text class="progress-title">🏁 赛事进度</text>
         <view class="progress-track">
           <view
-            class="progress-step {{item._active ? 'ps-active' : ''}} {{item._done ? 'ps-done' : ''}}"
+            class="progress-step {{item._active ? 'ps-active' : ''}} {{item._done ? 'ps-done' : ''}} {{item.key === 'archived' && item._active ? 'ps-archived' : ''}}"
             wx:for="{{progressSteps}}"
             wx:key="key"
           >
@@ -651,28 +651,35 @@
             </view><!-- /bbmc-row -->
 
             <!-- ===== 底部操作栏 ===== -->
-            <view class="bbmc-actions" wx:if="{{!isArchived}}">
-              <!-- 待裁决：裁决按钮 -->
+            <view class="bbmc-actions">
+              <!-- 待裁决：裁决按钮（非归档） -->
               <view
                 class="bbmc-act-btn bbmc-act-judge"
-                wx:if="{{item.match_status === 1 && actions.manage_matches.allowed}}"
+                wx:if="{{item.match_status === 1 && actions.manage_matches.allowed && !isArchived}}"
                 catchtap="openJudgeModal"
                 data-match-id="{{item.match_id}}"
               >
                 <text>⚖️ 裁决胜负</text>
               </view>
-              <!-- 已结束：上传对战结果 -->
+              <!-- 已结束：对战截图 -->
               <view class="bbmc-upload-row" wx:if="{{item.match_status === 2}}">
-                <block wx:if="{{!item.battle_image}}">
-                  <view class="bbmc-upload-btn" catchtap="uploadMatchImage" data-match-id="{{item.match_id}}">
-                    <text>📷 上传截图</text>
-                  </view>
+                <!-- 归档模式：仅展示图片 -->
+                <block wx:if="{{isArchived}}">
+                  <image wx:if="{{item.battle_image}}" class="bbmc-upload-img" src="{{item.battle_image}}" mode="aspectFill" catchtap="previewMatchImage" data-url="{{item.battle_image}}"></image>
                 </block>
-                <block wx:if="{{item.battle_image}}">
-                  <image class="bbmc-upload-img" src="{{item.battle_image}}" mode="aspectFill" catchtap="previewMatchImage" data-url="{{item.battle_image}}"></image>
-                  <view class="bbmc-replace-btn" catchtap="uploadMatchImage" data-match-id="{{item.match_id}}">
-                    <text>🔄 换图</text>
-                  </view>
+                <!-- 非归档：可上传/替换 -->
+                <block wx:else>
+                  <block wx:if="{{!item.battle_image}}">
+                    <view class="bbmc-upload-btn" catchtap="uploadMatchImage" data-match-id="{{item.match_id}}">
+                      <text>📷 上传截图</text>
+                    </view>
+                  </block>
+                  <block wx:if="{{item.battle_image}}">
+                    <image class="bbmc-upload-img" src="{{item.battle_image}}" mode="aspectFill" catchtap="previewMatchImage" data-url="{{item.battle_image}}"></image>
+                    <view class="bbmc-replace-btn" catchtap="uploadMatchImage" data-match-id="{{item.match_id}}">
+                      <text>🔄 换图</text>
+                    </view>
+                  </block>
                 </block>
               </view>
             </view>
@@ -695,7 +702,8 @@
 
 
       <!-- ========== 七、本轮完成 → 下一轮/结束比赛 ========== -->
-      <view class="bb-action-wrap" wx:if="{{battleRoundStatus === 'done' && actions.manage_matches.allowed && !isArchived}}">
+      <!-- 最新完成轮 → 下一轮 + 结束比赛同一排 -->
+      <view class="bb-action-wrap" wx:if="{{battleRoundStatus === 'done' && battleIsLatestRound && actions.manage_matches.allowed && !isArchived}}">
         <text class="bb-action-done">✅ 第{{battleRound}}轮全部完成</text>
         <view class="bb-action-row">
           <button class="bb-action-btn bb-next-btn" wx:if="{{!battleAllDone}}" bindtap="showBattleAction" data-action="next-round">
@@ -706,6 +714,12 @@
           </button>
         </view>
         <text class="bb-action-hint" wx:if="{{battleAllDone}}">所有轮次已完成，点击「结束比赛」进入名次归档</text>
+      </view>
+      <!-- 非最新完成轮 → 结束比赛居中（仅下一轮未开战时） -->
+      <view class="bb-action-wrap" wx:if="{{_isRoundDone && !battleIsLatestRound && !_nextRoundHasMatches && actions.manage_matches.allowed && !isArchived}}">
+        <button class="bb-action-btn bb-end-btn" bindtap="showBattleAction" data-action="end-battle">
+          🏁 结束比赛
+        </button>
       </view>
 
       </block>
@@ -769,7 +783,10 @@
                 >
                   <block wx:if="{{item.teamId}}">
                     <text class="rsr-team-name">{{item.teamName || '未知队伍'}}</text>
-                    <text class="rsr-team-captain">👑 {{item.captainName || ''}}</text>
+                    <view class="rsr-team-captain">
+                      <text class="rsr-team-captain-tag">👑 {{item.captainName || ''}}</text>
+                      <text class="rsr-team-avg">均{{item.avgMmr || 0}}分</text>
+                    </view>
                     <view class="rsr-members" wx:if="{{item.members.length > 0}}">
                       <text class="rsr-member" wx:for="{{item.members}}" wx:key="id" wx:for-item="m">{{m.isCaptain ? '👑' : '👤'}}{{m.nickName || '未知'}}</text>
                     </view>
@@ -819,12 +836,17 @@
                   <text class="rank-badge-medal" wx:if="{{item.rank_num === 3}}">🥉</text>
                 </view>
                 <view class="rank-info">
-                  <text class="rank-team-name">{{item.team_name || '未知队伍'}}</text>
-                  <text class="rank-team-captain-name" wx:if="{{item.captain_name}}">👑 {{item.captain_name}}</text>
+                  <view class="rank-team-name-row">
+                    <text class="rank-team-name">{{item.team_name || '未知队伍'}}</text>
+                    <text class="rank-record-text">🏆 {{item.wins || 0}} 胜 · {{item.losses || 0}} 负</text>
+                  </view>
+                  <view class="rank-team-captain-row" wx:if="{{item.captain_name}}">
+                    <text class="rank-team-captain-name">👑 {{item.captain_name}}</text>
+                    <text class="rank-team-avg">均{{item.avg_mmr || 0}}分</text>
+                  </view>
                   <view class="rank-members-row" wx:if="{{item.members && item.members.length > 0}}">
                     <text class="rank-member-tag" wx:for="{{item.members}}" wx:key="id" wx:for-item="m">{{m.isCaptain ? '👑' : '👤'}}{{m.nickName || ''}}</text>
                   </view>
-                  <text class="rank-team-mmr">{{item.total_mmr || 0}} 分</text>
                 </view>
               </view>
             </view>
@@ -906,12 +928,10 @@
           <view class="judge-option" bindtap="selectWinner" data-team-id="{{judgeMatch.team_a_id}}">
             <text class="jo-name">{{judgeMatch.team_a_name || '队伍A'}}</text>
             <text class="jo-captain" wx:if="{{judgeMatch.team_a_captain_name}}">👑 {{judgeMatch.team_a_captain_name}}</text>
-            <text class="jo-mmr">{{judgeMatch.team_a_avg_mmr || 0}} 均分</text>
           </view>
           <view class="judge-option" bindtap="selectWinner" data-team-id="{{judgeMatch.team_b_id}}">
             <text class="jo-name">{{judgeMatch.team_b_name || '队伍B'}}</text>
             <text class="jo-captain" wx:if="{{judgeMatch.team_b_captain_name}}">👑 {{judgeMatch.team_b_captain_name}}</text>
-            <text class="jo-mmr">{{judgeMatch.team_b_avg_mmr || 0}} 均分</text>
           </view>
         </view>
         <view class="modal-btns"><view class="modal-btn btn-secondary" bindtap="closeJudgeModal"><text>取消</text></view></view>
@@ -1046,7 +1066,8 @@
             </view>
             <view class="sti-right">
               <text class="sti-status sti-busy">已出战</text>
-              <text class="sti-score">🏅 {{item.wins || 0}}胜</text>
+              <text class="sti-score">🏅 {{item.wins || 0}}胜{{item.losses || 0}}负</text>
+              <text class="sti-mmr">📊 {{item.avgMmr || 0}}分</text>
             </view>
           </view>
         </scroll-view>
@@ -1069,7 +1090,8 @@
             </view>
             <view class="sti-right">
               <text class="sti-status sti-free">未出战</text>
-              <text class="sti-score">🏅 {{item.wins || 0}}胜</text>
+              <text class="sti-score">🏅 {{item.wins || 0}}胜{{item.losses || 0}}负</text>
+              <text class="sti-mmr">📊 {{item.avgMmr || 0}}分</text>
             </view>
           </view>
         </scroll-view>
@@ -1099,7 +1121,8 @@
             <text class="sti-captain">👑 {{item.captainName || ''}}</text>
           </view>
           <view class="sti-right">
-            <text class="sti-score">🏅 {{item.wins || 0}}胜</text>
+            <text class="sti-score">🏅 {{item.wins || 0}}胜{{item.losses || 0}}负</text>
+            <text class="sti-mmr">📊 {{item.avgMmr || 0}}分</text>
             <text class="sti-status sti-busy" wx:if="{{item._status === 'battle'}}">已参战</text>
             <text class="sti-status sti-free" wx:else>未参战</text>
           </view>

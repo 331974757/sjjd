@@ -192,20 +192,20 @@ function getScore(player) {
 function mapRawRankSort(rawSort, starFromDb) {
   // 已经是 1-8 映射值 → 直接使用
   if (rawSort >= 1 && rawSort <= 8) {
-    return { rankSort: rawSort, effectiveStar: starFromDb };
+    return { rankSort: rawSort, effectiveStar: starFromDb || 0 };
   }
 
   const tier = Math.floor(rawSort / 10); // 十位数 = 段位
-  const localStar = rawSort % 10;          // 个位数 = 星级
 
   // 冠绝一世
   if (rawSort === 80) {
     return { rankSort: 8, effectiveStar: 0 };
   }
 
-  // 有效段位范围：1-7，星级范围：1-5
-  if (tier >= 1 && tier <= 7 && localStar >= 1 && localStar <= 5) {
-    return { rankSort: tier, effectiveStar: localStar };
+  // 有效段位范围：1-7，星级取 calibrate_rank_star 字段（不从 rawSort 个位数推导）
+  const star = starFromDb || 0;
+  if (tier >= 1 && tier <= 7) {
+    return { rankSort: tier, effectiveStar: star };
   }
 
   // 无法映射 → 0
