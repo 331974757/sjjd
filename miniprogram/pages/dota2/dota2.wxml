@@ -23,7 +23,7 @@
     </view>
     <view class="gtb-divider" wx:if="{{userRole === 'super_admin'}}"></view>
     <view class="gtb-btn gtb-btn-admin" wx:if="{{userRole === 'super_admin'}}" bindtap="goAdmin">
-      <text class="gtb-icon">⚙</text>
+      <text class="gtb-icon">🔑</text>
     </view>
   </view>
 
