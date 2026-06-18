@@ -402,7 +402,13 @@
   flex-direction: row;
   flex-wrap: wrap;
   padding: 20rpx 28rpx;
-  /* 用padding替代gap，子元素用margin控制间距 */
+  /* 渐进式入场动画 */
+  animation: fadeInUp 0.35s ease;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16rpx); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .grid-card {
@@ -504,6 +510,12 @@
   overflow: hidden;
   border: 1rpx solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.3);
+  animation: fadeInDown 0.3s ease;
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-12rpx); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .chart-header {
@@ -692,11 +704,28 @@
   margin-top: 8rpx;
 }
 
-/* ===== 加载中 ===== */
+/* ===== 加载骨架屏 ===== */
 .loading-state {
   display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
   padding: 160rpx 40rpx;
+}
+
+/* 旋转加载动画 */
+.loading-spinner {
+  width: 48rpx;
+  height: 48rpx;
+  border: 4rpx solid rgba(255, 255, 255, 0.08);
+  border-top-color: #58a6ff;
+  border-radius: 50%;
+  margin-bottom: 20rpx;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .loading-text {
@@ -1440,9 +1469,24 @@
 }
 
 .hlm-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
   font-size: 24rpx;
   color: #484f58;
   padding: 16rpx 0;
+}
+
+/* 小尺寸旋转加载 */
+.loading-spinner-sm {
+  width: 28rpx;
+  height: 28rpx;
+  border: 3rpx solid rgba(255, 255, 255, 0.08);
+  border-top-color: #58a6ff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
 }
 
 .history-all-loaded {

@@ -40,9 +40,9 @@ Page({
     morePageSize: C.MORE_PAGE_SIZE,
     hasMore: false,
     loadingMore: false,
-    superAdminNames: [],
-    _superAdminOnly: [],
-    _adminOnly: [],
+    allAdminNames: [],          // 所有管理员名称（扁平数组，用于展示+寻路提示）
+    _superAdminOnly: [],        // 仅超管（内部用于模态区分）
+    _adminOnly: [],             // 仅普通管理员（内部用于模态区分）
     showChart: false,
     rankDistribution: [],
     deleteMode: false,
@@ -138,7 +138,7 @@ Page({
         })
         const allNames = superAdmins.concat(admins)
         this.setData({
-          superAdminNames: allNames,
+          allAdminNames: allNames,
           _superAdminOnly: superAdmins,
           _adminOnly: admins
         })
@@ -148,9 +148,9 @@ Page({
     }
   },
 
-  // 点击管理栏弹出说明
+  // 点击管理栏弹出管理员列表
   async showSuperAdminInfo() {
-    if (this.data.superAdminNames.length === 0) {
+    if (this.data.allAdminNames.length === 0) {
       wx.showLoading({ title: '查询中...' })
       await this.loadSuperAdminInfo()
       wx.hideLoading()
@@ -328,14 +328,21 @@ Page({
     }
   },
 
+  /**
+   * 下拉刷新：根据当前子Tab刷新对应数据
+   */
   onPullDownRefresh() {
     const tab = this.data.subTab
+    let promise
     if (tab === 'profile') {
-      this.loadAllPlayers().then(() => wx.stopPullDownRefresh()).catch(() => wx.stopPullDownRefresh())
+      promise = this.loadAllPlayers()
     } else if (tab === 'rules') {
-      this.loadRuleEvents().then(() => wx.stopPullDownRefresh()).catch(() => wx.stopPullDownRefresh())
+      promise = this.loadRuleEvents()
     } else if (tab === 'history') {
-      this.loadEvents(true).then(() => wx.stopPullDownRefresh()).catch(() => wx.stopPullDownRefresh())
+      promise = this.loadEvents(true)
+    }
+    if (promise) {
+      promise.then(() => wx.stopPullDownRefresh()).catch(() => wx.stopPullDownRefresh())
     } else {
       wx.stopPullDownRefresh()
     }
@@ -350,11 +357,14 @@ Page({
     }
   },
 
-  // ====== 数据加载（一次性拉取全部数据） ======
+  /**
+   * 全量拉取选手数据（一次性拉取，本地做分页/筛选/排序）
+   * - 5秒超时锁防止请求卡死
+   * - 失败后标记 loaded=true 避免永久 loading
+   */
   async loadAllPlayers() {
     if (this._loading) return
     this._loading = true
-    // 5秒超时自动释放锁，防止请求卡死导致永远无法重新加载
     const lockTimer = setTimeout(() => { this._loading = false }, 5000)
     try {
       const res = await api.get('/players', { pageSize: 1000 })
@@ -363,13 +373,10 @@ Page({
         calibrateRankName: R.normalizeRankName(p.calibrateRankName)
       }))
 
-      this.setData({
-        allPlayers: all,
-        loaded: true
-      })
+      this.setData({ allPlayers: all, loaded: true })
       this.filterAndDisplay()
     } catch (err) {
-      console.error('加载失败', err)
+      console.error('[选手数据] 加载失败', err)
       this.setData({ loaded: true })
       wx.showToast({ title: '加载失败', icon: 'none' })
     } finally {
@@ -378,7 +385,7 @@ Page({
     }
   },
 
-  // 从已排序的 filteredPlayers 中追加更多到 displayPlayers
+  // 从已排序的 filteredPlayers 中追加更多到 displayPlayers（修复：追加时附加 _rankIcon）
   loadMore() {
     if (this.data.loadingMore || !this.data.hasMore) return
     this.setData({ loadingMore: true })
@@ -386,7 +393,10 @@ Page({
     const filtered = this.data.filteredPlayers
     const current = this.data.displayPlayers
     const moreSize = this.data.morePageSize
-    const nextItems = filtered.slice(current.length, current.length + moreSize)
+    const nextItems = filtered.slice(current.length, current.length + moreSize).map(p => {
+      const icon = R.getRankIcon(p.calibrateRankName)
+      return { ...p, _rankIcon: icon, _rankIconIsImg: R.isRankIconImage(icon) }
+    })
 
     if (nextItems.length > 0) {
       this.setData({
@@ -422,6 +432,9 @@ Page({
     this.filterAndDisplay()
   },
 
+  /**
+   * 清除搜索关键词并重新渲染
+   */
   clearSearch() {
     this._searchText = ''
     this.setData({ _searchText: '' })
@@ -570,10 +583,11 @@ Page({
     }
   },
 
-  // 【第8轮新增】加载更多历史赛事
+  // 【第8轮新增】加载更多历史赛事（修复：先计算目标页码再 setData，避免异步 data 过期）
   async loadMoreEvents() {
     if (this.data.eventLoadingMore || !this.data.eventHasMore) return
-    this.setData({ eventLoadingMore: true, eventPage: this.data.eventPage + 1 })
+    const nextPage = (this.data.eventPage || 1) + 1
+    this.setData({ eventLoadingMore: true, eventPage: nextPage })
     try {
       await this.loadEvents(false) // 追加模式
     } finally {
@@ -690,17 +704,15 @@ Page({
       list.sort((a, b) => { return (a.calibrateRankSort || 0) - (b.calibrateRankSort || 0) })
     }
 
-    // 为每个元素添加 _rankIcon / _rankIconIsImg（使用 map 创建新数组，避免修改 allPlayers 引用）
-    list = list.map(p => {
+    // 【性能优化】仅在 displayPlayers 上附加 _rankIcon/_rankIconIsImg，避免对全量 filtered 做 map
+    const pageSize = this.data.pageSize
+    const firstPage = list.slice(0, pageSize).map(p => {
       const icon = R.getRankIcon(p.calibrateRankName)
       return { ...p, _rankIcon: icon, _rankIconIsImg: R.isRankIconImage(icon) }
     })
 
-    // 全量排序后存入 filteredPlayers，displayPlayers 只取前 pageSize 条
-    const pageSize = this.data.pageSize
-    const firstPage = list.slice(0, pageSize)
-
     this.setData({
+      // filteredPlayers 保持原始对象引用（不含 _rankIcon 属性），减少内存占用
       filteredPlayers: list,
       displayPlayers: firstPage,
       filteredCount: list.length,
@@ -711,7 +723,7 @@ Page({
   // ====== 导航 ======
   async goAdd() {
     if (!this.data.isAdmin) {
-      const names = this.data.superAdminNames.join('、')
+      const names = this.data.allAdminNames.join('、')
       await modal.confirm(this, {
         theme: 'warning',
         title: '仅管理员可添加选手',
@@ -913,11 +925,7 @@ Page({
   // ====== 【赛事创建】新建赛事弹窗逻辑 ======
 
   /**
-   * 打开「新建赛事」弹窗
-   * 仅管理员端可见调用入口，普通用户不会触发
-   */
-  /**
-   * 【初始化日期时间选择器】
+   * 初始化日期时间选择器（默认1小时后）
    */
   _initCreateDateTimePicker() {
     const now = new Date()
@@ -927,6 +935,9 @@ Page({
     this.setData({ createDateTimeRange: range, createDateTimeIndex: idx, createDateTimeText: text })
   },
 
+  /**
+   * 打开「新建赛事」弹窗（仅管理员可见入口）
+   */
   showCreateEventModal() {
     this._initCreateDateTimePicker()
     this.setData({
@@ -988,7 +999,7 @@ Page({
    * 报名人数上限选项点击
    */
   pickEventLimit(e) {
-    var val = parseInt(e.currentTarget.dataset.val)
+    const val = parseInt(e.currentTarget.dataset.val)
     this.setData({ createEventLimit: val })
     if (val !== -1) {
       this.setData({ createEventLimitCustom: '' })
@@ -1004,19 +1015,20 @@ Page({
 
   /**
    * 【核心】提交创建赛事
-   * 1. 前端校验：赛事名称必填、长度 2-50 字符
-   * 2. 调用 POST /api/events
-   * 3. 成功 → 提示 + 刷新列表 + 跳转详情页
+   * 1. 前端校验：赛事名称必填、2-50 字符
+   * 2. 日期时间选择器 → 毫秒时间戳
+   * 3. 调用 POST /api/events
+   * 4. 成功 → 关闭弹窗 + 刷新赛事章程列表 + 跳转详情页
    */
   async submitCreateEvent() {
-    // ── 【校验1】赛事名称非空 ──
-    var name = (this.data.createEventName || '').trim()
+    // ── 校验1：赛事名称非空 ──
+    const name = (this.data.createEventName || '').trim()
     if (!name) {
       wx.showToast({ title: '请输入赛事名称', icon: 'none' })
       return
     }
 
-    // ── 【校验2】长度 2-50 字符 ──
+    // ── 校验2：长度 2-50 字符 ──
     if (name.length < 2) {
       wx.showToast({ title: '赛事名称至少需要2个字符', icon: 'none' })
       return
@@ -1026,21 +1038,21 @@ Page({
       return
     }
 
-    // ── 【构造请求参数】日期时间选择器 → 毫秒时间戳 ──
-    var startTime = null
+    // ── 构造请求参数：日期时间选择器 → 毫秒时间戳 ──
+    let startTime = null
     if (this.data.createDateTimeRange.length > 0 && this.data.createDateTimeIndex.length > 0) {
       startTime = dt.toTimestamp(this.data.createDateTimeRange, this.data.createDateTimeIndex)
       if (isNaN(startTime)) startTime = null
     }
 
-    var desc = (this.data.createEventDesc || '').trim()
+    const desc = (this.data.createEventDesc || '').trim()
 
     // 报名人数上限处理
-    var signupLimit = null
+    let signupLimit = null
     if (this.data.createEventLimit > 0) {
       signupLimit = this.data.createEventLimit
     } else if (this.data.createEventLimit === -1 && this.data.createEventLimitCustom) {
-      var custom = parseInt(this.data.createEventLimitCustom)
+      const custom = parseInt(this.data.createEventLimitCustom)
       if (!isNaN(custom) && custom > 0) {
         signupLimit = custom
       }
@@ -1049,8 +1061,7 @@ Page({
     wx.showLoading({ title: '创建中...', mask: true })
 
     try {
-      // ── 【调用后端创建接口】 ──
-      var res = await api.post('/events', {
+      const res = await api.post('/events', {
         event_name: name,
         start_time: startTime,
         event_desc: desc || undefined,
@@ -1060,7 +1071,7 @@ Page({
       wx.hideLoading()
 
       if (res.success) {
-        // 创建成功：关闭弹窗
+        // 关闭弹窗
         this.setData({ showCreateModal: false })
 
         wx.showToast({ title: '赛事创建成功', icon: 'success', duration: 1500 })
@@ -1068,15 +1079,16 @@ Page({
         // 刷新赛事章程列表
         this.loadRuleEvents()
 
-        // 延迟跳转到新赛事详情页
-        var eventId = res.data.eventId
-        setTimeout(function () {
-          wx.navigateTo({
-            url: '/pages/event-detail/event-detail?eventId=' + eventId
-          })
-        }, 800)
+        // 延迟跳转详情（确保 toast 可见）
+        const eventId = (res.data && res.data.eventId) ? res.data.eventId : null
+        if (eventId) {
+          setTimeout(() => {
+            wx.navigateTo({
+              url: '/pages/event-detail/event-detail?eventId=' + eventId
+            })
+          }, 800)
+        }
       } else {
-        // 后端返回的业务错误
         wx.showToast({ title: res.error || '创建失败', icon: 'none', duration: 2000 })
       }
     } catch (err) {

@@ -114,10 +114,13 @@
       </view>
     </view>
 
-    <!-- 段位分布饼图 -->
+    <!-- 段位分布饼图（点击遮罩可关闭） -->
     <view class="chart-section" wx:if="{{showChart}}">
       <view class="chart-header">
         <text class="chart-title">段位分布</text>
+        <view class="chart-close" bindtap="closeChart">
+          <text>✕</text>
+        </view>
       </view>
       <view class="chart-body">
         <canvas type="2d" id="rankPieCanvas" class="pie-canvas" style="width:360rpx;height:360rpx;"></canvas>
@@ -169,14 +172,17 @@
       <text wx:else>已显示全部，共 {{filteredCount}} 名选手</text>
     </view>
 
-    <!-- 空状态 -->
+    <!-- 空状态（区分无数据 vs 筛选无结果） -->
     <view class="empty-state" wx:if="{{displayPlayers.length === 0 && loaded}}">
-      <text class="empty-icon">🎮</text>
-      <text class="empty-text">暂无符合条件的选手</text>
+      <text class="empty-icon">{{allPlayers.length === 0 ? '📭' : '🔍'}}</text>
+      <text class="empty-text">{{allPlayers.length === 0 ? '暂无选手数据' : '暂无符合条件的选手'}}</text>
+      <text class="empty-sub" wx:if="{{allPlayers.length === 0 && isAdmin}}">点击右下角 + 号添加第一位选手</text>
+      <text class="empty-sub" wx:elif="{{allPlayers.length > 0}}">试试调整筛选条件</text>
     </view>
 
-    <!-- 加载中 -->
+    <!-- 加载骨架屏 -->
     <view class="loading-state" wx:if="{{!loaded}}">
+      <view class="loading-spinner"></view>
       <text class="loading-text">加载中...</text>
     </view>
 
@@ -200,6 +206,7 @@
 
       <!-- 加载中 -->
       <view class="loading-state" wx:if="{{!rulesLoaded}}">
+        <view class="loading-spinner"></view>
         <text class="loading-text">加载赛事中...</text>
       </view>
 
@@ -246,6 +253,7 @@
 
       <!-- 加载中 -->
       <view class="loading-state" wx:if="{{!eventsLoaded}}">
+        <view class="loading-spinner"></view>
         <text class="loading-text">加载赛事中...</text>
       </view>
 
@@ -329,6 +337,7 @@
             <text>加载更多</text>
           </view>
           <view class="hlm-loading" wx:if="{{eventLoadingMore}}">
+            <view class="loading-spinner-sm"></view>
             <text>加载中...</text>
           </view>
         </view>
