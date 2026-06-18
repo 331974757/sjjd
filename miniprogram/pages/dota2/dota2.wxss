@@ -1347,6 +1347,7 @@
   flex-shrink: 0;
   line-height: 1;
   vertical-align: middle;
+  margin-top: -4rpx;
 }
 
 .hp-team-name {
