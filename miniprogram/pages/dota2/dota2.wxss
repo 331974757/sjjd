@@ -1345,9 +1345,7 @@
 .hp-medal {
   font-size: 30rpx;
   flex-shrink: 0;
-  line-height: 1;
-  vertical-align: middle;
-  margin-top: -4rpx;
+  transform: translateY(-4rpx);
 }
 
 .hp-team-name {

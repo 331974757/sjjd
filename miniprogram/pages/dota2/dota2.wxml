@@ -298,9 +298,9 @@
               <view class="hp-info">
                 <view class="hp-name-row">
                   <view class="hp-left">
-                    <text class="hp-medal">
+                    <view class="hp-medal">
                       {{rank.rankNum === 1 ? '🥇' : rank.rankNum === 2 ? '🥈' : '🥉'}}
-                    </text>
+                    </view>
                     <text class="hp-team-name">{{rank.teamName}}</text>
                   </view>
                   <text class="hp-record">{{rank.wins || 0}} 胜 · {{rank.losses || 0}} 负</text>
