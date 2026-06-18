@@ -421,7 +421,12 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
       const openid = req._openid || '';
       const limitDb = signupLimitVal > 0 ? signupLimitVal : null;
 
-      // 尝试写入含 signup_limit 的完整 SQL
+      // 【兼容旧表结构】三层 insert 回退策略：
+      //   1) 优先写入 signup_limit + event_desc（新版表）
+      //   2) 若 signup_limit 列不存在 → 跳过该列重试
+      //   3) 若 event_desc 列也不存在 → 再跳过该列重试
+      // 这种异常驱动的方式避免了 ALTER TABLE 的运维开销，
+      // 但三层嵌套 try-catch 可读性较差，后续 DB 迁移完成后应简化为单层 INSERT
       try {
         const sql = 'INSERT INTO dota2_events (event_id, event_name, event_desc, creator_id, event_status, start_time, signup_limit, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?, 0, ?, ?)';
         await pool.query(sql, [eventId, eventName, eventDesc || null, openid, startTime, limitDb, now, now]);
@@ -1365,7 +1370,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
    * @param {Array} teams - [{ teamId?, playerIds: [] }]
    * @returns {{ valid: boolean, duplicates: string[], error: string }}
    */
-  function validatePlayerUniqueness(teams, existingTeamId) {
+  function validatePlayerUniqueness(teams) {
     const playerTeamMap = {}; // playerId → team name/index
     const duplicates = [];
 
@@ -1999,28 +2004,33 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
 
   /**
    * 【分数配对算法】按队伍积分（胜场数）从近到远两两配对
-   * 排序规则：胜场降序 → 均分升序（同胜场优先匹配均分最接近的队伍） → 队长昵称升序
+   *
+   * 排序策略（三级排序确保公平性）：
+   *   1. 胜场降序：胜场多的队伍排前面
+   *   2. 均分降序：同胜场内均分高的优先（降序配对后相邻队伍均分差最小）
+   *   3. 队长昵称升序：同胜场同均分时保序
+   *
    * 排序后相邻队伍配对，保证实力最接近的队伍对战
+   * 奇数队伍时，最后一支队伍轮空（本算法不处理轮空—手动模式的概念）
+   *
    * @param {Array} teams - 队伍列表（含 team_id, team_name, wins, avg_mmr, captainName）
    * @returns {Array} [{ teamA, teamB }]
    */
   function autoPairTeams(teams) {
     if (teams.length < 2) return [];
-    // 胜场降序 → 均分升序(同胜场内均分接近的相邻) → 队长昵称升序(保序)
     const sorted = [...teams].sort((a, b) => {
       const scoreA = a.wins || 0
       const scoreB = b.wins || 0
-      if (scoreB !== scoreA) return scoreB - scoreA
+      if (scoreB !== scoreA) return scoreB - scoreA      // 胜场降序
       const mmrA = a.avg_mmr || 0
       const mmrB = b.avg_mmr || 0
-      if (mmrA !== mmrB) return mmrB - mmrA
-      return (a.captainName || '').localeCompare(b.captainName || '', 'zh')
+      if (mmrA !== mmrB) return mmrB - mmrA               // 均分降序（相邻配对均分差最小）
+      return (a.captainName || '').localeCompare(b.captainName || '', 'zh')  // 队长名保序
     });
     const pairs = [];
     for (let i = 0; i < sorted.length - 1; i += 2) {
       pairs.push({ teamA: sorted[i], teamB: sorted[i + 1] });
     }
-    // 奇数队伍时，最后一条不配对（轮空），但这里不涉及轮空——轮空是手动模式的概念
     return pairs;
   }
 
@@ -2351,10 +2361,9 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
         return res.status(400).json({ success: false, error: '本轮没有待开始的对战' });
       }
 
-      const now = Date.now();
       await pool.query(
-        'UPDATE dota2_event_matches SET match_status = 1 WHERE event_id = ? AND round_num = ? AND match_status = 0',
-        [eventId, rn]
+        'UPDATE dota2_event_matches SET match_status = 1, updated_at = ? WHERE event_id = ? AND round_num = ? AND match_status = 0',
+        [Date.now(), eventId, rn]
       );
 
       res.json({
@@ -2402,7 +2411,9 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
         return res.status(400).json({ success: false, error: '双方不能为同一支队伍' });
       }
 
-      values.push(matchId);
+      // 追加 updated_at 时间戳
+      sets.push('updated_at = ?');
+      values.push(Date.now(), matchId);
       await pool.query('UPDATE dota2_event_matches SET ' + sets.join(', ') + ' WHERE match_id = ?', values);
       res.json({ success: true });
     } catch (e) {

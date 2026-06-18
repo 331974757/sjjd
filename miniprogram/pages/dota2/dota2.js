@@ -1087,6 +1087,9 @@ Page({
               url: '/pages/event-detail/event-detail?eventId=' + eventId
             })
           }, 800)
+        } else {
+          // API 返回成功但未返回 eventId，仅刷新列表不跳转（防御性处理）
+          console.warn('[赛事创建] API 成功但未返回 eventId，跳过详情跳转')
         }
       } else {
         wx.showToast({ title: res.error || '创建失败', icon: 'none', duration: 2000 })

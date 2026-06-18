@@ -27,7 +27,7 @@
  * ============================================================
  */
 
-const { getScore, attachScores } = require('./rank-score');
+const { attachScores } = require('./rank-score');
 
 // ---------- 常量定义 ----------
 
@@ -64,11 +64,6 @@ function parsePositions(posStr) {
     .split(/[,，/、\s]+/)
     .map(s => parseInt(s, 10))
     .filter(n => ALL_POSITIONS.includes(n));
-}
-
-/** 浅拷贝选手对象，避免修改原数据 */
-function clonePlayer(p) {
-  return { ...p };
 }
 
 /** 计算标准差 */
@@ -175,7 +170,7 @@ function allocateTeams(playerList, teamCount, forceRules = {}, config = {}) {
   }
 
   // === 第6步：生成最终输出 ===
-  const finalTeams = buildTeamOutput(teams, players);
+  const finalTeams = buildTeamOutput(teams);
   const balanceInfo = computeBalance(finalTeams, {
     swapCount,
     scoreSourceCount,
@@ -685,7 +680,7 @@ function executeSwap(needTeam, swapInfo) {
 /**
  * 构建每支队伍的输出对象
  */
-function buildTeamOutput(teams, allPlayers) {
+function buildTeamOutput(teams) {
   return teams.map(team => {
     const members = team.members;
 

@@ -25,7 +25,7 @@ App({
    * 小程序从后台切回前台时触发
    * 清理过期缓存，确保数据刷新
    */
-  onShow(options) {
+  onShow() {
     // 检查最近一次离开时长，超过一定时间则做轻量清理
     const now = Date.now()
     if (this.globalData._lastHideTime && (now - this.globalData._lastHideTime) > 30000) {

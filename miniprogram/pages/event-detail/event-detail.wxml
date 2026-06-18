@@ -556,7 +556,7 @@
           <view class="bb-pair-card" wx:for="{{battlePairs}}" wx:key="index">
             <view class="bbpc-vs-row">
               <text class="bbpc-swap-edge" wx:if="{{actions.manage_matches.allowed && !isArchived}}">⇄</text>
-              <view class="bbpc-team bbpc-a {{item.teamA ? 'bbpc-filled' : 'bbpc-empty'}}" bindtap="{{actions.manage_matches.allowed && !isArchived ? 'pickTeamForPair' : ''}}" data-index="{{index}}" data-side="A">
+              <view class="bbpc-team {{item.teamA ? '' : 'bbpc-empty'}}" bindtap="{{actions.manage_matches.allowed && !isArchived ? 'pickTeamForPair' : ''}}" data-index="{{index}}" data-side="A">
                 <block wx:if="{{item.teamA}}">
                   <text class="bbpct-name">{{item.teamA.teamName || '未知'}}</text>
                   <text class="bbpct-score">🏅 {{item.teamA.wins || 0}}胜</text>
@@ -569,7 +569,7 @@
               <view class="bbpc-vs">
                 <text class="bbpc-vs-text">VS</text>
               </view>
-              <view class="bbpc-team bbpc-b {{item.teamB ? 'bbpc-filled' : 'bbpc-empty'}}" bindtap="{{actions.manage_matches.allowed && !isArchived ? 'pickTeamForPair' : ''}}" data-index="{{index}}" data-side="B">
+              <view class="bbpc-team {{item.teamB ? '' : 'bbpc-empty'}}" bindtap="{{actions.manage_matches.allowed && !isArchived ? 'pickTeamForPair' : ''}}" data-index="{{index}}" data-side="B">
                 <block wx:if="{{item.teamB}}">
                   <text class="bbpct-name">{{item.teamB.teamName || '未知'}}</text>
                   <text class="bbpct-score">🏅 {{item.teamB.wins || 0}}胜</text>

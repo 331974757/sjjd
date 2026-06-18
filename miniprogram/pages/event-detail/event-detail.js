@@ -416,8 +416,6 @@ Page({
 
     // 未解锁提示
     if (tab._locked && !this.data.readonly) {
-      const statusNames = ['创建中', '报名中', '分组编队', '分组锁定', '对战中', '名次归档']
-      const required = statusNames[tab.unlockStatus] || '未知'
       // 未解锁，静默忽略
       return
     }
@@ -1188,10 +1186,7 @@ Page({
     if (this.data.selectedPlayerId === playerId) {
       this.setData({ selectedPlayerId: '' })
     } else {
-      const player = this.data.freeAgents.find(p => String(p.id) === playerId)
       this.setData({ selectedPlayerId: playerId })
-      if (player) {
-      }
     }
   },
 
@@ -1409,22 +1404,27 @@ Page({
   // 保存编组到服务器
   async saveTeams() {
     if (!this.data.actions.manage_teams || !this.data.actions.manage_teams.allowed) {
+      wx.showToast({ title: '当前不可保存编组', icon: 'none' })
       return
     }
     if (this.data.teams.length === 0) {
+      wx.showToast({ title: '请至少创建一支队伍', icon: 'none' })
       return
     }
 
-    // 前端校验
+    // 前端校验：每队至少5人且有队长
     for (const team of this.data.teams) {
       const members = team.members || team.players || []
       if (members.length < 5) {
+        wx.showToast({ title: `队伍「${team.team_name}」至少需要5名队员，当前${members.length}人`, icon: 'none' })
         return
       }
       if (!team.captain_id) {
+        wx.showToast({ title: `队伍「${team.team_name}」未指定队长`, icon: 'none' })
         return
       }
       if (!members.some(m => String(m.id) === String(team.captain_id))) {
+        wx.showToast({ title: `队伍「${team.team_name}」的队长不在队员列表中`, icon: 'none' })
         return
       }
     }
@@ -1480,10 +1480,12 @@ Page({
   async confirmAutoAllocate() {
     const count = parseInt(this.data.autoTeamCount)
     if (isNaN(count) || count < 1) {
+      wx.showToast({ title: '请输入有效的队伍数量', icon: 'none' })
       return
     }
     const totalPlayers = this.data.signupTotal || this.data.signupCount || 0
     if (count > totalPlayers) {
+      wx.showToast({ title: `队伍数量(${count})不能超过报名人数(${totalPlayers})`, icon: 'none' })
       return
     }
     this.setData({ showTeamCountModal: false, allocating: true })
@@ -1658,7 +1660,7 @@ Page({
             team_b_score: b.wins || 0,
             team_b_avg_mmr: b.avgMmr || m.team_b_avg_mmr || 0,
             team_b_captain: b.captainName || '',
-            battle_image: m.battle_image ? (m.battle_image.startsWith('http') ? m.battle_image : 'https://congqin.online' + m.battle_image) : ''
+            battle_image: this._normalizeImageUrl(m.battle_image)
           }
         })
         // 判断本轮状态
@@ -2286,6 +2288,12 @@ Page({
     })
   },
 
+  /**
+   * 上传对战结果图片（内部实现）
+   * - 使用 wx.uploadFile 直传服务器
+   * - 上传成功后更新本地 battleMatches 数据
+   * - _isUploading 标记防止 onShow 刷数据覆盖当前轮次
+   */
   async _doUploadMatchImage(matchId, filePath) {
     wx.showLoading({ title: '上传中...' })
     try {
@@ -2318,7 +2326,7 @@ Page({
       wx.hideLoading()
       const data = JSON.parse(res.data)
       if (data.success) {
-        const imageUrl = data.data.url.startsWith('http') ? data.data.url : 'https://congqin.online' + data.data.url
+        const imageUrl = this._normalizeImageUrl(data.data.url)
         const matches = this.data.battleMatches.map(m => {
           if (m.match_id === matchId) return { ...m, battle_image: imageUrl }
           return m
@@ -2330,15 +2338,26 @@ Page({
     } catch (e) {
       wx.hideLoading()
       wx.showToast({ title: '上传失败', icon: 'none' })
+    } finally {
+      // 【修复】始终重置 _isUploading，防止阻止后续 onShow 刷新
       this._isUploading = false
     }
+  },
+
+  /**
+   * 归一化图片URL：相对路径→完整URL
+   * 统一处理所有图片URL前缀，避免多处重复拼接
+   */
+  _normalizeImageUrl(url) {
+    if (!url) return ''
+    return url.startsWith('http') ? url : 'https://congqin.online' + url
   },
 
   // 预览对战结果图片
   previewMatchImage(e) {
     const url = e.currentTarget.dataset.url
     if (url) {
-      const fullUrl = url.startsWith('http') ? url : 'https://congqin.online' + url
+      const fullUrl = this._normalizeImageUrl(url)
       wx.previewImage({ urls: [fullUrl], current: fullUrl })
     }
   },
@@ -2589,7 +2608,7 @@ Page({
   // 点击排名区槽位 → 将选中队伍填入该名次
   assignTeamToRank(e) {
     const index = e.currentTarget.dataset.index
-    const { rankSelectedTeamId, rankTeamCards, rankEditSlots, teamsForRank } = this.data
+    const { rankSelectedTeamId, rankTeamCards, rankEditSlots } = this.data
     if (!rankSelectedTeamId) {
       return
     }
