@@ -172,15 +172,18 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
       let where = ' WHERE 1=1';
       const params = [];
 
-      // 按状态筛选（0创建中/1报名中/2报名截止/3分组锁定/4对战中/5已归档）
+      // 按状态筛选（0创建比赛/1报名中/2分组编队/3对战预备/4对战中/5名次归档/6已归档）
       if (status !== undefined && status !== '') {
         where += ' AND event_status = ?';
         params.push(parseInt(status));
       }
-      // 按归档标记筛选
+      // 按归档标记筛选（兼容旧 is_archived 和新 event_status=6）
       if (archived !== undefined && archived !== '') {
-        where += ' AND is_archived = ?';
-        params.push(parseInt(archived));
+        if (parseInt(archived) === 1) {
+          where += ' AND (is_archived = 1 OR event_status >= 6)';
+        } else {
+          where += ' AND is_archived = 0 AND event_status < 6';
+        }
       }
 
       const p = parseInt(page) || 1;
@@ -440,7 +443,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
   /**
    * 更新赛事状态（admin/super_admin）
    * PUT /api/events/:eventId/status
-   * Body: { eventStatus }  - 0创建中/1报名中/2报名截止/3分组锁定/4对战中/5已归档
+   * Body: { eventStatus }  - 0创建比赛/1报名中/2分组编队/3对战预备/4对战中/5名次归档/6已归档
    * - 增加状态流转合法性校验：仅允许正向顺序流转
    */
   app.put('/api/events/:eventId/status', async (req, res) => {
@@ -456,8 +459,8 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
       }
 
       const { eventStatus, signupLimit } = req.body;
-      if (eventStatus === undefined || eventStatus < 0 || eventStatus > 5) {
-        return res.status(400).json({ success: false, error: '无效的赛事状态，有效值0-5' });
+      if (eventStatus === undefined || eventStatus < 0 || eventStatus > 6) {
+        return res.status(400).json({ success: false, error: '无效的赛事状态，有效值0-6' });
       }
 
       // 状态流转校验
@@ -533,10 +536,9 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
 
       // 仅允许在分组编队前修改（状态 0/1/2）
       if (event.event_status >= 3) {
-        const msgs = { 3: '赛事已进入分组阶段', 4: '赛事对战中', 5: '赛事已归档' };
         return res.status(400).json({
           success: false,
-          error: (msgs[event.event_status] || '当前阶段') + '，不可修改报名人数上限',
+          error: `当前为「${STATUS_NAMES[event.event_status] || '未知'}」阶段，不可修改报名人数上限`,
           code: 'EVENT_LOCKED'
         });
       }
@@ -1252,8 +1254,8 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
 
   /**
    * 【队伍锁定校验工具】校验赛事状态是否允许编辑队伍
-   * 队伍编辑仅允许在 报名截止(2) 或 分组锁定(3) 状态下进行
-   * 对战中(4)和已归档(5)时永久锁定
+   * 队伍编辑仅允许在 分组编队(2) 状态下进行
+   * 对战预备(3)及以上时永久锁定
    * @returns {{ locked: boolean, error: string }}
    */
   async function validateTeamEditable(pool, eventId) {
@@ -1263,13 +1265,13 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
     if (event.is_archived === 1) {
       return { locked: true, error: '赛事已归档，队伍数据不可修改' };
     }
-    // 状态<2(创建中/报名中) → 尚未到编组阶段
+    // 状态<2(创建比赛/报名中) → 尚未到编组阶段
     if (event.event_status < 2) {
       return { locked: true, error: '赛事尚未截止报名，无法进行队伍编排' };
     }
-    // 状态>=4(对战中/已归档) → 队伍已永久锁定
-    if (event.event_status >= 4) {
-      return { locked: true, error: '比赛已开始，队伍数据已永久锁定，不可修改' };
+    // 状态>=3(对战预备及以上) → 队伍已永久锁定
+    if (event.event_status >= 3) {
+      return { locked: true, error: '队伍已锁定，不可修改' };
     }
     return { locked: false, error: '', event };
   }
@@ -1464,20 +1466,11 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
           results.push({ teamId, teamName: t.teamName, totalMmr, avgMmr, playerCount: memberCount });
         }
 
-        // 【设计决策】保存编组后自动推进赛事状态 2→3（分组编队→分组锁定）
-        // 理由：队伍已生成完毕，状态应同步变更以避免管理员额外操作。
-        // 使用 AND event_status = 2 条件，防止并发时重复推进（竞态安全）。
-        const [statusResult] = await conn.query(
-          'UPDATE dota2_events SET event_status = 3, updated_at = ? WHERE event_id = ? AND event_status = 2',
-          [now, eventId]
-        );
-        const autoAdvanced = statusResult.affectedRows > 0;
-
         await conn.commit();
         res.json({
           success: true,
           data: { teamCount: results.length, teams: results },
-          message: `成功保存 ${results.length} 支队伍，${autoAdvanced ? '自动锁定分组（状态2→3）' : '队伍已保存'}`
+          message: `成功保存 ${results.length} 支队伍`
         });
       } catch (e) {
         await conn.rollback();
@@ -1575,9 +1568,9 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
    * 【核心接口】开赛锁定（admin/super_admin）
    * POST /api/events/:eventId/lock-teams
    * - 二次校验队伍数据完整性（每队>=1人且有队长）
-   * - 将赛事状态从「分组锁定」(3) 更新为「对战中」(4)
-   * - 状态流转：仅允许 3→4，使用统一 validateStatusTransition 校验
-   * - 对战中/已归档时，所有队伍编辑接口永久拦截
+   * - 将赛事状态从「分组编队」(2) 更新为「分组锁定」(3)
+   * - 状态流转：仅允许 2→3，使用统一 validateStatusTransition 校验
+   * - 分组锁定后，所有队伍编辑接口永久拦截，对阵对战Tab解锁
    */
   app.post('/api/events/:eventId/lock-teams', async (req, res) => {
     try {
@@ -1593,8 +1586,8 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
         return res.status(403).json({ success: false, error: '赛事已归档，不可操作', code: 'ARCHIVED' });
       }
 
-      // 状态流转校验：仅允许「分组锁定(3)」→「对战中(4)」
-      const transition = validateStatusTransition(event.event_status, 4);
+      // 状态流转校验：仅允许「分组编队(2)」→「分组锁定(3)」
+      const transition = validateStatusTransition(event.event_status, 3);
       if (!transition.valid) {
         return res.status(400).json({
           success: false,
@@ -1627,9 +1620,9 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
         }
       }
 
-      // 执行锁定：更新状态为对战中
+      // 执行锁定：状态 2→3（分组编队→分组锁定）
       await pool.query(
-        'UPDATE dota2_events SET event_status = 4, updated_at = ? WHERE event_id = ?',
+        'UPDATE dota2_events SET event_status = 3, updated_at = ? WHERE event_id = ?',
         [Date.now(), eventId]
       );
 
@@ -1637,9 +1630,49 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
         success: true,
         data: {
           teamCount: existingTeams.length,
-          status: '对战中',
-          message: '队伍已锁定，比赛开始！'
+          status: '分组锁定',
+          message: '队伍已锁定，对阵对战已开放！'
         }
+      });
+    } catch (e) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  /**
+   * 【返回分组编队】从分组锁定退回到分组编队（admin/super_admin）
+   * POST /api/events/:eventId/back-to-teams
+   * - 仅允许状态3(分组锁定)→2(分组编队)
+   * - 已生成对战的赛事不可返回
+   */
+  app.post('/api/events/:eventId/back-to-teams', async (req, res) => {
+    try {
+      if (!await assertAdmin(req, res)) return;
+      const { eventId } = req.params;
+
+      const event = await validateEvent(pool, eventId);
+      if (!event) return res.status(404).json({ success: false, error: '赛事不存在' });
+      if (event.is_archived === 1) {
+        return res.status(403).json({ success: false, error: '赛事已归档，不可返回', code: 'ARCHIVED' });
+      }
+      if (event.event_status !== 3) {
+        return res.status(400).json({ success: false, error: `当前状态「${STATUS_NAMES[event.event_status]}」，仅对战预备时可返回` });
+      }
+
+      // 检查是否已生成对战
+      const [[{ cnt }]] = await pool.query('SELECT COUNT(*) as cnt FROM dota2_event_matches WHERE event_id = ?', [eventId]);
+      if (cnt > 0) {
+        return res.status(400).json({ success: false, error: '已有对战记录，无法返回编队阶段' });
+      }
+
+      await pool.query(
+        'UPDATE dota2_events SET event_status = 2, updated_at = ? WHERE event_id = ?',
+        [Date.now(), eventId]
+      );
+
+      res.json({
+        success: true,
+        data: { fromStatus: 3, toStatus: 2, message: '已返回分组编队阶段' }
       });
     } catch (e) {
       res.status(500).json({ success: false, error: e.message });
@@ -1871,8 +1904,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
       return { valid: false, error: '赛事已归档，所有对战数据不可修改', event };
     }
     if (!allowedStatuses.includes(event.event_status)) {
-      const map = { 0: '创建中', 1: '报名中', 2: '报名截止', 3: '分组锁定', 4: '对战中', 5: '已归档' };
-      return { valid: false, error: `赛事当前状态为「${map[event.event_status] || '未知'}」，非对战阶段不可操作`, event };
+      return { valid: false, error: `赛事当前状态为「${STATUS_NAMES[event.event_status] || '未知'}」，非对战阶段不可操作`, event };
     }
     return { valid: true, error: '', event };
   }
@@ -1888,11 +1920,11 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
    * @returns {{ blocked: boolean, error: string }}
    */
   async function checkNotArchived(pool, eventId) {
-    const [[{ archived }]] = await pool.query(
-      'SELECT is_archived as archived FROM dota2_events WHERE event_id = ?',
+    const [[{ archived, event_status }]] = await pool.query(
+      'SELECT is_archived as archived, event_status FROM dota2_events WHERE event_id = ?',
       [eventId]
     );
-    if (archived === 1) {
+    if (archived === 1 || event_status >= 6) {
       return { blocked: true, error: '赛事已归档，所有数据为只读状态，不可修改' };
     }
     return { blocked: false, error: '' };
@@ -1969,12 +2001,29 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
 
       const [rows] = await pool.query(sql, params);
 
-      // 格式化返回数据：为每个对战附加状态中文名
+      // 收集所有队长ID并批量查询名字
+      const captainIds = new Set();
+      rows.forEach(m => {
+        if (m.team_a_captain) captainIds.add(m.team_a_captain);
+        if (m.team_b_captain) captainIds.add(m.team_b_captain);
+      });
+      const captainMap = {};
+      if (captainIds.size > 0) {
+        const [captains] = await pool.query(
+          'SELECT id, wx_nickname FROM dota2_players WHERE id IN (?)',
+          [[...captainIds]]
+        );
+        (captains || []).forEach(p => { captainMap[p.id] = p.wx_nickname || ''; });
+      }
+
+      // 格式化返回数据：为每个对战附加状态中文名 + 队长名
       const matches = rows.map(m => ({
         ...m,
         _statusName: m.match_status === 0 ? '未开始' : m.match_status === 1 ? '进行中' : '已结束',
         _isDone: m.match_status === 2,
         _winnerLabel: m.match_status === 2 ? (m.winner_name || '未知') : '—',
+        team_a_captain_name: captainMap[m.team_a_captain] || '',
+        team_b_captain_name: captainMap[m.team_b_captain] || '',
       }));
 
       res.json({ success: true, data: matches });
@@ -2176,19 +2225,30 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
         );
       }
 
+      // 首轮对战生成后，状态从对战预备(3)推进到对战中(4)
+      let advanced = false;
+      if (nextRound === 1 && battleCheck.event.event_status === 3) {
+        await pool.query(
+          'UPDATE dota2_events SET event_status = 4, updated_at = ? WHERE event_id = ? AND event_status = 3',
+          [now, eventId]
+        );
+        advanced = true;
+      }
+
       res.json({
         success: true,
         data: {
           roundNum: nextRound,
           matchCount: createdMatches.length,
           matches: createdMatches,
+          statusAdvanced: advanced,
           // 轮空的队伍（手动模式中未被勾选的队伍）
           byes: mode === 'manual'
             ? allTeams.filter(t => !pairs.some(p => p.teamAId === t.team_id || p.teamBId === t.team_id))
                 .map(t => ({ teamId: t.team_id, teamName: t.team_name }))
             : [],
         },
-        message: `第${nextRound}轮已生成，共 ${createdMatches.length} 场对战`
+        message: `第${nextRound}轮已生成，共 ${createdMatches.length} 场对战${advanced ? '，赛事已进入对战中' : ''}`
       });
     } catch (e) {
       res.status(500).json({ success: false, error: e.message });
@@ -2531,7 +2591,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
    * POST /api/events/:eventId/end-battle
    *
    * - 校验所有轮次所有对战已完成判定
-   * - 更新赛事状态 对战中(4) → 已归档(5)
+   * - 更新赛事状态 对战中(4) → 名次归档(5)
    * - 后续可由排名模块设定名次
    */
   app.post('/api/events/:eventId/end-battle', async (req, res) => {
@@ -2671,9 +2731,9 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
           await conn.query(cleanSql(table), [eventId]);
         }
 
-        // 4) 更新 events 归档标记
+        // 4) 更新 events 归档标记 + 状态推进到6
         await conn.query(
-          'UPDATE dota2_events SET is_archived = 1, archived_by = ?, archived_at = ?, updated_at = ? WHERE event_id = ?',
+          'UPDATE dota2_events SET is_archived = 1, event_status = 6, archived_by = ?, archived_at = ?, updated_at = ? WHERE event_id = ?',
           [openid, now, now, eventId]
         );
 

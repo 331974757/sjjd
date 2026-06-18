@@ -138,7 +138,7 @@
               <text wx:if="{{item._done}}">✓︎</text>
               <text wx:else>{{index + 1}}</text>
             </view>
-            <view class="ps-line-right" wx:if="{{index < 5}}"></view>
+            <view class="ps-line-right" wx:if="{{index < 6}}"></view>
             <view class="ps-line-left" wx:if="{{index > 0}}"></view>
             <text class="ps-label">{{item.label}}</text>
           </view>
@@ -279,7 +279,7 @@
     <view class="tab-content" wx:if="{{activeTab === 'teams'}}">
 
       <!-- 操作提示（仅管理员可编辑时） -->
-      <view class="team-hint" wx:if="{{actions.manage_teams.allowed && !isArchived && event.event_status < 4}}">
+      <view class="team-hint" wx:if="{{actions.manage_teams.allowed && !isArchived && event.event_status < 3}}">
         <text>👆 点击自由选手选中，再点击队伍卡片放入 · 点击队员 × 移回自由区 · 点击 ♔ 设为队长</text>
       </view>
 
@@ -294,13 +294,13 @@
         <button class="ta-btn ta-btn-save" bindtap="saveTeams" loading="{{teamsSaving}}">💾 保存编组</button>
       </view>
       <!-- 分隔线 -->
-      <view class="team-actions-divider" wx:if="{{actions.lock_teams.allowed && !isArchived && teams.length > 0 && (event.event_status === 2 || event.event_status === 3)}}">
+      <view class="team-actions-divider" wx:if="{{actions.lock_teams.allowed && !isArchived && teams.length > 0}}">
         <view class="tad-line"></view>
         <text class="tad-label">— 确认编组无误后 —</text>
         <view class="tad-line"></view>
       </view>
-      <!-- 状态2/3: 有队伍 → 锁定开赛 -->
-      <view class="team-actions team-actions-lock" wx:if="{{actions.lock_teams.allowed && !isArchived && teams.length > 0 && (event.event_status === 2 || event.event_status === 3)}}">
+      <!-- 状态2: 有队伍 → 锁定开赛（进入对战预备） -->
+      <view class="team-actions team-actions-lock" wx:if="{{actions.lock_teams.allowed && !isArchived && teams.length > 0}}">
         <button class="ta-btn ta-btn-lock" bindtap="doLockTeams" loading="{{locking}}" disabled="{{teamsDirty}}">🔒 锁定开赛</button>
         <view class="ta-lock-hint" wx:if="{{teamsDirty}}">⚠ 请先保存编组</view>
       </view>
@@ -317,7 +317,7 @@
             wx:for="{{freeAgents}}"
             wx:key="id"
             wx:if="{{item.id}}"
-            bindtap="{{actions.manage_teams.allowed && !isArchived && event.event_status < 4 ? 'selectFreeAgent' : ''}}"
+            bindtap="{{actions.manage_teams.allowed && !isArchived && event.event_status < 3 ? 'selectFreeAgent' : ''}}"
             data-player-id="{{item.id}}"
           >
             <image class="fa-avatar" src="{{item.avatar_url || ''}}" mode="aspectFill" />
@@ -353,7 +353,7 @@
         </view>
         <view class="team-list" wx:if="{{teams.length > 0}}">
           <view
-            class="team-card {{selectedPlayerId && event.event_status < 4 && !isArchived ? 'tc-droppable' : ''}}"
+            class="team-card {{selectedPlayerId && event.event_status < 3 && !isArchived ? 'tc-droppable' : ''}}"
             wx:for="{{teams}}"
             wx:key="team_id"
             bindtap="{{selectedPlayerId && actions.manage_teams.allowed && !isArchived && event.event_status < 4 ? 'dropToTeam' : ''}}"
@@ -376,7 +376,7 @@
               <view class="tc-header-right">
                 <text class="tc-mmr">总分 {{item.total_mmr || 0}}　均分 {{item._avgMmr || 0}}</text>
                 <text class="tc-count">{{item._memberCount}}人</text>
-                <view class="tc-del-btn" wx:if="{{actions.manage_teams.allowed && !isArchived && event.event_status < 4}}" catchtap="deleteTeam" data-team-id="{{item.team_id}}">
+                <view class="tc-del-btn" wx:if="{{actions.manage_teams.allowed && !isArchived && event.event_status < 3}}" catchtap="deleteTeam" data-team-id="{{item.team_id}}">
                   <text>×</text>
                 </view>
               </view>
@@ -407,7 +407,7 @@
                   <text class="tcm-mmr">{{(m.calibrate_mmr || 0)}}分</text>
                 </view>
                 <!-- 操作按钮 -->
-                <view class="tcm-actions" wx:if="{{actions.manage_teams.allowed && !isArchived && event.event_status < 4}}">
+                <view class="tcm-actions" wx:if="{{actions.manage_teams.allowed && !isArchived && event.event_status < 3}}">
                   <view class="tcm-set-capt {{m.id === item.captain_id ? 'tcm-is-capt' : ''}}" catchtap="setTeamCaptain" data-team-id="{{item.team_id}}" data-player-id="{{m.id}}">
                     <text>{{m.id === item.captain_id ? '👑' : '♔'}}</text>
                   </view>
@@ -418,7 +418,7 @@
               </view>
             </view>
             <!-- 放入提示 -->
-            <view class="tc-drop-hint" wx:if="{{selectedPlayerId && actions.manage_teams.allowed && !isArchived && event.event_status < 4}}">
+            <view class="tc-drop-hint" wx:if="{{selectedPlayerId && actions.manage_teams.allowed && !isArchived && event.event_status < 3}}">
               <text>📥 点击放入此队</text>
             </view>
           </view>
@@ -429,7 +429,7 @@
       <view class="team-readonly-tip" wx:if="{{event.event_status !== 2 && (event.event_status >= 3 || isArchived)}}">
         <text wx:if="{{isArchived}}">🔒 赛事已归档，队伍信息为只读</text>
         <text wx:elif="{{event.event_status === 4}}">🔒 对战中，队伍信息为只读状态</text>
-        <text wx:elif="{{event.event_status === 3}}">🔒 分组已锁定，队伍不可修改</text>
+        <text wx:elif="{{event.event_status === 3}}">🔒 对战预备，队伍不可修改</text>
         <text wx:else>🔒 队伍信息为只读状态</text>
       </view>
     </view>
@@ -447,6 +447,14 @@
 
       <block wx:if="{{!battleLoading}}">
 
+      <!-- 返回分组编队按钮（仅状态3且未开始对战时可见） -->
+      <view class="back-to-teams-bar" wx:if="{{isAdmin && !isArchived && event.event_status === 3 && battleRoundStatus !== 'fighting'}}">
+        <view class="btt-group">
+          <view class="btt-btn" bindtap="doBackToTeams">↩ 返回分组编队</view>
+          <text class="btt-hint">对战开始前可返回重新编辑队伍</text>
+        </view>
+      </view>
+
       <!-- ========== 一、出战队伍（始终展示） ========== -->
       <view class="sb-section" wx:if="{{battleScoreboard.length > 0}}">
         <view class="sb-header">
@@ -459,7 +467,7 @@
             class="sb-card {{item._selected ? 'sb-selected' : ''}} {{battleRoundStatus === 'fighting' || battleRoundStatus === 'done' || isArchived ? 'sb-readonly' : ''}}"
             wx:for="{{battleScoreboard}}"
             wx:key="teamId"
-            bindtap="toggleBattleTeam"
+            bindtap="{{item._matchId && item._matchStatus === 0 && actions.manage_matches.allowed && !isArchived ? '' : 'toggleBattleTeam'}}"
             data-team-id="{{item.teamId}}"
           >
             <view class="sbc-info">
@@ -470,6 +478,10 @@
               <text class="sbc-wins">🏅 {{item.wins || 0}}胜</text>
               <text class="sbc-losses" wx:if="{{item.losses > 0}}">{{item.losses}}负</text>
               <text class="sbc-mmr">📊 均{{item.avgMmr || 0}}分</text>
+            </view>
+            <!-- 更换队伍按钮 -->
+            <view class="sbc-swap" wx:if="{{item._matchId && item._matchStatus === 0 && actions.manage_matches.allowed && !isArchived}}" catchtap="openTeamSwap" data-team-id="{{item.teamId}}">
+              <text>⇄ 更换</text>
             </view>
             <view class="sbc-check" wx:if="{{item._selected && battleRoundStatus !== 'fighting' && battleRoundStatus !== 'done'}}">
               <text>✓︎</text>
@@ -551,7 +563,7 @@
                   <text class="bbpct-captain">👑 {{item.teamA.captainName || ''}}</text>
                 </block>
                 <block wx:else>
-                  <text class="bbpct-empty">点击选择A队</text>
+                  <text class="bbpct-empty">+</text>
                 </block>
               </view>
               <view class="bbpc-vs">
@@ -564,7 +576,7 @@
                   <text class="bbpct-captain">👑 {{item.teamB.captainName || ''}}</text>
                 </block>
                 <block wx:else>
-                  <text class="bbpct-empty">点击选择B队</text>
+                  <text class="bbpct-empty">+</text>
                 </block>
               </view>
               <text class="bbpc-swap-edge" wx:if="{{actions.manage_matches.allowed && !isArchived}}">⇄</text>
@@ -593,9 +605,9 @@
           >
             <!-- ===== 状态标签 ===== -->
             <view class="bbmc-status-tag">
-              <text class="bbmc-st-tag {{item.match_status === 2 ? 'st-done' : item.match_status === 1 ? 'st-fight' : 'st-wait'}}">
+              <view class="bbmc-st-tag {{item.match_status === 2 ? 'st-done' : item.match_status === 1 ? 'st-fight' : 'st-wait'}}">
                 {{item.match_status === 2 ? '已结束' : item.match_status === 1 ? '待裁决' : '待开战'}}
-              </text>
+              </view>
             </view>
 
             <!-- ===== 对战线 ===== -->
@@ -620,10 +632,6 @@
               <view class="bbmc-vs-ring">
                 <text class="bbmc-vs-text">VS</text>
               </view>
-              <!-- 对决状态 -->
-              <text class="bbmc-vs-sub" wx:if="{{item.match_status === 2}}">已决出</text>
-              <text class="bbmc-vs-sub bbmc-vs-sub-live" wx:if="{{item.match_status === 1}}">待裁决</text>
-              <text class="bbmc-vs-sub" wx:if="{{item.match_status === 0}}">待开战</text>
             </view>
 
             <!-- ===== B队 卡片 ===== -->
@@ -897,11 +905,13 @@
         <view class="judge-options">
           <view class="judge-option" bindtap="selectWinner" data-team-id="{{judgeMatch.team_a_id}}">
             <text class="jo-name">{{judgeMatch.team_a_name || '队伍A'}}</text>
-            <text class="jo-mmr">{{judgeMatch.team_a_mmr || 0}} 分</text>
+            <text class="jo-captain" wx:if="{{judgeMatch.team_a_captain_name}}">👑 {{judgeMatch.team_a_captain_name}}</text>
+            <text class="jo-mmr">{{judgeMatch.team_a_avg_mmr || 0}} 均分</text>
           </view>
           <view class="judge-option" bindtap="selectWinner" data-team-id="{{judgeMatch.team_b_id}}">
             <text class="jo-name">{{judgeMatch.team_b_name || '队伍B'}}</text>
-            <text class="jo-mmr">{{judgeMatch.team_b_mmr || 0}} 分</text>
+            <text class="jo-captain" wx:if="{{judgeMatch.team_b_captain_name}}">👑 {{judgeMatch.team_b_captain_name}}</text>
+            <text class="jo-mmr">{{judgeMatch.team_b_avg_mmr || 0}} 均分</text>
           </view>
         </view>
         <view class="modal-btns"><view class="modal-btn btn-secondary" bindtap="closeJudgeModal"><text>取消</text></view></view>
@@ -1013,24 +1023,59 @@
     </view>
   </view>
 
-  <!-- 换队选择弹窗 -->
+  <!-- 换队选择弹窗（分对战区/自由区） -->
   <view class="modal-mask" wx:if="{{showSwapModal}}" catchtouchmove="preventMove">
     <view class="modal-box">
-      <text class="modal-title">选择替换队伍</text>
-      <text class="modal-subtitle">替换 {{swapSide === 'A' ? 'A队' : 'B队'}} 位置</text>
-      <scroll-view class="swap-team-list" scroll-y="true" style="max-height:500rpx;">
-        <view
-          class="swap-team-item"
-          wx:for="{{battleScoreboard}}"
-          wx:key="teamId"
-          bindtap="doSwapTeam"
-          data-team-id="{{item.teamId}}"
-        >
-          <text class="sti-name">{{item.teamName || '未命名'}}</text>
-          <text class="sti-score">🏅 {{item.wins || 0}}胜</text>
-          <text class="sti-captain">👑 {{item.captainName || ''}}</text>
-        </view>
-      </scroll-view>
+      <text class="modal-title">更换队伍</text>
+      <text class="modal-subtitle">{{swapCurTeamName}} · {{swapSide === 'A' ? 'A队' : 'B队'}}位置</text>
+
+      <!-- 对战区 -->
+      <view class="swap-zone" wx:if="{{swapBattleTeams.length > 0}}">
+        <text class="swap-zone-title">⚔️ 对战区（点击互换位置）</text>
+        <scroll-view class="swap-team-list" scroll-y="true" style="max-height:240rpx;">
+          <view
+            class="swap-team-item sti-inmatch"
+            wx:for="{{swapBattleTeams}}"
+            wx:key="teamId"
+            bindtap="doSwapTeam"
+            data-team-id="{{item.teamId}}"
+          >
+            <view class="sti-left">
+              <text class="sti-name">{{item.teamName || '未命名'}}</text>
+              <text class="sti-captain">👑 {{item.captainName || ''}}</text>
+            </view>
+            <view class="sti-right">
+              <text class="sti-status sti-busy">已出战</text>
+              <text class="sti-score">🏅 {{item.wins || 0}}胜</text>
+            </view>
+          </view>
+        </scroll-view>
+      </view>
+
+      <!-- 自由区 -->
+      <view class="swap-zone" wx:if="{{swapFreeTeams.length > 0}}">
+        <text class="swap-zone-title">📋 自由区（点击替换至对战区）</text>
+        <scroll-view class="swap-team-list" scroll-y="true" style="max-height:240rpx;">
+          <view
+            class="swap-team-item"
+            wx:for="{{swapFreeTeams}}"
+            wx:key="teamId"
+            bindtap="doSwapTeam"
+            data-team-id="{{item.teamId}}"
+          >
+            <view class="sti-left">
+              <text class="sti-name">{{item.teamName || '未命名'}}</text>
+              <text class="sti-captain">👑 {{item.captainName || ''}}</text>
+            </view>
+            <view class="sti-right">
+              <text class="sti-status sti-free">未出战</text>
+              <text class="sti-score">🏅 {{item.wins || 0}}胜</text>
+            </view>
+          </view>
+        </scroll-view>
+      </view>
+
+      <view class="swap-team-hint" wx:if="{{swapBattleTeams.length === 0 && swapFreeTeams.length === 0}}">没有可选的队伍</view>
       <view class="modal-btns" style="margin-top:20rpx;">
         <view class="modal-btn btn-secondary" bindtap="closeSwapModal"><text>取消</text></view>
       </view>
@@ -1040,22 +1085,27 @@
   <!-- 手动配对-队伍选择弹窗 -->
   <view class="modal-mask" wx:if="{{showPairTeamPicker}}" catchtouchmove="preventMove">
     <view class="modal-box">
-      <text class="modal-title">选择{{pairPickerSide === 'A' ? 'A队' : 'B队'}}</text>
       <text class="modal-subtitle">第{{pairPickerIndex + 1}}组对战 • {{pairPickerSide === 'A' ? '左侧' : '右侧'}}位置</text>
       <scroll-view class="swap-team-list" scroll-y="true" style="max-height:500rpx;">
         <view
-          class="swap-team-item {{_pairUsedIds.indexOf(item.teamId) >= 0 ? 'sti-disabled' : ''}}"
-          wx:for="{{pairPickerTeams}}"
+          class="swap-team-item"
+          wx:for="{{pairPickerAllTeams}}"
           wx:key="teamId"
           bindtap="selectPairTeam"
           data-team-id="{{item.teamId}}"
         >
-          <text class="sti-name">{{item.teamName || '未命名'}}</text>
-          <text class="sti-score">🏅 {{item.wins || 0}}胜</text>
-          <text class="sti-captain">👑 {{item.captainName || ''}}</text>
-          <text class="sti-used" wx:if="{{_pairUsedIds.indexOf(item.teamId) >= 0}}">已使用</text>
+          <view class="sti-left">
+            <text class="sti-name">{{item.teamName || '未命名'}}</text>
+            <text class="sti-captain">👑 {{item.captainName || ''}}</text>
+          </view>
+          <view class="sti-right">
+            <text class="sti-score">🏅 {{item.wins || 0}}胜</text>
+            <text class="sti-status sti-busy" wx:if="{{item._status === 'battle'}}">已参战</text>
+            <text class="sti-status sti-free" wx:else>未参战</text>
+          </view>
         </view>
       </scroll-view>
+      <view class="swap-team-hint" wx:if="{{pairPickerAllTeams.length === 0}}">没有可选的队伍</view>
       <view class="modal-btns" style="margin-top:20rpx;">
         <view class="modal-btn btn-secondary" bindtap="closePairTeamPicker"><text>取消</text></view>
       </view>

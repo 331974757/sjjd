@@ -142,24 +142,26 @@ function clearCache() {
  * 赛事状态枚举
  */
 const EVENT_STATUS = {
-  CREATING: 0,        // 创建中
+  CREATING: 0,        // 创建比赛
   SIGNUP_OPEN: 1,     // 报名中
   SIGNUP_CLOSED: 2,   // 分组编队
-  TEAMS_LOCKED: 3,    // 分组锁定
+  BATTLE_READY: 3,    // 对战预备
   BATTLE_ACTIVE: 4,   // 对战中
-  FINISHED: 5,        // 名次归档(event_status层面，比赛结束可设名次；is_archived=1才是正式归档)
+  FINISHED: 5,        // 名次归档
+  ARCHIVED: 6,        // 已归档
 };
 
 /**
  * 赛事状态中文名
  */
 const STATUS_NAMES = {
-  0: '创建中',
+  0: '创建比赛',
   1: '报名中',
   2: '分组编队',
-  3: '分组锁定',
+  3: '对战预备',
   4: '对战中',
   5: '名次归档',
+  6: '已归档',
 };
 
 /**
@@ -191,8 +193,8 @@ function checkAction(action, options) {
   var isAdmin = role === 'admin' || role === 'super_admin';
   var isSuperAdmin = role === 'super_admin';
 
-  // 通用规则：已归档 → 所有写操作禁止
-  if (archived === 1 && action !== 'view' && action !== 'view_detail') {
+  // 通用规则：已归档(status=6 或 is_archived=1) → 所有写操作禁止
+  if ((archived === 1 || status >= EVENT_STATUS.ARCHIVED) && action !== 'view' && action !== 'view_detail') {
     return { allowed: false, disabled: true, reason: '赛事已归档' };
   }
 
@@ -237,7 +239,7 @@ function checkAction(action, options) {
     // ─── 管理员：报名管理 ───
     case 'manage_signups':
       if (!isAdmin) return { allowed: false, disabled: true, reason: '仅管理员可操作' };
-      if (status >= EVENT_STATUS.BATTLE_ACTIVE) {
+      if (status >= EVENT_STATUS.BATTLE_READY) {
         return { allowed: false, disabled: true, reason: `${STATUS_NAMES[status]}阶段不可管理报名` };
       }
       return { allowed: true, disabled: false, reason: '' };
@@ -248,7 +250,7 @@ function checkAction(action, options) {
       if (status < EVENT_STATUS.SIGNUP_CLOSED) {
         return { allowed: false, disabled: true, reason: '报名尚未截止，无法编组' };
       }
-      if (status >= EVENT_STATUS.BATTLE_ACTIVE) {
+      if (status >= EVENT_STATUS.BATTLE_READY) {
         return { allowed: false, disabled: true, reason: '队伍已锁定，不可编辑' };
       }
       return { allowed: true, disabled: false, reason: '' };
@@ -259,16 +261,15 @@ function checkAction(action, options) {
       if (status < EVENT_STATUS.SIGNUP_CLOSED) {
         return { allowed: false, disabled: true, reason: '报名尚未截止，无法开赛' };
       }
-      if (status >= EVENT_STATUS.BATTLE_ACTIVE) {
-        return { allowed: false, disabled: true, reason: '赛事已开赛，无需重复锁定' };
+      if (status >= EVENT_STATUS.BATTLE_READY) {
+        return { allowed: false, disabled: true, reason: '队伍已锁定，无需重复操作' };
       }
       return { allowed: true, disabled: false, reason: '' };
 
-    // ─── 管理员：对战管理 ───
+    // ─── 管理员：对战管理（状态3对战预备/4对战中均可） ───
     case 'manage_matches':
       if (!isAdmin) return { allowed: false, disabled: true, reason: '仅管理员可操作' };
-      // 仅对战中(status=4)可操作对战（生成对战/判定胜负/下一轮/结束比赛）
-      if (status !== EVENT_STATUS.BATTLE_ACTIVE) {
+      if (status !== EVENT_STATUS.BATTLE_READY && status !== EVENT_STATUS.BATTLE_ACTIVE) {
         return { allowed: false, disabled: true, reason: `「${STATUS_NAMES[status] || '未知'}」阶段不可操作对战` };
       }
       return { allowed: true, disabled: false, reason: '' };
@@ -277,7 +278,7 @@ function checkAction(action, options) {
     case 'end_battle':
       if (!isAdmin) return { allowed: false, disabled: true, reason: '仅管理员可操作' };
       if (status !== EVENT_STATUS.BATTLE_ACTIVE) {
-        return { allowed: false, disabled: true, reason: `「${STATUS_NAMES[status] || '未知'}」阶段不可操作对战` };
+        return { allowed: false, disabled: true, reason: `「${STATUS_NAMES[status] || '未知'}」阶段只能在对战中进行` };
       }
       return { allowed: true, disabled: false, reason: '' };
 

@@ -44,24 +44,26 @@ const ROLES = {
 // 二、赛事状态常量
 
 const STATUS = {
-  CREATING: 0,          // 创建中
+  CREATING: 0,          // 创建比赛
   SIGNUP_OPEN: 1,       // 报名中
-  SIGNUP_CLOSED: 2,     // 报名截止
-  TEAMS_LOCKED: 3,      // 分组锁定
+  SIGNUP_CLOSED: 2,     // 分组编队
+  BATTLE_READY: 3,      // 对战预备
   BATTLE_ACTIVE: 4,     // 对战中
-  FINISHED: 5,          // 名次归档(event_status层面，比赛结束可设名次；is_archived=1才是正式归档)
+  FINISHED: 5,          // 名次归档
+  ARCHIVED: 6,          // 已归档
 };
 
 const STATUS_NAMES = {
-  0: '创建中',
+  0: '创建比赛',
   1: '报名中',
   2: '分组编队',
-  3: '分组锁定',
+  3: '对战预备',
   4: '对战中',
   5: '名次归档',
+  6: '已归档',
 };
 
-// 三、状态流转规则（严格正向顺序 0→1→2→3→4→5）
+// 三、状态流转规则（严格正向顺序 0→1→2→3→4→5→6）
 
 /**
  * 校验状态流转合法性
@@ -76,7 +78,7 @@ function validateStatusTransition(currentStatus, targetStatus) {
   }
   return {
     valid: false,
-    error: `状态流转不合法：当前「${STATUS_NAMES[currentStatus]}」→「${STATUS_NAMES[targetStatus]}」不是合法跳转。仅允许按顺序依次推进：创建中→报名中→分组编队→分组锁定→对战中→已归档`
+    error: `状态流转不合法：当前「${STATUS_NAMES[currentStatus]}」→「${STATUS_NAMES[targetStatus]}」不是合法跳转。仅允许按顺序依次推进：${Object.values(STATUS_NAMES).join('→')}`
   };
 }
 
@@ -85,24 +87,24 @@ function validateStatusTransition(currentStatus, targetStatus) {
  * @returns {string[]} 允许的操作类型列表
  */
 function getAllowedActions(eventStatus, isArchived) {
-  // 已正式归档 → 全部只读
-  if (isArchived === 1) {
-    return ['view']; // 仅查看
+  // 状态6(已归档) 或 is_archived=1 → 全部只读
+  if (eventStatus >= STATUS.ARCHIVED || isArchived === 1) {
+    return ['view'];
   }
 
   const actions = ['view'];
   switch (eventStatus) {
     case STATUS.CREATING:
-      actions.push('edit_event', 'delete_event'); // 编辑/删除赛事基本信息
+      actions.push('edit_event', 'delete_event');
       break;
     case STATUS.SIGNUP_OPEN:
       actions.push('signup', 'cancel_signup', 'manage_signups', 'edit_event');
       break;
     case STATUS.SIGNUP_CLOSED:
-      actions.push('manage_teams', 'edit_event', 'manage_signups');
+      actions.push('manage_teams', 'edit_event', 'manage_signups', 'lock_teams');
       break;
-    case STATUS.TEAMS_LOCKED:
-      actions.push('manage_teams', 'lock_teams', 'edit_event', 'manage_matches');
+    case STATUS.BATTLE_READY:
+      actions.push('manage_matches', 'edit_event', 'back_to_teams');
       break;
     case STATUS.BATTLE_ACTIVE:
       actions.push('manage_matches', 'judge', 'next_round', 'end_battle');
@@ -184,7 +186,7 @@ async function requireSignupOpen(req, res, next) {
   if (!event) {
     return res.status(404).json({ success: false, error: '赛事不存在' });
   }
-  if (event.is_archived === 1) {
+  if (event.is_archived === 1 || event.event_status >= STATUS.ARCHIVED) {
     return res.status(400).json({ success: false, error: '赛事已归档，不可进行报名操作' });
   }
   if (event.event_status !== STATUS.SIGNUP_OPEN) {
@@ -198,7 +200,7 @@ async function requireSignupOpen(req, res, next) {
 }
 
 /**
- * 断言赛事队伍可编辑（status=2 或 3）
+ * 断言赛事队伍可编辑（仅 status=2 分组编队）
  * 适用：队伍编组、自动分队、删除队伍
  */
 async function requireTeamEditable(req, res, next) {
@@ -207,21 +209,21 @@ async function requireTeamEditable(req, res, next) {
   if (!event) {
     return res.status(404).json({ success: false, error: '赛事不存在' });
   }
-  if (event.is_archived === 1) {
+  if (event.is_archived === 1 || event.event_status >= STATUS.ARCHIVED) {
     return res.status(400).json({ success: false, error: '赛事已归档，队伍数据不可修改' });
   }
   if (event.event_status < STATUS.SIGNUP_CLOSED) {
     return res.status(400).json({ success: false, error: '赛事尚未截止报名，无法进行队伍编排' });
   }
-  if (event.event_status >= STATUS.BATTLE_ACTIVE) {
-    return res.status(400).json({ success: false, error: '比赛已开始，队伍数据已永久锁定，不可修改' });
+  if (event.event_status >= STATUS.BATTLE_READY) {
+    return res.status(400).json({ success: false, error: '队伍已锁定，不可修改' });
   }
   req._event = event;
   next();
 }
 
 /**
- * 断言赛事在「对战中」状态（status=4）
+ * 断言赛事在对战阶段（status=3 对战预备 或 status=4 对战中）
  * 适用：生成对战、胜负判定、进入下一轮、结束比赛
  */
 async function requireBattleActive(req, res, next) {
@@ -230,10 +232,10 @@ async function requireBattleActive(req, res, next) {
   if (!event) {
     return res.status(404).json({ success: false, error: '赛事不存在' });
   }
-  if (event.is_archived === 1) {
+  if (event.is_archived === 1 || event.event_status >= STATUS.ARCHIVED) {
     return res.status(400).json({ success: false, error: '赛事已归档，所有对战数据不可修改' });
   }
-  if (event.event_status !== STATUS.BATTLE_ACTIVE) {
+  if (event.event_status !== STATUS.BATTLE_READY && event.event_status !== STATUS.BATTLE_ACTIVE) {
     return res.status(400).json({
       success: false,
       error: `赛事当前状态为「${STATUS_NAMES[event.event_status] || '未知'}」，非对战阶段不可操作`
@@ -249,11 +251,11 @@ async function requireBattleActive(req, res, next) {
  */
 async function requireNotArchived(req, res, next) {
   const eventId = req.params.eventId;
-  const [[{ archived }]] = await pool.query(
-    'SELECT is_archived as archived FROM dota2_events WHERE event_id = ?',
+  const [[{ archived, event_status }]] = await pool.query(
+    'SELECT is_archived as archived, event_status FROM dota2_events WHERE event_id = ?',
     [eventId]
   );
-  if (archived === 1) {
+  if (archived === 1 || event_status >= STATUS.ARCHIVED) {
     return res.status(403).json({ success: false, error: '赛事已归档，所有数据为只读状态，不可修改' });
   }
   next();
@@ -273,7 +275,7 @@ async function requireAdminNotArchived(req, res, next) {
   if (!event) {
     return res.status(404).json({ success: false, error: '赛事不存在' });
   }
-  if (event.is_archived === 1) {
+  if (event.is_archived === 1 || event.event_status >= STATUS.ARCHIVED) {
     return res.status(403).json({ success: false, error: '赛事已归档，不可编辑' });
   }
   req._event = event;
@@ -371,12 +373,11 @@ async function validateEvent(eventId) {
 async function validateSignupEvent(eventId) {
   const event = await getEvent(eventId);
   if (!event) return { valid: false, error: '赛事不存在', event: null };
-  if (event.is_archived === 1) {
+  if (event.is_archived === 1 || event.event_status >= STATUS.ARCHIVED) {
     return { valid: false, error: '赛事已归档，不可进行报名操作', event };
   }
   if (event.event_status !== STATUS.SIGNUP_OPEN) {
-    const map = { 0: '赛事尚未开启报名', 2: '报名已截止', 3: '赛事已进入分组阶段', 4: '赛事对战中', 5: '赛事已归档' };
-    return { valid: false, error: map[event.event_status] || '当前赛事不在报名阶段', event };
+    return { valid: false, error: `赛事当前为「${STATUS_NAMES[event.event_status] || '未知'}」阶段，非报名阶段不可操作`, event };
   }
   return { valid: true, error: '', event };
 }
@@ -387,14 +388,14 @@ async function validateSignupEvent(eventId) {
 async function validateTeamEditable(eventId) {
   const event = await getEvent(eventId);
   if (!event) return { locked: true, error: '赛事不存在' };
-  if (event.is_archived === 1) {
+  if (event.is_archived === 1 || event.event_status >= STATUS.ARCHIVED) {
     return { locked: true, error: '赛事已归档，队伍数据不可修改' };
   }
   if (event.event_status < STATUS.SIGNUP_CLOSED) {
     return { locked: true, error: '赛事尚未截止报名，无法进行队伍编排' };
   }
-  if (event.event_status >= STATUS.BATTLE_ACTIVE) {
-    return { locked: true, error: '比赛已开始，队伍数据已永久锁定，不可修改' };
+  if (event.event_status >= STATUS.BATTLE_READY) {
+    return { locked: true, error: '队伍已锁定，不可修改' };
   }
   return { locked: false, error: '', event };
 }
@@ -405,10 +406,11 @@ async function validateTeamEditable(eventId) {
 async function validateBattleEvent(eventId) {
   const event = await getEvent(eventId);
   if (!event) return { valid: false, error: '赛事不存在', event: null };
-  if (event.is_archived === 1) {
+  if (event.is_archived === 1 || event.event_status >= STATUS.ARCHIVED) {
     return { valid: false, error: '赛事已归档，所有对战数据不可修改', event };
   }
-  if (event.event_status !== STATUS.BATTLE_ACTIVE) {
+  // 对战预备(3) 和 对战中(4) 均允许操作对战
+  if (event.event_status !== STATUS.BATTLE_READY && event.event_status !== STATUS.BATTLE_ACTIVE) {
     return { valid: false, error: `赛事当前状态为「${STATUS_NAMES[event.event_status] || '未知'}」，非对战阶段不可操作`, event };
   }
   return { valid: true, error: '', event };

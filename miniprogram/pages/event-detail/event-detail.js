@@ -187,12 +187,15 @@ Page({
     showSwapModal: false,
     swapMatchId: '',
     swapSide: 'A',  // 要换的是 A队 还是 B队
+    swapCurTeamName: '',        // 当前被换的队伍名
+    swapBattleTeams: [],        // 对战区可选队伍（互换位置）
+    swapFreeTeams: [],          // 自由区可选队伍（替换至对战区）
     // —— 手动配对-队伍选择弹窗 ——
     showPairTeamPicker: false,
     pairPickerIndex: -1,
     pairPickerSide: 'A',
-    pairPickerTeams: [],        // 可选队伍列表（积分榜数据）
-    _pairUsedIds: [],            // 当前已使用队伍ID（灰化）
+    pairPickerAllTeams: [],     // 统一队伍列表（每项带 _status: 'free' | 'battle'）
+    _pairBattleTeamMap: {},     // 已参战队伍→所在配对信息 {teamId: {pairIndex, pairSide}}
 
     // ===== Tab5: 名次归档 =====
     isArchived: false,
@@ -272,7 +275,6 @@ Page({
       this._updateTabLocks()
       this._updateActions()
       await this._loadTabData(this.data.activeTab)
-      wx.showToast({ title: '已刷新', icon: 'success', duration: 1200 })
     } catch (e) {
       wx.showToast({ title: '刷新失败', icon: 'none' })
     } finally {
@@ -336,7 +338,7 @@ Page({
         const ts = event.start_time
         this.setData({
           event,
-          isArchived: event.is_archived === 1,
+          isArchived: event.is_archived === 1 || event.event_status >= 6,
           _archiveTimeText: event.archived_at ? '归档时间：' + this.formatTime(event.archived_at) : '',
           _archiveByText: event.archived_by_nickname ? '归档操作人：' + event.archived_by_nickname : (event.archived_by ? '归档操作人：' + event.archived_by : ''),
           editTimeRange: this._buildEditTimeRange(ts),
@@ -376,22 +378,23 @@ Page({
     this._updateProgressSteps()
   },
 
-  /** 计算赛事进度条 */
+  /** 计算赛事进度条（7步，一一对应event_status 0-6） */
   _updateProgressSteps() {
     const status = this.data.event.event_status
-    const isArchived = this.data.isArchived
     const steps = [
-      { label: '创建中', key: 'draft' },
+      { label: '创建比赛', key: 'draft' },
       { label: '报名中', key: 'signup' },
-      { label: '分组编队', key: 'signup_closed' },
-      { label: '分组锁定', key: 'locked' },
-      { label: '对战中', key: 'fighting' },
-      { label: '名次归档', key: 'archived' }
+      { label: '分组编队', key: 'teams' },
+      { label: '对战预备', key: 'ready' },
+      { label: '对战中', key: 'matches' },
+      { label: '名次归档', key: 'ranks' },
+      { label: '已归档', key: 'archived' }
     ]
+    // event_status 直接对应 steps 下标
     const progressSteps = steps.map((s, i) => ({
       ...s,
-      _done: isArchived ? true : (i < status),
-      _active: isArchived ? (i === 5) : (i === status)
+      _done: i < status,
+      _active: i === status
     }))
     this.setData({ progressSteps })
   },
@@ -406,7 +409,7 @@ Page({
     if (tab._locked && !this.data.readonly) {
       const statusNames = ['创建中', '报名中', '分组编队', '分组锁定', '对战中', '名次归档']
       const required = statusNames[tab.unlockStatus] || '未知'
-      wx.showToast({ title: '赛事进入「' + required + '」阶段后解锁', icon: 'none', duration: 2000 })
+      // 未解锁，静默忽略
       return
     }
 
@@ -468,7 +471,7 @@ Page({
     if (!event) return
     const opts = {
       eventStatus: event.event_status,
-      isArchived: event.is_archived || 0,
+      isArchived: (event.is_archived || 0) || (event.event_status >= 6 ? 1 : 0),
       userRole: this.data.userRole
     }
     if (this.data.readonly) {
@@ -505,7 +508,7 @@ Page({
   _canEditEventInfo() {
     const { event, isAdmin, readonly } = this.data
     if (!event || readonly || !isAdmin) return false
-    if (event.is_archived === 1) return false
+    if (event.is_archived === 1 || event.event_status >= 6) return false
     return true
   },
 
@@ -522,8 +525,8 @@ Page({
   },
   async confirmEditName() {
     const val = (this.data.editNameValue || '').trim()
-    if (!val) { wx.showToast({ title: '赛事名称不能为空', icon: 'none' }); return }
-    if (val.length < 2 || val.length > 50) { wx.showToast({ title: '名称需2-50个字符', icon: 'none' }); return }
+      if (!val) { return }
+    if (val.length < 2 || val.length > 50) { return }
     if (val === this.data.event.event_name) { this.cancelEditName(); return }
     this.setData({ editingName: false })
     try {
@@ -603,7 +606,7 @@ Page({
     if (!ts || isNaN(ts)) {
       const backIdx = this._getEditTimeIndex(this.data.event.start_time)
       this.setData({ editTimeIndex: backIdx })
-      wx.showToast({ title: '选择时间无效', icon: 'none' })
+      // 时间无效，静默还原
       return
     }
     if (ts === this.data.event.start_time) return
@@ -643,7 +646,6 @@ Page({
       const res = await api.del('/events/' + this.data.eventId)
       this.setData({ cancelEventSubmitting: false })
       if (res.success) {
-        wx.showToast({ title: '赛事已取消', icon: 'success' })
         setTimeout(() => { wx.navigateBack() }, 1200)
       } else {
         wx.showToast({ title: res.error || '取消失败', icon: 'none' })
@@ -713,7 +715,7 @@ Page({
   getBtnDisabledReason() {
     const event = this.data.event
     if (!event) return ''
-    const map = { 0: '报名未开始', 1: '', 2: '报名已截止', 3: '赛事已分组锁定', 4: '赛事对战中', 5: '赛事已归档' }
+    const map = { 0: '报名未开始', 1: '', 2: '报名已截止', 3: '对战预备中', 4: '赛事对战中', 5: '赛事已结束', 6: '赛事已归档' }
     return map[event.event_status] || ''
   },
 
@@ -731,7 +733,7 @@ Page({
   // 开启/截止报名
   showStatusConfirm() {
     const next = this.getNextStatus()
-    if (!next) { wx.showToast({ title: '当前状态不支持此操作', icon: 'none' }); return }
+    if (!next) { return }
     // 开启报名：直接执行，不弹窗
     if (next.status === 1) {
       this._doChangeStatusDirect(1)
@@ -784,7 +786,7 @@ Page({
       const res = await api.put('/events/' + this.data.eventId + '/status', payload)
       this.setData({ loading: false })
       if (res.success) {
-        wx.showToast({ title: this.data.targetStatusName + '成功', icon: 'success' })
+        // 成功，静默处理
         await this.loadEvent()
         this._updateTabLocks()
         this._updateActions()
@@ -837,7 +839,7 @@ Page({
     } else if (editSignupLimitVal === 'custom') {
       limitVal = parseInt(editCustomSignupLimit)
       if (!limitVal || limitVal <= 0) {
-        wx.showToast({ title: '请输入有效人数', icon: 'none' }); return
+        return
       }
     } else {
       limitVal = parseInt(editSignupLimitVal)
@@ -866,12 +868,13 @@ Page({
     if (!event || readonly) { this.setData({ _overviewJump: null }); return }
     const status = event.event_status
     const jumpMap = {
-      0: null,                          // 创建中：不显示跳转按钮
+      0: null,                          // 创建比赛：不显示跳转按钮
       1: { tab: 'signups', index: 1, label: '📝 前往报名管理', desc: '管理报名人员' },
-      2: { tab: 'teams', index: 2, label: '👥 前往分组编组', desc: '进行队伍分组编排' },
-      3: { tab: 'teams', index: 2, label: '👥 查看分组编组', desc: '分组已锁定，查看队伍编排' },
+      2: { tab: 'teams', index: 2, label: '👥 前往分组编队', desc: '进行队伍分组编排' },
+      3: { tab: 'matches', index: 3, label: '⚔️ 前往对阵对战', desc: '生成对战编排' },
       4: { tab: 'matches', index: 3, label: '⚔️ 前往对阵对战', desc: '编排对战与判定胜负' },
-      5: { tab: 'ranks', index: 4, label: '🏆 前往名次归档', desc: '设定最终排名' }
+      5: { tab: 'ranks', index: 4, label: '🏆 前往名次归档', desc: '设定最终排名' },
+      6: null                           // 已归档：不显示跳转按钮
     }
     this.setData({ _overviewJump: jumpMap[status] || null })
   },
@@ -951,11 +954,10 @@ Page({
   // --- 用户自主报名 ---
   async doSignup() {
     const { event, mySignup, signupCount } = this.data
-    if (event.event_status !== 1) { wx.showToast({ title: this.getBtnDisabledReason(), icon: 'none' }); return }
-    if (mySignup && mySignup.signedUp) { wx.showToast({ title: '您已报名当前赛事', icon: 'none' }); return }
+    if (event.event_status !== 1) { return }
+    if (mySignup && mySignup.signedUp) { return }
     // 前端校验：报名人数上限（仅自主报名受限，管理员添加不受限）
     if (event.signup_limit && event.signup_limit > 0 && signupCount >= event.signup_limit) {
-      wx.showToast({ title: '报名人数已满（上限' + event.signup_limit + '人）', icon: 'none', duration: 2000 })
       return
     }
     this.setData({ loading: true })
@@ -963,7 +965,7 @@ Page({
       const res = await api.post('/events/' + this.data.eventId + '/signups', {})
       this.setData({ loading: false })
       if (res.success) {
-        wx.showToast({ title: '报名成功！', icon: 'success' })
+        // 报名成功，静默处理
         await Promise.all([this.loadMySignup(), this.loadSignups()])
       } else {
         this._handleSignupError(res)
@@ -984,11 +986,11 @@ Page({
       case 'MULTIPLE_MATCH':
         await modal.confirm(this, { theme: 'warning', title: '匹配到多条记录', content: '您的昵称匹配到多个选手档案，请联系管理员手动添加报名。', showCancel: false }); break
       case 'ALREADY_SIGNED':
-        wx.showToast({ title: '您已报名当前赛事', icon: 'none' }); break
+        break
       case 'EVENT_NOT_OPEN':
-        wx.showToast({ title: res.error || '当前赛事不在报名阶段', icon: 'none' }); break
+        break
       case 'SIGNUP_FULL':
-        wx.showToast({ title: '报名人数已满', icon: 'none', duration: 2000 }); break
+        break
       default:
         wx.showToast({ title: res.error || '报名失败', icon: 'none' })
     }
@@ -1003,7 +1005,6 @@ Page({
       const res = await api.del('/events/' + this.data.eventId + '/signups/' + this.data.mySignup.signupId)
       this.setData({ loading: false })
       if (res.success) {
-        wx.showToast({ title: '已取消报名', icon: 'success' })
         await Promise.all([this.loadMySignup(), this.loadSignups()])
       } else {
         wx.showToast({ title: res.error || '取消失败', icon: 'none' })
@@ -1053,13 +1054,6 @@ Page({
   // 单个添加：直接添加一名选手到报名池
   async doSingleAdd(e) {
     const pid = e.currentTarget.dataset.pid
-    const player = this.data.searchResults.find(p => p._id == pid)
-    const name = player ? (player.wx_nickname || '未知') : ''
-    const r = await modal.confirm(this, {
-      title: '添加报名',
-      content: '确定将「' + name + '」加入报名池？'
-    })
-    if (!r.confirm) return
     this.setData({ addLoading: true })
     try {
           const res = await api.post('/events/' + this.data.eventId + '/signups/batch', { playerIds: [pid] })
@@ -1067,7 +1061,6 @@ Page({
           const result = res.data || {}
           const added = result.success || 0
           if (res.success && added > 0) {
-            wx.showToast({ title: '添加成功', icon: 'success' })
             // 仅当服务器确认添加成功后，才在搜索结果中标记已报名
             const results = this.data.searchResults.map(p =>
               p._id == pid ? { ...p, _alreadySigned: true } : p
@@ -1076,13 +1069,10 @@ Page({
             await this.loadSignups()
           } else if (res.success && result.skipped > 0) {
             this.setData({ addLoading: false })
-            wx.showToast({ title: '该选手已报名，无需重复添加', icon: 'none' })
           } else if (res.success && result.failed > 0) {
             this.setData({ addLoading: false })
-            wx.showToast({ title: (result.details && result.details[0] && result.details[0].reason) || '添加失败', icon: 'none' })
           } else {
             this.setData({ addLoading: false })
-            wx.showToast({ title: res.error || '添加失败', icon: 'none' })
           }
         } catch (e) {
           this.setData({ addLoading: false })
@@ -1106,7 +1096,7 @@ Page({
       const res = await api.del('/events/' + this.data.eventId + '/signups/' + s.signup_id)
       this.setData({ loading: false })
       if (res.success) {
-        wx.showToast({ title: '已剔除报名', icon: 'success' })
+        // 已剔除，静默处理
         await this.loadSignups()
       } else {
         wx.showToast({ title: res.error || '操作失败', icon: 'none' })
@@ -1187,7 +1177,6 @@ Page({
       const player = this.data.freeAgents.find(p => String(p.id) === playerId)
       this.setData({ selectedPlayerId: playerId })
       if (player) {
-        wx.showToast({ title: '已选「' + (player.wx_nickname || '未知') + '」', icon: 'none', duration: 1200 })
       }
     }
   },
@@ -1209,7 +1198,6 @@ Page({
     if (targetTeam) {
       const members = targetTeam.members || targetTeam.players || []
       if (members.some(m => String(m.id) === String(playerId))) {
-        wx.showToast({ title: '该选手已在队伍中', icon: 'none' })
         return
       }
     }
@@ -1237,7 +1225,6 @@ Page({
     })
 
     this.setData({ freeAgents, teams: this._normalizeTeams(teams), selectedPlayerId: '', teamsDirty: true })
-    wx.showToast({ title: '已加入「' + (targetTeam ? targetTeam.team_name : '') + '」', icon: 'success', duration: 1200 })
   },
 
   // ============ 队伍内操作 ============
@@ -1273,7 +1260,6 @@ Page({
     })
 
     this.setData({ teams: this._normalizeTeams(teams), freeAgents, teamsDirty: true })
-    wx.showToast({ title: '已移回自由区', icon: 'success', duration: 1000 })
   },
 
   // 设置/取消队长
@@ -1303,7 +1289,7 @@ Page({
   // 新建空队伍
   addTeam() {
     if (!this.data.actions.manage_teams || !this.data.actions.manage_teams.allowed) {
-      wx.showToast({ title: '无操作权限', icon: 'none' }); return
+      return
     }
     const index = this.data.teams.length + 1
     const teams = [...this.data.teams, {
@@ -1317,8 +1303,8 @@ Page({
       isNew: true
     }]
     this.setData({ teams: this._normalizeTeams(teams), teamsDirty: true })
-    wx.showToast({ title: '已创建"战队' + index + '"', icon: 'success', duration: 1000 })
   },
+
 
   // 删除队伍（释放队员到自由区）
   async deleteTeam(e) {
@@ -1338,16 +1324,17 @@ Page({
     const freeAgents = [...this.data.freeAgents, ...members]
     const teams = this.data.teams.filter(t => String(t.team_id) !== String(teamId))
     this.setData({ teams: this._normalizeTeams(teams), freeAgents, selectedPlayerId: '', teamsDirty: true })
-    wx.showToast({ title: '已删除', icon: 'success' })
   },
 
   // ============ 战队名编辑（队长/管理员，保存分组后，归档前） ============
   /** 判断当前用户是否可以编辑指定队伍的名称 */
   _canEditTeamName(team) {
     const { event, isAdmin, isArchived, _myPlayerId } = this.data
-    if (isArchived || !team) return false
-    // 仅「分组编队」阶段(状态2)可编辑；分组锁定(3)/对战中(4)/已归档(5)均禁止
+    if (isArchived || event.event_status >= 6 || !team) return false
+    // 仅「分组编队」阶段(状态2)可编辑战队名
     if (!event || event.event_status !== 2) return false
+    // 未保存编组前（temp_/alloc_/isNew 队伍）不允许改战队名
+    if (team.isNew || String(team.team_id).startsWith('temp_') || String(team.team_id).startsWith('alloc_')) return false
     // 管理员可编辑
     if (isAdmin) return true
     // 队长可编辑
@@ -1377,8 +1364,8 @@ Page({
   async confirmEditTeamName() {
     const { _editingTeamId, _editTeamNameValue, eventId } = this.data
     const val = (_editTeamNameValue || '').trim()
-    if (!val) { wx.showToast({ title: '战队名不能为空', icon: 'none' }); return }
-    if (val.length > 50) { wx.showToast({ title: '战队名不能超过50个字符', icon: 'none' }); return }
+    if (!val) { return }
+    if (val.length > 50) { return }
 
     this.setData({ _editingTeamId: '', _editTeamNameValue: '' })
     wx.showLoading({ title: '更新中...' })
@@ -1394,7 +1381,6 @@ Page({
           return t
         })
         this.setData({ teams })
-        wx.showToast({ title: '战队名已更新', icon: 'success' })
       } else {
         wx.showToast({ title: res.error || '更新失败', icon: 'none' })
       }
@@ -1409,23 +1395,23 @@ Page({
   // 保存编组到服务器
   async saveTeams() {
     if (!this.data.actions.manage_teams || !this.data.actions.manage_teams.allowed) {
-      wx.showToast({ title: '无操作权限', icon: 'none' }); return
+      return
     }
     if (this.data.teams.length === 0) {
-      wx.showToast({ title: '请先创建队伍', icon: 'none' }); return
+      return
     }
 
     // 前端校验
     for (const team of this.data.teams) {
       const members = team.members || team.players || []
       if (members.length < 5) {
-        wx.showToast({ title: '「' + team.team_name + '」至少需要5名队员，当前仅' + members.length + '人', icon: 'none' }); return
+        return
       }
       if (!team.captain_id) {
-        wx.showToast({ title: '「' + team.team_name + '」未指定队长', icon: 'none' }); return
+        return
       }
       if (!members.some(m => String(m.id) === String(team.captain_id))) {
-        wx.showToast({ title: '「' + team.team_name + '」队长不在队员中', icon: 'none' }); return
+        return
       }
     }
 
@@ -1443,7 +1429,7 @@ Page({
       const res = await api.post('/events/' + this.data.eventId + '/teams/batch', { teams: teamsPayload })
       this.setData({ teamsSaving: false, teamsDirty: false })
       if (res.success) {
-        wx.showToast({ title: res.message || '保存成功', icon: 'success' })
+        // 保存成功，静默处理
         setTimeout(() => {
           this.loadTeams()
           this.loadEvent().then(() => { this._updateTabLocks(); this._updateActions() })
@@ -1460,7 +1446,7 @@ Page({
   // 自动分队 → 先弹窗输入组数
   doAutoAllocate() {
     if (!this.data.actions.manage_teams || !this.data.actions.manage_teams.allowed) {
-      wx.showToast({ title: '无操作权限', icon: 'none' }); return
+      return
     }
     const suggested = Math.max(1, Math.floor((this.data.signupTotal || this.data.signupCount) / 5))
     this.setData({ showTeamCountModal: true, autoTeamSuggestion: String(suggested), autoTeamCount: String(suggested) })
@@ -1480,11 +1466,11 @@ Page({
   async confirmAutoAllocate() {
     const count = parseInt(this.data.autoTeamCount)
     if (isNaN(count) || count < 1) {
-      wx.showToast({ title: '请输入有效的组数（≥1）', icon: 'none' }); return
+      return
     }
     const totalPlayers = this.data.signupTotal || this.data.signupCount || 0
     if (count > totalPlayers) {
-      wx.showToast({ title: '组数不能超过选手总数（' + totalPlayers + '人）', icon: 'none' }); return
+      return
     }
     this.setData({ showTeamCountModal: false, allocating: true })
     try {
@@ -1505,7 +1491,6 @@ Page({
         freeAgents = freeAgents.map(normalizeFreeAgent).filter(p => p.id)
 
         this.setData({ teams: this._normalizeTeams(teams), freeAgents, selectedPlayerId: '', teamsDirty: true })
-        wx.showToast({ title: '自动分队完成（共' + count + '组）', icon: 'success' })
       } else {
         wx.showToast({ title: res.error || '分队失败', icon: 'none' })
       }
@@ -1517,18 +1502,15 @@ Page({
 
   // 锁定分组并开赛
   async doLockTeams() {
-    if (!this.data.actions.lock_teams || !this.data.actions.lock_teams.allowed) {
-      wx.showToast({ title: '无操作权限', icon: 'none' }); return
-    }
-    // 先保存再锁定
-    if (this.data.teams.some(t => (t.isNew || String(t.team_id).startsWith('temp_') || String(t.team_id).startsWith('alloc_')))) {
-      wx.showToast({ title: '请先保存编组再锁定开赛', icon: 'none' })
+    const lockAction = this.data.actions.lock_teams
+    if (!lockAction || !lockAction.allowed) {
+      wx.showToast({ title: lockAction?.reason || '当前不可锁定开赛', icon: 'none' })
       return
     }
     const r = await modal.confirm(this, {
       theme: 'danger',
-      title: '锁定分组并开赛',
-      content: '确认锁定当前分组并开始比赛？\n\n锁定后队伍信息不可修改，赛事进入对战中状态。'
+      title: '锁定分组开赛',
+      content: '确认锁定当前分组？\n\n锁定后队伍信息不可修改，对阵对战将开放进入「对战预备」状态。'
     })
     if (!r.confirm) return
     this.setData({ locking: true })
@@ -1536,7 +1518,6 @@ Page({
           const res = await api.post('/events/' + this.data.eventId + '/lock-teams', {})
           this.setData({ locking: false })
           if (res.success) {
-            wx.showToast({ title: '已开赛', icon: 'success' })
             await this.loadEvent()
             this._updateTabLocks()
             this._updateActions()
@@ -1548,6 +1529,29 @@ Page({
           this.setData({ locking: false })
           wx.showToast({ title: '操作失败，请重试', icon: 'none' })
         }
+  },
+
+  // 返回分组编队
+  async doBackToTeams() {
+    const r = await modal.confirm(this, {
+      theme: 'warn',
+      title: '返回分组编队',
+      content: '确认返回分组编队阶段？\n\n返回后对阵对战将暂时关闭，可重新编辑队伍。'
+    })
+    if (!r.confirm) return
+    try {
+      const res = await api.post('/events/' + this.data.eventId + '/back-to-teams', {})
+      if (res.success) {
+        await this.loadEvent()
+        this._updateTabLocks()
+        this._updateActions()
+        setTimeout(() => this._switchToTab('teams'), 400)
+      } else {
+        wx.showToast({ title: res.error || '返回失败', icon: 'none' })
+      }
+    } catch (e) {
+      wx.showToast({ title: '返回失败，请重试', icon: 'none' })
+    }
   },
 
   // 跳转到队伍编辑页（保留兼容，但不再使用）
@@ -1649,11 +1653,14 @@ Page({
           battleRoundHasMatches: hasMatches,
           battleRoundStatus: status
         })
-        // 根据状态回填选中ID，同步 _selected 标记
+        // 根据状态回填选中ID，同步 _selected 标记 + 对战信息
         if (hasMatches) {
           const ids = new Set()
           matches.forEach(m => { if (m.team_a_id) ids.add(String(m.team_a_id)); if (m.team_b_id) ids.add(String(m.team_b_id)) })
           this._syncBattleSelected([...ids])
+          this._markScoreboardMatchInfo(matches)
+        } else {
+          this._markScoreboardMatchInfo([])
         }
         // 开战后不显示配对编辑
         if (status === 'fighting' || status === 'done') {
@@ -1681,30 +1688,42 @@ Page({
     this.setData({ battleScoreboard: sb, battleSelectedIds: [...set] })
   },
 
+  // 标记出战队伍卡片上的对战信息（用于显示「更换」按钮）
+  _markScoreboardMatchInfo(matches) {
+    const infoMap = {}
+    ;(matches || []).forEach(m => {
+      if (m.team_a_id) infoMap[String(m.team_a_id)] = { _matchId: m.match_id, _matchSide: 'A', _matchStatus: m.match_status }
+      if (m.team_b_id) infoMap[String(m.team_b_id)] = { _matchId: m.match_id, _matchSide: 'B', _matchStatus: m.match_status }
+    })
+    const sb = this.data.battleScoreboard.map(s => {
+      const info = infoMap[s.teamId]
+      return info
+        ? { ...s, _matchId: info._matchId, _matchSide: info._matchSide, _matchStatus: info._matchStatus }
+        : { ...s, _matchId: '', _matchSide: '', _matchStatus: -1 }
+    })
+    this.setData({ battleScoreboard: sb })
+  },
+
   // 点击队伍卡片切换参战选中
   toggleBattleTeam(e) {
     const teamId = String(e.currentTarget.dataset.teamId)
 
     // 检查是否已归档
     if (this.data.isArchived) {
-      wx.showToast({ title: '赛事已归档，无法选队', icon: 'none', duration: 2000 })
       return
     }
 
     // 检查用户权限
     const matchPerm = this.data.actions.manage_matches
     if (!matchPerm || !matchPerm.allowed) {
-      wx.showToast({ title: matchPerm ? matchPerm.reason : '无操作权限', icon: 'none', duration: 2000 })
       return
     }
 
     // 检查对战状态
     if (this.data.battleRoundStatus === 'fighting') {
-      wx.showToast({ title: '对战中，无法更改参战队伍', icon: 'none', duration: 2000 })
       return
     }
     if (this.data.battleRoundStatus === 'done') {
-      wx.showToast({ title: '本轮已结束，无法更改参战队伍', icon: 'none', duration: 2000 })
       return
     }
 
@@ -1727,51 +1746,110 @@ Page({
     this.setData({ battlePairs: pairs })
   },
 
-  // 点击配对卡片的队伍位置：弹出队伍选择器
+  // 点击配对卡片的队伍位置：弹出队伍选择器（分对战区/自由区）
   pickTeamForPair(e) {
     if (!this.data.isAdmin) return
     const index = parseInt(e.currentTarget.dataset.index)
     const side = e.currentTarget.dataset.side
-    // 收集当前已占用的队伍ID（排除当前槽位）
     const pairs = this.data.battlePairs
-    const usedIds = []
+    const allTeams = this.data.battleScoreboard
+    const curPair = pairs[index] || {}
+
+    // 需要排除的队伍ID：当前槽位自己的 + 同组另一方
+    const excludeIds = new Set()
+    const curTeam = side === 'A' ? curPair.teamA : curPair.teamB
+    if (curTeam && curTeam.teamId != null) excludeIds.add(String(curTeam.teamId))
+    const samePairOther = side === 'A' ? curPair.teamB : curPair.teamA
+    if (samePairOther && samePairOther.teamId != null) excludeIds.add(String(samePairOther.teamId))
+
+    // 收集其他对战组已占用的队伍→对战区
+    const battleMap = {}
     pairs.forEach((p, i) => {
-      if (i !== index && p.teamA) usedIds.push(String(p.teamA.teamId))
-      if (i !== index && p.teamB) usedIds.push(String(p.teamB.teamId))
+      if (i === index) return
+      if (p.teamA && p.teamA.teamId != null) battleMap[String(p.teamA.teamId)] = { pairIndex: i, pairSide: 'A' }
+      if (p.teamB && p.teamB.teamId != null) battleMap[String(p.teamB.teamId)] = { pairIndex: i, pairSide: 'B' }
     })
+
+    // 合并为一个列表，每项带 _status 标记
+    const allTeamList = []
+    allTeams.forEach(t => {
+      const tid = String(t.teamId)
+      if (excludeIds.has(tid)) return       // 当前组队伍完全不显示
+      if (battleMap[tid]) {
+        allTeamList.push({ ...t, _status: 'battle', _pairInfo: battleMap[tid] })
+      } else {
+        allTeamList.push({ ...t, _status: 'free' })
+      }
+    })
+
     this.setData({
       showPairTeamPicker: true,
       pairPickerIndex: index,
       pairPickerSide: side,
-      pairPickerTeams: this.data.battleScoreboard,
-      _pairUsedIds: usedIds
+      pairPickerAllTeams: allTeamList,
+      _pairBattleTeamMap: battleMap
     })
   },
 
-  // 在弹窗中选定队伍并填入配对槽位
+  // 在弹窗中选定队伍（未参战→直接填入；已参战→互换位置）
   selectPairTeam(e) {
     const teamId = String(e.currentTarget.dataset.teamId)
-    const { pairPickerIndex, pairPickerSide, pairPickerTeams, _pairUsedIds } = this.data
-    if (_pairUsedIds.indexOf(teamId) >= 0) return
+    const { pairPickerIndex, pairPickerSide, pairPickerAllTeams, _pairBattleTeamMap } = this.data
 
-    const team = pairPickerTeams.find(t => String(t.teamId) === teamId)
+    const team = pairPickerAllTeams.find(t => String(t.teamId) === teamId)
     if (!team) return
 
     const pairs = [...this.data.battlePairs]
-    if (pairPickerIndex >= 0 && pairPickerIndex < pairs.length) {
-      pairs[pairPickerIndex] = { ...pairs[pairPickerIndex] }
+    if (pairPickerIndex < 0 || pairPickerIndex >= pairs.length) return
+
+    const curPair = pairs[pairPickerIndex] || { teamA: null, teamB: null }
+    pairs[pairPickerIndex] = { ...curPair }
+
+    if (team._status === 'battle') {
+      // ★ 已参战：两个队伍互换配对位置
+      const info = _pairBattleTeamMap[teamId]
+      if (!info) return
+
+      const curTeam = pairPickerSide === 'A' ? curPair.teamA : curPair.teamB
+      const otherIdx = info.pairIndex
+      if (otherIdx < 0 || otherIdx >= pairs.length) return
+
+      pairs[otherIdx] = { ...(pairs[otherIdx] || { teamA: null, teamB: null }) }
+
+      // 当前槽位填入选中的队伍
+      if (pairPickerSide === 'A') {
+        pairs[pairPickerIndex].teamA = team
+      } else {
+        pairs[pairPickerIndex].teamB = team
+      }
+
+      // 另一方槽位填入当前槽位原来的队伍
+      if (info.pairSide === 'A') {
+        pairs[otherIdx].teamA = curTeam
+      } else {
+        pairs[otherIdx].teamB = curTeam
+      }
+    } else {
+      // ★ 未参战：直接填入当前槽位（原队伍退回自由区）
       if (pairPickerSide === 'A') {
         pairs[pairPickerIndex].teamA = team
       } else {
         pairs[pairPickerIndex].teamB = team
       }
     }
+
     this.setData({ battlePairs: pairs, showPairTeamPicker: false })
   },
 
   // 关闭手动配对队伍选择弹窗
   closePairTeamPicker() {
-    this.setData({ showPairTeamPicker: false, pairPickerIndex: -1, pairPickerSide: 'A', _pairUsedIds: [] })
+    this.setData({
+      showPairTeamPicker: false,
+      pairPickerIndex: -1,
+      pairPickerSide: 'A',
+      pairPickerAllTeams: [],
+      _pairBattleTeamMap: {}
+    })
   },
 
   // 自动匹配：根据分数将选中队伍相邻配对
@@ -1780,7 +1858,7 @@ Page({
     const selectedIds = battleSelectedIds.length > 0
       ? battleSelectedIds
       : battleScoreboard.map(t => t.teamId)
-    if (selectedIds.length < 2) { wx.showToast({ title: '至少需要2支队伍', icon: 'none' }); return }
+    if (selectedIds.length < 2) { return }
 
     // 从积分榜中取出选中队伍（保持积分榜排序：分数降→队长名升）
     const teamMap = {}; battleScoreboard.forEach(t => { teamMap[t.teamId] = t })
@@ -1801,70 +1879,146 @@ Page({
     this.setData({ battlePairs: pairs })
   },
 
-  // 点击配对的队伍位置：弹出换队选择器
+  // 点击已生成对战的队伍位置：弹出换队选择器
   openSwapModal(e) {
     const { matchId, side } = e.currentTarget.dataset
-    this.setData({ showSwapModal: true, swapMatchId: matchId || '', swapSide: side || 'A' })
+    if (!matchId) return
+    this._buildSwapModalCore(matchId, side)
   },
-  closeSwapModal() { this.setData({ showSwapModal: false, swapMatchId: '', swapSide: 'A' }) },
 
-  // 选择替换的队伍
+  // 从出战队伍卡片点击「更换」按钮
+  openTeamSwap(e) {
+    const teamId = String(e.currentTarget.dataset.teamId)
+    const team = this.data.battleScoreboard.find(s => s.teamId === teamId)
+    if (!team || !team._matchId) return
+    this._buildSwapModalCore(team._matchId, team._matchSide)
+  },
+
+  // 核心：构建换队弹窗数据（分对战区/自由区）
+  _buildSwapModalCore(matchId, side) {
+    const { battleScoreboard, battleMatches } = this.data
+    const curMatch = battleMatches.find(m => m.match_id === matchId)
+    if (!curMatch) return
+
+    const otherSideTeamId = side === 'A' ? String(curMatch.team_b_id || '') : String(curMatch.team_a_id || '')
+    const curTeamId = side === 'A' ? String(curMatch.team_a_id || '') : String(curMatch.team_b_id || '')
+
+    const inMatchSet = new Set()
+    const teamMatchMap = {}
+    battleMatches.forEach(m => {
+      const aId = String(m.team_a_id || '')
+      const bId = String(m.team_b_id || '')
+      if (aId) { inMatchSet.add(aId); teamMatchMap[aId] = m.match_id }
+      if (bId) { inMatchSet.add(bId); teamMatchMap[bId] = m.match_id }
+    })
+
+    const available = battleScoreboard
+      .filter(t => {
+        const tid = String(t.teamId)
+        return tid !== otherSideTeamId && tid !== curTeamId
+      })
+      .map(t => {
+        const tid = String(t.teamId)
+        const inMatch = inMatchSet.has(tid)
+        return {
+          ...t,
+          _inMatch: inMatch,
+          _otherMatchId: inMatch ? (teamMatchMap[tid] || '') : ''
+        }
+      })
+
+    const curTeam = battleScoreboard.find(s => s.teamId === curTeamId)
+    this.setData({
+      showSwapModal: true,
+      swapMatchId: matchId,
+      swapSide: side,
+      swapCurTeamName: curTeam ? (curTeam.teamName || '未知') : '未知',
+      swapBattleTeams: available.filter(t => t._inMatch),
+      swapFreeTeams: available.filter(t => !t._inMatch)
+    })
+  },
+
+  closeSwapModal() {
+    this.setData({
+      showSwapModal: false,
+      swapMatchId: '',
+      swapSide: 'A',
+      swapCurTeamName: '',
+      swapBattleTeams: [],
+      swapFreeTeams: []
+    })
+  },
+
+  // 选择替换的队伍（自由区→替换至对战区；对战区→互换位置）
   async doSwapTeam(e) {
-    const newTeamId = e.currentTarget.dataset.teamId
-    const { swapSide, swapMatchId, battleScoreboard, eventId, battleMatches } = this.data
-    if (!swapMatchId || !newTeamId) {
-      this.setData({ showSwapModal: false })
-      return
-    }
+    const newTeamId = String(e.currentTarget.dataset.teamId)
+    const { swapSide, swapMatchId, swapBattleTeams, swapFreeTeams, eventId, battleMatches, battleScoreboard } = this.data
+    if (!swapMatchId || !newTeamId) { this.setData({ showSwapModal: false }); return }
 
-    const newTeam = battleScoreboard.find(t => String(t.teamId) === String(newTeamId))
-    if (!newTeam) {
-      this.setData({ showSwapModal: false })
-      wx.showToast({ title: '队伍不存在', icon: 'none' })
-      return
-    }
+    const selectedTeam = [...swapBattleTeams, ...swapFreeTeams].find(t => String(t.teamId) === newTeamId)
+    if (!selectedTeam) { this.setData({ showSwapModal: false }); return }
 
     const matchIdx = battleMatches.findIndex(m => m.match_id === swapMatchId)
-    if (matchIdx < 0) {
-      this.setData({ showSwapModal: false })
-      return
-    }
+    if (matchIdx < 0) { this.setData({ showSwapModal: false }); return }
 
     const match = battleMatches[matchIdx]
-    if (match.match_status !== 0) {
-      wx.showToast({ title: '仅可调整待开战的对战', icon: 'none' })
-      this.setData({ showSwapModal: false })
-      return
-    }
+    if (match.match_status !== 0) { this.setData({ showSwapModal: false }); return }
 
-    // 检查是否与另一方重复
-    const otherTeamId = swapSide === 'A' ? match.team_b_id : match.team_a_id
-    if (String(newTeamId) === String(otherTeamId)) {
-      wx.showToast({ title: '不能与对方相同', icon: 'none' })
-      return
-    }
-
-    // 先更新本地（含均分）
     const updated = [...battleMatches]
-    if (swapSide === 'A') {
-      updated[matchIdx] = { ...match, team_a_id: newTeamId, team_a_name: newTeam.teamName,
-        team_a_mmr: newTeam.totalMmr || 0, team_a_avg_mmr: newTeam.avgMmr || 0 }
+    const apiCalls = []
+
+    if (selectedTeam._inMatch) {
+      // ★ 对战区队伍 → 两个队伍互换位置
+      const otherMatchId = selectedTeam._otherMatchId
+      const otherMatchIdx = battleMatches.findIndex(m => m.match_id === otherMatchId)
+      if (otherMatchIdx < 0) { this.setData({ showSwapModal: false }); return }
+
+      const otherMatch = updated[otherMatchIdx]
+      const otherSide = String(otherMatch.team_a_id) === newTeamId ? 'A' : 'B'
+
+      if (swapSide === 'A') {
+        const oldTeamId = String(match.team_a_id || '')
+        updated[matchIdx] = this._fillMatchTeam(updated[matchIdx], 'A', selectedTeam, battleScoreboard)
+        updated[otherMatchIdx] = this._fillMatchTeamById(updated[otherMatchIdx], otherSide, oldTeamId, battleScoreboard)
+        apiCalls.push(
+          api.put('/events/' + eventId + '/matches/' + swapMatchId, { teamAId: newTeamId }),
+          api.put('/events/' + eventId + '/matches/' + otherMatchId, otherSide === 'A' ? { teamAId: oldTeamId } : { teamBId: oldTeamId })
+        )
+      } else {
+        const oldTeamId = String(match.team_b_id || '')
+        updated[matchIdx] = this._fillMatchTeam(updated[matchIdx], 'B', selectedTeam, battleScoreboard)
+        updated[otherMatchIdx] = this._fillMatchTeamById(updated[otherMatchIdx], otherSide, oldTeamId, battleScoreboard)
+        apiCalls.push(
+          api.put('/events/' + eventId + '/matches/' + swapMatchId, { teamBId: newTeamId }),
+          api.put('/events/' + eventId + '/matches/' + otherMatchId, otherSide === 'A' ? { teamAId: oldTeamId } : { teamBId: oldTeamId })
+        )
+      }
     } else {
-      updated[matchIdx] = { ...match, team_b_id: newTeamId, team_b_name: newTeam.teamName,
-        team_b_mmr: newTeam.totalMmr || 0, team_b_avg_mmr: newTeam.avgMmr || 0 }
+      // ★ 自由区队伍 → 替换至对战区（原队伍退回自由区）
+      if (swapSide === 'A') {
+        updated[matchIdx] = this._fillMatchTeam(updated[matchIdx], 'A', selectedTeam, battleScoreboard)
+        apiCalls.push(api.put('/events/' + eventId + '/matches/' + swapMatchId, { teamAId: newTeamId }))
+      } else {
+        updated[matchIdx] = this._fillMatchTeam(updated[matchIdx], 'B', selectedTeam, battleScoreboard)
+        apiCalls.push(api.put('/events/' + eventId + '/matches/' + swapMatchId, { teamBId: newTeamId }))
+      }
     }
+
     this.setData({ battleMatches: updated, showSwapModal: false })
 
-    // 同步更新到服务器
     try {
-      const res = await api.put('/events/' + eventId + '/matches/' + swapMatchId,
-        swapSide === 'A' ? { teamAId: newTeamId } : { teamBId: newTeamId })
-      if (!res.success) {
-        wx.showToast({ title: res.error || '换队失败', icon: 'none' })
-        // 恢复
+      const results = await Promise.all(apiCalls)
+      const failed = results.filter(r => !r.success)
+      if (failed.length > 0) {
+        wx.showToast({ title: failed[0].error || '换队失败', icon: 'none' })
         this.setData({ battleMatches })
       } else {
-        // 替换成功，静默更新
+        // 成功后刷新出战队伍卡片的对战信息
+        this._markScoreboardMatchInfo(updated)
+        // 同步参战ID
+        const ids = new Set()
+        updated.forEach(m => { if (m.team_a_id) ids.add(String(m.team_a_id)); if (m.team_b_id) ids.add(String(m.team_b_id)) })
+        this._syncBattleSelected([...ids])
       }
     } catch (e) {
       wx.showToast({ title: '换队失败，请重试', icon: 'none' })
@@ -1872,13 +2026,38 @@ Page({
     }
   },
 
+  // 工具：用队伍对象填充 match 的 A/B 槽位
+  _fillMatchTeam(match, side, team, sb) {
+    const sbTeam = sb.find(t => String(t.teamId) === String(team.teamId)) || team
+    if (side === 'A') {
+      return { ...match, team_a_id: String(team.teamId), team_a_name: team.teamName || sbTeam.teamName,
+        team_a_mmr: sbTeam.totalMmr || 0, team_a_avg_mmr: sbTeam.avgMmr || 0 }
+    } else {
+      return { ...match, team_b_id: String(team.teamId), team_b_name: team.teamName || sbTeam.teamName,
+        team_b_mmr: sbTeam.totalMmr || 0, team_b_avg_mmr: sbTeam.avgMmr || 0 }
+    }
+  },
+
+  // 工具：用 teamId 字符串填充 match 的 A/B 槽位
+  _fillMatchTeamById(match, side, teamId, sb) {
+    const team = sb.find(t => String(t.teamId) === String(teamId))
+    if (!team) return match
+    if (side === 'A') {
+      return { ...match, team_a_id: teamId, team_a_name: team.teamName,
+        team_a_mmr: team.totalMmr || 0, team_a_avg_mmr: team.avgMmr || 0 }
+    } else {
+      return { ...match, team_b_id: teamId, team_b_name: team.teamName,
+        team_b_mmr: team.totalMmr || 0, team_b_avg_mmr: team.avgMmr || 0 }
+    }
+  },
+
   // ============ 生成对战（调用API） ============
   async doGenerateMatches() {
     const { battlePairs } = this.data
-    if (battlePairs.length === 0) { wx.showToast({ title: '请先添加对战组', icon: 'none' }); return }
+    if (battlePairs.length === 0) { return }
     // 验证每对都有两支队伍
     const incomplete = battlePairs.some(p => !p.teamA || !p.teamB)
-    if (incomplete) { wx.showToast({ title: '请先填满所有对战组的队伍', icon: 'none' }); return }
+    if (incomplete) { return }
     // 组装确认弹窗内容：列出每场对战详情
     const pairLines = battlePairs.map((p) => {
       const a = p.teamA || {}
@@ -1987,12 +2166,12 @@ Page({
   // ============ 胜负判定 ============
   openJudgeModal(e) {
     if (!this.data.isAdmin) return
-    if (this.data.isArchived) { wx.showToast({ title: '赛事已归档，不可修改', icon: 'none' }); return }
+    if (this.data.isArchived) { return }
     const matchId = e.currentTarget.dataset.matchId
     const match = this.data.battleMatches.find(m => m.match_id === matchId)
     if (!match) return
-    if (match._isDone || match.match_status === 2) { wx.showToast({ title: '该对战已判定', icon: 'none' }); return }
-    if (match.match_status !== 1) { wx.showToast({ title: '请先点击「开战」', icon: 'none' }); return }
+    if (match._isDone || match.match_status === 2) { return }
+    if (match.match_status !== 1) { return }
     this.setData({ showJudgeModal: true, judgeMatch: match, judgeStep: 0, judgeWinnerId: '' })
   },
   selectWinner(e) {
@@ -2055,7 +2234,6 @@ Page({
     const match = this.data.battleMatches.find(m => m.match_id === matchId)
     if (!match) return
     if (!this._canUploadMatchImage(match)) {
-      wx.showToast({ title: '仅参赛队伍队长或管理员可上传', icon: 'none' })
       return
     }
     const that = this
@@ -2102,7 +2280,6 @@ Page({
       wx.hideLoading()
       const data = JSON.parse(res.data)
       if (data.success) {
-        wx.showToast({ title: '上传成功', icon: 'success' })
         const imageUrl = data.data.url.startsWith('http') ? data.data.url : 'https://congqin.online' + data.data.url
         const matches = this.data.battleMatches.map(m => {
           if (m.match_id === matchId) return { ...m, battle_image: imageUrl }
@@ -2346,11 +2523,10 @@ Page({
 
     // 找到第一个空槽位
     const card = rankTeamCards.find(c => c.teamId === teamId)
-    if (!card) { wx.showToast({ title: '队伍信息未找到', icon: 'none' }); return }
+    if (!card) { return }
 
     const emptyIndex = rankEditSlots.findIndex(s => !s.teamId)
     if (emptyIndex < 0) {
-      wx.showToast({ title: '所有名次均已填满，请先添加更多名次', icon: 'none' })
       return
     }
 
@@ -2372,18 +2548,16 @@ Page({
     const index = e.currentTarget.dataset.index
     const { rankSelectedTeamId, rankTeamCards, rankEditSlots, teamsForRank } = this.data
     if (!rankSelectedTeamId) {
-      wx.showToast({ title: '请先点击上方队伍卡片选择队伍', icon: 'none' })
       return
     }
     // 检查该队伍是否已被其他名次占用
     const dupSlot = rankEditSlots.find((s, i) => i !== index && s.teamId === rankSelectedTeamId)
     if (dupSlot) {
-      wx.showToast({ title: '该队伍已在第' + dupSlot.rankNum + '名', icon: 'none' })
       return
     }
     // 查找队伍卡片信息
     const card = rankTeamCards.find(c => c.teamId === rankSelectedTeamId)
-    if (!card) { wx.showToast({ title: '队伍信息未找到', icon: 'none' }); return }
+    if (!card) { return }
     // 获取队员信息
     const members = this._getTeamMembers(rankSelectedTeamId)
     const slots = [...rankEditSlots]
@@ -2411,7 +2585,7 @@ Page({
 
   addMoreRankSlots() {
     const slots = [...this.data.rankEditSlots]
-    if (slots.length >= 20) { wx.showToast({ title: '最多设置20个名次', icon: 'none' }); return }
+    if (slots.length >= 20) { return }
     const next = slots.length + 1
     slots.push({ rankNum: next, teamId: '', teamName: '', captainName: '', label: '第' + next + '名', members: [] })
     this.setData({ rankEditSlots: slots })
@@ -2421,7 +2595,7 @@ Page({
   async removeRankSlot(e) {
     const index = e.currentTarget.dataset.index
     const slots = [...this.data.rankEditSlots]
-    if (slots.length <= 1) { wx.showToast({ title: '至少保留1个名次', icon: 'none' }); return }
+    if (slots.length <= 1) { return }
     // 如果被移除的槽位有队伍数据，提示确认
     if (slots[index].teamId) {
       const r = await modal.confirm(this, {
@@ -2472,7 +2646,6 @@ Page({
       const res = await api.post('/events/' + this.data.eventId + '/ranks/batch', { ranks: ranksData })
       this.setData({ ranksSaving: false })
       if (res.success) {
-        wx.showToast({ title: '名次已保存', icon: 'success' })
         this.setData({ ranksEditing: false, _rankUsedTeamMap: {}, rankSelectedTeamId: '' })
         await this.loadRanks()
       } else {
@@ -2492,7 +2665,6 @@ Page({
       const res = await api.post('/events/' + this.data.eventId + '/archive', {})
       this.setData({ archiveSubmitting: false, showArchiveConfirm: false })
       if (res.success) {
-        wx.showToast({ title: '赛事已归档', icon: 'success', duration: 1500 })
         // 归档完成后自动跳转到历史赛事
         setTimeout(() => {
           wx.redirectTo({ url: '/pages/dota2/dota2?subTab=history' })
