@@ -6,9 +6,9 @@
     <text class="page-header-sub">Dota2 选手档案信息</text>
   </view>
 
-  <!-- 头像区 -->
+  <!-- 头像区（含空头像占位） -->
   <view class="avatar-section" wx:if="{{player}}">
-    <image class="detail-avatar" src="{{player.avatarUrl || ''}}" mode="aspectFill" bindtap="changeAvatar" />
+    <image class="detail-avatar {{player.avatarUrl ? '' : 'detail-avatar-empty'}}" src="{{player.avatarUrl}}" mode="aspectFill" bindtap="changeAvatar" />
     <text class="avatar-tip" wx:if="{{canEditAll || canEditOwn}}">点击更换头像</text>
   </view>
 
@@ -19,7 +19,7 @@
         <text class="field-label">微信群昵称</text>
         <block wx:if="{{editingField === 'wxNickname'}}">
           <view class="field-edit-inline">
-            <input class="field-input" value="{{editingFieldValue}}" bindinput="onEditInput" focus auto-focus maxlength="50" placeholder="请输入微信群昵称"/>
+            <input class="field-input" value="{{editingFieldValue}}" bindinput="onEditInput" focus maxlength="50" placeholder="请输入微信群昵称"/>
             <view class="field-btn field-cancel" catchtap="cancelEditField"><text>✗︎</text></view>
             <view class="field-btn field-confirm" catchtap="confirmEditField"><text>✓︎</text></view>
           </view>
@@ -39,7 +39,7 @@
         <text class="field-label">Steam ID</text>
         <block wx:if="{{editingField === 'steamId'}}">
           <view class="field-edit-inline">
-            <input class="field-input" value="{{editingFieldValue}}" bindinput="onEditInput" focus auto-focus maxlength="50" placeholder="请输入Steam ID"/>
+            <input class="field-input" value="{{editingFieldValue}}" bindinput="onEditInput" focus maxlength="50" placeholder="请输入Steam ID"/>
             <view class="field-btn field-cancel" catchtap="cancelEditField"><text>✗︎</text></view>
             <view class="field-btn field-confirm" catchtap="confirmEditField"><text>✓︎</text></view>
           </view>
@@ -59,7 +59,7 @@
         <text class="field-label">Dota2 游戏昵称</text>
         <block wx:if="{{editingField === 'gameId'}}">
           <view class="field-edit-inline">
-            <input class="field-input" value="{{editingFieldValue}}" bindinput="onEditInput" focus auto-focus maxlength="50" placeholder="请输入Dota2游戏昵称"/>
+            <input class="field-input" value="{{editingFieldValue}}" bindinput="onEditInput" focus maxlength="50" placeholder="请输入Dota2游戏昵称"/>
             <view class="field-btn field-cancel" catchtap="cancelEditField"><text>✗︎</text></view>
             <view class="field-btn field-confirm" catchtap="confirmEditField"><text>✓︎</text></view>
           </view>
@@ -142,7 +142,7 @@
         <text class="field-label">实际天梯分</text>
         <block wx:if="{{editingField === 'calibrateMmr'}}">
           <view class="field-edit-inline">
-            <input class="field-input" type="number" value="{{editingFieldValue}}" bindinput="onEditInput" focus auto-focus placeholder="请输入整数天梯分"/>
+            <input class="field-input" type="number" value="{{editingFieldValue}}" bindinput="onEditInput" focus placeholder="请输入整数天梯分"/>
             <view class="field-btn field-cancel" catchtap="cancelEditField"><text>✗︎</text></view>
             <view class="field-btn field-confirm" catchtap="confirmEditField"><text>✓︎</text></view>
           </view>
@@ -191,8 +191,9 @@
     </view>
   </view>
 
-  <!-- 加载中 -->
+  <!-- 加载骨架屏 -->
   <view class="loading-state" wx:if="{{!player}}">
+    <view class="loading-spinner"></view>
     <text class="loading-text">加载中...</text>
   </view>
 
@@ -225,8 +226,6 @@
       </view>
     </view>
   </view>
-
-
 
   <!-- 删除按钮（仅管理员/超管可见） -->
   <view class="delete-section" wx:if="{{player && canDelete}}">

@@ -55,6 +55,15 @@
   box-shadow: 0 8rpx 32rpx rgba(0, 0, 0, 0.4);
 }
 
+/* 空头像占位：显示默认图标 */
+.detail-avatar-empty {
+  opacity: 0.35;
+  background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="38" r="22" fill="%238b949e"/><ellipse cx="50" cy="85" rx="35" ry="22" fill="%238b949e"/></svg>');
+  background-size: 60%;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
 .avatar-tip {
   font-size: 22rpx;
   color: #484f58;
@@ -67,6 +76,12 @@
   border-radius: 20rpx;
   overflow: hidden;
   border: 1rpx solid rgba(255, 255, 255, 0.05);
+  animation: detailFadeIn 0.35s ease;
+}
+
+@keyframes detailFadeIn {
+  from { opacity: 0; transform: translateY(12rpx); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .field-row {
@@ -157,11 +172,28 @@
 .pos-tag.pos-4 { background-color: rgba(52, 152, 219, 0.85); }
 .pos-tag.pos-5 { background-color: rgba(155, 89, 182, 0.85); }
 
-/* ===== 加载中 ===== */
+/* ===== 加载骨架屏 ===== */
 .loading-state {
   display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  padding: 160rpx 0;
+  padding: 200rpx 0;
+}
+
+/* 旋转加载动画 */
+.loading-spinner {
+  width: 48rpx;
+  height: 48rpx;
+  border: 4rpx solid rgba(255, 255, 255, 0.08);
+  border-top-color: #58a6ff;
+  border-radius: 50%;
+  margin-bottom: 20rpx;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .loading-text {
@@ -353,13 +385,4 @@
   font-size: 22rpx;
 }
 
-.rank-grid-inline {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  margin-top: 8rpx;
-}
 
-.rank-grid-inline .rank-cell {
-  margin: 0 8rpx 12rpx 8rpx;
-}
