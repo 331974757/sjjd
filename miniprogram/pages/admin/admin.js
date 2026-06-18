@@ -98,13 +98,13 @@ Page({
     this.filterUsers()
   },
 
-  // 公共筛选方法
+  // 公共筛选方法：仅显示已改过昵称的用户
   _getFiltered() {
-    let list = this.data.allUsers.slice()
+    let list = this.data.allUsers.filter(u => !!u.nickName)
     const kw = this.data.keyword.toLowerCase()
     if (kw) {
       list = list.filter(u => {
-        return (u.nickName || '').toLowerCase().indexOf(kw) !== -1
+        return u.nickName.toLowerCase().indexOf(kw) !== -1
       })
     }
     return list

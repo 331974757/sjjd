@@ -9,7 +9,7 @@
         <view class="admin-refresh" bindtap="onRefreshTap">
           <text class="refresh-icon">⟳</text>
         </view>
-        <text class="user-count">{{keyword ? _filteredTotal + '/' + allUsers.length : allUsers.length}} 人</text>
+        <text class="user-count">{{keyword ? _filteredTotal + '/' + _filteredTotal : _filteredTotal}} 人</text>
       </view>
     </view>
 
@@ -64,8 +64,8 @@
       </view>
 
       <view class="empty-state" wx:if="{{users.length === 0 && !loading}}">
-        <text class="empty-text">暂无注册用户</text>
-        <text class="empty-hint">暂无注册用户，用户打开小程序后将自动注册</text>
+        <text class="empty-text">暂无可管理的用户</text>
+        <text class="empty-hint">仅已修改昵称的用户会出现在此列表中</text>
       </view>
 
       <!-- 翻页按钮 -->
