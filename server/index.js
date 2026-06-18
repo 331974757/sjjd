@@ -29,9 +29,17 @@ const uploadDir = process.env.UPLOAD_DIR || 'uploads';
 fs.mkdirSync(uploadDir, { recursive: true });
 app.use('/uploads', express.static(uploadDir));
 
+const path = require('path');
 const storage = multer.diskStorage({
   destination: uploadDir,
-  filename: (req, file, cb) => cb(null, Date.now() + '_' + file.originalname)
+  filename: (req, file, cb) => {
+    // 清理文件名：移除路径遍历字符，仅保留安全字符
+    const ext = path.extname(file.originalname);
+    const base = path.basename(file.originalname, ext)
+      .replace(/[^a-zA-Z0-9\u4e00-\u9fa5_-]/g, '_')  // 仅保留字母数字中文下划线连字符
+      .substring(0, 100);  // 限制长度
+    cb(null, Date.now() + '_' + base + ext);
+  }
 });
 const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
 
@@ -43,6 +51,10 @@ const pool = mysql.createPool({
   charset: 'utf8mb4',              // 确保中文正常存储
   waitForConnections: true,
   connectionLimit: 10,
+  connectTimeout: 10000,           // 10秒连接超时
+  acquireTimeout: 10000,           // 10秒获取连接超时
+  enableKeepAlive: true,           // 启用TCP Keep-Alive
+  keepAliveInitialDelay: 0,        // Keep-Alive初始延迟
 });
 
 const WECHAT_APPID = process.env.WECHAT_APPID || 'wxecea6e915b217430';
@@ -55,6 +67,13 @@ const JWT_EXPIRES = '7d';
 // 使用 crypto 生成唯一 ID
 function genId() {
   return crypto.randomBytes(16).toString('hex');
+}
+
+// 安全回滚辅助：避免回滚失败掩盖原始错误
+async function safeRollback(conn, ctx) {
+  try { await conn.rollback(); } catch (e) {
+    console.error(`[tx:rollback:${ctx}]`, e.message);
+  }
 }
 
 // Health check
@@ -71,11 +90,17 @@ app.get('/api/auth/login', async (req, res) => {
     const https = require('https');
     const wxUrl = `https://api.weixin.qq.com/sns/jscode2session?appid=${WECHAT_APPID}&secret=${WECHAT_SECRET}&js_code=${code}&grant_type=authorization_code`;
 
-    const wxRes = await new Promise((resolve, reject) => {
+      const wxRes = await new Promise((resolve, reject) => {
       https.get(wxUrl, (resp) => {
         let data = '';
         resp.on('data', chunk => data += chunk);
-        resp.on('end', () => resolve(JSON.parse(data)));
+        resp.on('end', () => {
+          try {
+            resolve(JSON.parse(data));
+          } catch (parseErr) {
+            reject(new Error('微信API返回非JSON: ' + parseErr.message));
+          }
+        });
         resp.on('error', reject);
       });
     });
@@ -380,6 +405,13 @@ app.put('/api/players/:id', async (req, res) => {
     if (sets.length > 0) {
       sets.push('updated_at = NOW()');
       values.push(playerId);
+      // 白名单校验：确保所有列名均来自预定义集合（防御动态SQL注入）
+      const ALLOWED_COLS = Object.values(fieldMap).concat(['calibrate_rank_label', 'calibrate_rank_sort', 'updated_at']);
+      const setCols = sets.map(s => s.split(' ')[0]);
+      const invalidCols = setCols.filter(c => !ALLOWED_COLS.includes(c));
+      if (invalidCols.length) {
+        return res.status(400).json({ success: false, error: '包含无效字段: ' + invalidCols.join(', ') });
+      }
       await pool.query('UPDATE dota2_players SET ' + sets.join(', ') + ' WHERE id = ?', values);
     }
     res.json({ success: true });
@@ -451,7 +483,7 @@ app.post('/api/players/import', async (req, res) => {
     await conn.commit();
     res.json({ success: true, imported: inserted + updated, inserted, updated });
   } catch (e) {
-    await conn.rollback();
+    await safeRollback(conn, 'importPlayers');
     res.status(500).json({ success: false, error: e.message });
   } finally {
     conn.release();
@@ -530,7 +562,7 @@ app.post('/api/players/import/xlsx', uploadXlsx.single('file'), async (req, res)
       }
       await conn.commit();
     } catch (e) {
-      await conn.rollback();
+      await safeRollback(conn, 'importXlsx');
       errors.push({ row: 0, msg: '写入事务失败: ' + e.message });
       imported = 0; updated = 0;
     } finally {

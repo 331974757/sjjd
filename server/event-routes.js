@@ -28,6 +28,19 @@ function genId() {
 }
 
 /**
+ * 安全回滚辅助：捕获回滚异常，避免掩盖原始错误
+ * @param {Object} conn - 数据库连接对象
+ * @param {string} ctx - 上下文标识（用于日志）
+ */
+async function safeRollback(conn, ctx) {
+  try {
+    await conn.rollback();
+  } catch (rollbackErr) {
+    console.error(`[tx:rollback:${ctx}] 回滚失败:`, rollbackErr.message);
+  }
+}
+
+/**
  * 【归档表辅助】根据是否归档返回对应表名
  * @param {string} baseName - 基础表名（如 'dota2_events'）
  * @param {boolean} isArchived - 是否已归档
@@ -145,8 +158,9 @@ async function getPlayersByIds(pool, ids) {
  * @returns {Object|null} 赛事行数据，不存在返回 null
  */
 // 本地赛事查询辅助（返回赛事对象或 null）
-// 注意：与 auth.js 的同名函数 validateEvent() 不同，
-// auth.js 版本返回 {valid, error, event} 封装对象，此版本直接返回行数据或 null。
+// 注意：与 auth.js 的同名函数 validateEvent() 功能不同，
+// auth.js 版本用于状态流转校验，返回 {valid, error, event} 封装对象；
+// 此版本为简单行查询，直接返回行数据或 null，供路由快速判断赛事存在性。
 async function validateEvent(pool, eventId) {
   const [rows] = await pool.query('SELECT * FROM dota2_events WHERE event_id = ?', [eventId]);
   return rows.length ? rows[0] : null;
@@ -673,7 +687,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
         await conn.commit();
         res.json({ success: true });
       } catch (e) {
-        await conn.rollback();
+        await safeRollback(conn, 'deleteEvent');
         throw e;
       } finally {
         conn.release();
@@ -1156,7 +1170,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
             results.details.push({ playerId, status: 'success', signupId });
           } catch (e) {
             // 单条记录失败 → 回滚整个事务
-            await conn.rollback();
+            await safeRollback(conn, 'batchSignupSingle');
             releaseOnce();
             return res.status(500).json({
               success: false,
@@ -1169,7 +1183,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
         await conn.commit();
         res.json({ success: true, data: results });
       } catch (e) {
-        await conn.rollback();
+        await safeRollback(conn, 'batchSignup');
         res.status(500).json({ success: false, error: e.message });
       } finally {
         releaseOnce();
@@ -1526,7 +1540,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
           message: `成功保存 ${results.length} 支队伍`
         });
       } catch (e) {
-        await conn.rollback();
+        await safeRollback(conn, 'saveTeams');
         throw e;
       } finally {
         conn.release();
@@ -2798,7 +2812,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
 
         await conn.commit();
       } catch (err) {
-        await conn.rollback();
+        await safeRollback(conn, 'archiveEvent');
         throw err;
       } finally {
         conn.release();
@@ -3034,7 +3048,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
           }
         });
       } catch (e) {
-        await conn.rollback();
+        await safeRollback(conn, 'batchRanks');
         if (e.code === 'ER_DUP_ENTRY') {
           return res.status(400).json({ success: false, error: '存在重复名次，请检查后重新提交' });
         }

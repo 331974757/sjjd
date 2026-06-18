@@ -3,11 +3,14 @@ const API_BASE = 'https://congqin.online/api'
 
 // 缓存 openid 避免每次都调 getApp
 let _openidCache = null
-let _openidFetched = false  // 标记是否已完成首次获取（防止空串死循环）
+let _lastFetchTime = 0
+const OPENID_CACHE_TTL = 5 * 60 * 1000  // 5 分钟 TTL（超时后重新获取）
 
 async function getOpenId() {
-  if (_openidCache) return _openidCache
-  if (_openidFetched) return ''  // 已尝试过且结果为空的，不再重试
+  // 缓存有效期内直接返回（含空字符串，避免死循环）
+  if (_openidCache !== null && (Date.now() - _lastFetchTime) < OPENID_CACHE_TTL) {
+    return _openidCache
+  }
   try {
     const app = getApp()
     // 如果 globalData.openid 为空，等待 app.getOpenId() 完成
@@ -16,10 +19,11 @@ async function getOpenId() {
     }
     const result = app.globalData.openid || ''
     _openidCache = result
-    _openidFetched = true
+    _lastFetchTime = Date.now()
     return result
   } catch (e) { /* 静默降级 */ }
-  _openidFetched = true
+  _openidCache = ''
+  _lastFetchTime = Date.now()
   return ''
 }
 
@@ -110,7 +114,7 @@ module.exports = {
   getToken: getToken,
   clearCache() {
     _openidCache = null;
-    _openidFetched = false;
+    _lastFetchTime = 0;
   },
   API_BASE
 }
