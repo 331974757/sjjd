@@ -400,4 +400,39 @@ module.exports = function (app, h) {
     }
   });
 
+  /** POST /api/events/:eventId/clone — 克隆赛事（复制名称/描述/时间/人数上限/章程） */
+  app.post('/api/events/:eventId/clone', h.auth.requireAdmin, async (req, res) => {
+    try {
+      const { eventId } = req.params;
+      const event = await h.validateEvent(eventId);
+      if (!event) return res.status(404).json({ success: false, error: '赛事不存在' });
+
+      const newId = h.genId();
+      const openid = req._openid || '';
+      // 去掉旧名末尾的"（新）"或"(数字)"，再加"（新）"
+      const newName = (event.event_name || '').replace(/[（(]\d*[)）]$/, '').replace(/（新）$/, '') + '（新）';
+
+      await h.pool.query(
+        'INSERT INTO dota2_events (event_id, event_name, event_desc, creator_id, event_status, start_time, signup_limit, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?, 0, NOW(), NOW())',
+        [newId, newName, event.event_desc || null, openid, event.start_time || null, event.signup_limit || null]
+      );
+
+      // 克隆绑定的章程
+      const [rules] = await h.pool.query(
+        'SELECT * FROM dota2_event_rules WHERE event_id = ?', [eventId]
+      );
+      for (const rule of rules) {
+        const ruleId = h.genId();
+        await h.pool.query(
+          'INSERT INTO dota2_event_rules (rule_id, event_id, rule_title, rule_content, version, rule_status, creator_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, ?, NOW(), NOW())',
+          [ruleId, newId, rule.rule_title, rule.rule_content, rule.version || 1, openid]
+        );
+      }
+
+      res.json({ success: true, data: { eventId: newId, eventName: newName }, message: `已克隆为「${newName}」` });
+    } catch (e) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
 };

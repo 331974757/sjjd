@@ -73,6 +73,7 @@ const coreMethods = {
 
     // 其他基础数据
     isArchived: false,
+    _cloning: false,
     showNameModal: false,
     showDescModal: false,
     showTimeModal: false,
@@ -355,6 +356,28 @@ const coreMethods = {
       if (res.success) { modal.toast(this, { title: '赛事已取消', icon: 'success' }); setTimeout(() => wx.navigateBack(), 1500) }
       else { modal.toast(this, { title: res.error || '取消失败', icon: 'none' }) }
     } catch (e) { this.setData({ loading: false }); modal.toast(this, { title: '取消失败，请重试', icon: 'none' }) }
+  },
+
+  /** 克隆赛事（仅归档赛事可用） */
+  async cloneEvent() {
+    if (this._cloning) return; this._cloning = true
+    this.setData({ _cloning: true })
+    try {
+      const res = await api.post('/events/' + this.data.eventId + '/clone')
+      this.setData({ _cloning: false })
+      if (res.success) {
+        modal.toast(this, { title: res.message || '克隆成功', icon: 'success' })
+        // 跳转到新创建的赛事
+        setTimeout(() => {
+          wx.redirectTo({ url: '/pages/event-detail/event-detail?eventId=' + res.data.eventId })
+        }, 800)
+      } else {
+        modal.toast(this, { title: res.error || '克隆失败', icon: 'none' })
+      }
+    } catch (e) {
+      this.setData({ _cloning: false })
+      modal.toast(this, { title: '克隆失败', icon: 'none' })
+    }
   },
 
   // 确认开战弹窗（供Tab4 method调用）

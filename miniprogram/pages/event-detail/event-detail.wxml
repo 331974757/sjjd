@@ -152,6 +152,13 @@
         </button>
         <text class="oj-single-hint">{{_overviewJump.desc}}</text>
       </view>
+      <!-- 归档赛事：克隆按钮 -->
+      <view class="overview-jump" wx:if="{{readonly || isArchived}}">
+        <button class="oj-single-btn oj-clone-btn" bindtap="cloneEvent" loading="{{_cloning}}">
+          {{_cloning ? '克隆中...' : '📋 克隆此赛事'}}
+        </button>
+        <text class="oj-single-hint">复制赛事信息到新赛事（含章程）</text>
+      </view>
 
       <!-- 底部统计 -->
       <view class="overview-meta" wx:if="{{event.event_status > 0}}">
