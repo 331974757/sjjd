@@ -666,6 +666,15 @@
               </view>
               <!-- 已结束：对战截图 -->
               <view class="bbmc-upload-row" wx:if="{{item.match_status === 2}}">
+                <!-- 非归档：撤回判定按钮（5分钟内） -->
+                <view
+                  class="bbmc-act-btn bbmc-act-revoke"
+                  wx:if="{{!isArchived && actions.manage_matches.allowed}}"
+                  catchtap="revokeJudgement"
+                  data-match-id="{{item.match_id}}"
+                >
+                  <text>↩️ 撤回</text>
+                </view>
                 <!-- 归档模式：仅展示图片 -->
                 <block wx:if="{{isArchived}}">
                   <image wx:if="{{item.battle_image}}" class="bbmc-upload-img" src="{{item.battle_image}}" mode="aspectFill" catchtap="previewMatchImage" data-url="{{item.battle_image}}"></image>

@@ -320,6 +320,47 @@ module.exports = function (app, h) {
     }
   });
 
+  /** PUT /api/events/:eventId/matches/:matchId/revoke — 撤回判定（5分钟内） */
+  app.put('/api/events/:eventId/matches/:matchId/revoke', async (req, res) => {
+    try {
+      if (!await h.assertAdmin(req, res)) return;
+      const { eventId, matchId } = req.params;
+
+      const [matches] = await h.pool.query(
+        'SELECT * FROM dota2_event_matches WHERE match_id = ? AND event_id = ?', [matchId, eventId]
+      );
+      if (!matches.length) return res.status(404).json({ success: false, error: '对战记录不存在', code: 'NOT_FOUND' });
+
+      const match = matches[0];
+      if (match.match_status !== 2) {
+        return res.status(400).json({ success: false, error: '该对战尚未判定，无需撤回', code: 'NOT_JUDGED' });
+      }
+
+      // 检查 5 分钟窗口
+      const judgeTime = match.judge_time;
+      if (judgeTime) {
+        const judgeMs = new Date(judgeTime).getTime();
+        const nowMs = Date.now();
+        const diffMin = (nowMs - judgeMs) / 60000;
+        if (diffMin > 5) {
+          return res.status(400).json({
+            success: false, error: `判定已超过 5 分钟（已过 ${Math.round(diffMin)} 分钟），不可撤回`,
+            code: 'REVOKE_TIMEOUT'
+          });
+        }
+      }
+
+      await h.pool.query(
+        'UPDATE dota2_event_matches SET winner_id = NULL, match_status = 1, judge_id = NULL, judge_time = NULL WHERE match_id = ? AND event_id = ?',
+        [matchId, eventId]
+      );
+
+      res.json({ success: true, data: { matchId, message: '判定已撤回，对战恢复为进行中' } });
+    } catch (e) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
   /** POST /api/events/:eventId/matches/:matchId/image — 上传对战结果图片 */
   app.post('/api/events/:eventId/matches/:matchId/image', h.upload.single('file'), async (req, res) => {
     try {

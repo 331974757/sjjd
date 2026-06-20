@@ -568,6 +568,30 @@ module.exports = {
     },
     closeJudgeModal() { this.setData({ showJudgeModal: false, judgeMatch: null, judgeWinnerId: '', judgeStep: 0 }) },
 
+    /** 撤回判定（5分钟内有效） */
+    async revokeJudgement(e) {
+      const matchId = e.currentTarget.dataset.matchId
+      const r = await modal.confirm(this, {
+        theme: 'danger', title: '撤回判定',
+        content: '确定撤回该对战的判定结果吗？\n\n⚠ 仅判定后 5 分钟内可撤回。撤回后对战恢复为"进行中"状态，可重新判定。'
+      })
+      if (!r.confirm) return
+      wx.showLoading({ title: '撤回中...' })
+      try {
+        const res = await api.put(`/events/${this.data.eventId}/matches/${matchId}/revoke`)
+        wx.hideLoading()
+        if (res.success) {
+          modal.toast(this, { title: '判定已撤回', icon: 'success' })
+          await this.loadBattleData()
+        } else {
+          modal.toast(this, { title: res.error || '撤回失败', icon: 'none' })
+        }
+      } catch (err) {
+        wx.hideLoading()
+        modal.toast(this, { title: '撤回失败', icon: 'none' })
+      }
+    },
+
     // ============ 上传对战结果图片 ============
     _canUploadMatchImage(match) {
       if (!match || this.data.isArchived) return false

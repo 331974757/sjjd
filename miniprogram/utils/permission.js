@@ -8,8 +8,8 @@ let _rolePromise = null
 // Storage 缓存 key
 const STORAGE_ROLE_KEY = '_perm_role'
 const STORAGE_ROLE_TIME_KEY = '_perm_role_time'
-// Storage 缓存有效期：30分钟（毫秒）
-const STORAGE_TTL = 30 * 60 * 1000
+// Storage 缓存有效期：5分钟（毫秒）
+const STORAGE_TTL = 5 * 60 * 1000
 
 // 读取本地缓存的昵称
 function getNickName() {
