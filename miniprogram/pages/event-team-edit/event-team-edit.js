@@ -14,7 +14,7 @@
  * ============================================================
  */
 
-const api = require('../../utils/api')
+const api = require('../../utils/api.js')
 const perm = require('../../utils/permission.js')
 const modal = require('../../utils/modal')
 

@@ -601,6 +601,7 @@ app.post('/api/players/import/xlsx', uploadXlsx.single('file'), async (req, res)
 // ============== 下载导入模板（Excel） ==============
 app.get('/api/players/template/xlsx', async (req, res) => {
   try {
+    if (!assertLogin(req, res)) return;
     const workbook = xlsx.utils.book_new();
     const headers = ['微信群昵称', 'Steam ID', 'Dota2游戏昵称', '核准段位', '核准星数', '实际天梯分', '擅长游戏位置', '比赛报名位置'];
     const exampleRow = ['示例选手', '123456789', 'Dota2示例昵称', '统帅', 3, 3500, '1,2,3', '1'];

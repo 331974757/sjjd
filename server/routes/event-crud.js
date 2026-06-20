@@ -12,7 +12,7 @@ module.exports = function (app, h) {
 
       if (status !== undefined && status !== '') {
         where += ' AND event_status = ?';
-        params.push(parseInt(status));
+        params.push(parseInt(status) || 0);
       }
       if (archived !== undefined && archived !== '') {
         if (parseInt(archived) === 1) {

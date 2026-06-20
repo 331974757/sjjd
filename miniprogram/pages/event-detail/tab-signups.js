@@ -93,7 +93,7 @@ module.exports = {
         modal.toast(this, { title: '当前赛事不在报名阶段', icon: 'none' })
         return
       }
-      if (mySignup && mySignup.signedUp) {
+      if (mySignup && mySignup.isActive) {
         modal.toast(this, { title: '您已报名', icon: 'none' })
         return
       }
