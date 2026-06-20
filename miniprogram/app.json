@@ -10,7 +10,6 @@
     "pages/event-team-edit/event-team-edit",
     "pages/event-match-edit/event-match-edit",
     "pages/home-edit/home-edit",
-    "pages/announce-manage/announce-manage",
     "pages/events-hub/events-hub"
   ],
   "window": {

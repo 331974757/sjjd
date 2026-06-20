@@ -1,5 +1,5 @@
 /**
- * 美化弹窗工具 - 多主题
+ * 美化弹窗工具 - 多主题 + Toast
  *
  * 主题说明:
  *   'default' - 蓝紫渐变（通用确认）
@@ -11,6 +11,7 @@
  *   const modal = require('../../utils/modal.js')
  *   const r = await modal.confirm(ctx, { theme: 'danger', title: '删除', content: '确定删除？' })
  *   if (r.confirm) { ... }
+ *   modal.toast(ctx, { theme: 'success', content: '操作成功' })
  */
 
 /** 安全获取 modal 组件，未注册时降级到系统弹窗 */
@@ -50,4 +51,24 @@ function sheet(ctx, opts = {}) {
   })
 }
 
-module.exports = { confirm, sheet }
+/**
+ * 自定义 Toast 轻提示
+ * @param {Object} ctx - 页面/组件上下文 (this)
+ * @param {Object} opts - { theme: 'success'|'danger'|'warning'|'default', content: '提示文本', duration: 2000 }
+ */
+function toast(ctx, opts = {}) {
+  const m = getModalSafe(ctx)
+  if (m) {
+    m.show({ type: 'toast', ...opts })
+  } else {
+    // 降级：使用系统原生 Toast
+    const iconMap = { success: 'success', danger: 'error', warning: 'none', default: 'none' }
+    wx.showToast({
+      title: opts.content || opts.title || '',
+      icon: iconMap[opts.theme] || 'none',
+      duration: opts.duration || 2000
+    })
+  }
+}
+
+module.exports = { confirm, sheet, toast }

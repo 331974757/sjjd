@@ -255,8 +255,6 @@
   transition: all 0.15s ease;
 }
 .gtb-btn:active { background-color: rgba(255, 255, 255, 0.1); transform: scale(0.95); }
-.gtb-btn-admin { background-color: rgba(155, 89, 182, 0.1); border-color: rgba(155, 89, 182, 0.2); }
-.gtb-btn-admin:active { background-color: rgba(155, 89, 182, 0.2); }
 .gtb-icon { width: 28rpx; height: 28rpx; display: block; flex-shrink: 0; }
 .gtb-divider { width: 2rpx; height: 20rpx; background-color: rgba(255, 255, 255, 0.06); margin: 0 4rpx; border-radius: 1rpx; }
 
@@ -314,12 +312,20 @@
   display: flex; align-items: center;
 }
 .marquee-track {
-  display: flex; flex-direction: row;
-  white-space: nowrap; will-change: transform;
+  display: inline-flex; align-items: center;
+  white-space: nowrap;
+  animation: marquee-scroll 15s linear infinite;
+}
+.marquee-spacer {
+  width: 100vw; flex-shrink: 0; height: 1rpx;
 }
 .marquee-text {
-  display: inline-block; font-size: 24rpx; color: #c9d1d9;
+  font-size: 24rpx; color: #c9d1d9;
   line-height: 64rpx; white-space: nowrap; flex-shrink: 0;
+}
+@keyframes marquee-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-100%); }
 }
 .marquee-empty { margin: 0 36rpx; height: 64rpx; display: flex; align-items: center; justify-content: center; }
 .marquee-empty-text { font-size: 24rpx; color: #484f58; }
@@ -401,18 +407,7 @@
   margin-left: 6rpx;
 }
 
-/* 旧样式占位（废弃） */
-.home-game-header,
-.hgh-icon,
-.hgh-name,
-.home-jump-list,
-.hjl-row,
-.hjl-left,
-.hjl-icon,
-.hjl-label,
-.hjl-arrow {
-  display: none;
-}
+/* ===== 旧样式占位（已废弃，保留以防外部引用） ===== */
 
 /* ===== 模块4：赛事动态 ===== */
 .ed-item {
@@ -1116,7 +1111,7 @@
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
   background-color: rgba(0, 0, 0, 0.65);
-  z-index: 9999;
+  z-index: 10000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1135,17 +1130,20 @@
 
 .nick-modal-close {
   position: absolute;
-  top: 24rpx;
-  right: 28rpx;
+  top: 20rpx;
+  right: 24rpx;
   width: 48rpx;
   height: 48rpx;
+  border-radius: 24rpx;
   display: flex;
   align-items: center;
   justify-content: center;
+  background-color: rgba(255, 255, 255, 0.04);
 }
+.nick-modal-close:active { background-color: rgba(255, 255, 255, 0.1); }
 
 .nick-close-icon {
-  font-size: 32rpx;
+  font-size: 28rpx;
   color: #5a6678;
   line-height: 1;
 }
@@ -1289,11 +1287,12 @@
 .admin-modal-mask {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  background-color: rgba(0, 0, 0, 0.65);
-  z-index: 9999;
+  background-color: rgba(0, 0, 0, 0.75);
+  z-index: 10000;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 
 .admin-modal {
@@ -1310,27 +1309,40 @@
 
 .admin-modal-close {
   position: absolute;
-  top: 24rpx;
-  right: 28rpx;
-  width: 48rpx;
-  height: 48rpx;
+  top: 16rpx;
+  right: 16rpx;
+  width: 60rpx;
+  height: 60rpx;
+  border-radius: 30rpx;
   display: flex;
   align-items: center;
   justify-content: center;
+  background-color: rgba(255, 255, 255, 0.06);
+  z-index: 10;
 }
+.admin-modal-close:active { background-color: rgba(255, 255, 255, 0.15); }
 
 .admin-close-icon {
   font-size: 32rpx;
-  color: #5a6678;
+  color: #8b949e;
   line-height: 1;
+  font-weight: 700;
 }
 
+.admin-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 36rpx;
+}
 .admin-modal-title {
   font-size: 36rpx;
   font-weight: 700;
   color: #ffffff;
-  text-align: center;
-  margin-bottom: 36rpx;
+}
+.admin-modal-count {
+  font-size: 24rpx;
+  color: #8b949e;
 }
 
 /* 管理员列表 */
@@ -1380,18 +1392,23 @@
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
+  gap: 10rpx;
 }
 
 .admin-name {
-  display: inline-block;
-  padding: 10rpx 22rpx;
-  margin-right: 12rpx;
-  margin-bottom: 10rpx;
+  flex: 1;
+  min-width: 140rpx;
+  max-width: 200rpx;
+  padding: 10rpx 16rpx;
   border-radius: 10rpx;
   font-size: 26rpx;
   color: #c9d1d9;
   background-color: rgba(255, 255, 255, 0.06);
   border: 1rpx solid rgba(255, 255, 255, 0.08);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 空状态 */
@@ -1423,20 +1440,38 @@
 
 /* ===== 权限管理弹窗 ===== */
 .umg-modal {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 92vw;
-  max-height: 85vh;
+  position: relative;
+  width: 86vw;
+  max-width: 600rpx;
+  min-height: 55vh;
+  max-height: 78vh;
   background-color: #161b22;
   border: 1rpx solid #30363d;
   border-radius: 24rpx;
-  padding: 36rpx 28rpx 28rpx;
+  padding: 56rpx 28rpx 28rpx;
   display: flex;
   flex-direction: column;
-  z-index: 999;
+  overflow: hidden;
+  z-index: 10001;
 }
+/* 权限管理 - 角色统计行 */
+.umg-stats-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 16rpx;
+  margin-bottom: 16rpx;
+}
+.umg-stat {
+  font-size: 24rpx;
+  color: #8b949e;
+  text-align: left;
+}
+.umg-stat-super { color: #f0c040; }
+.umg-stat-admin { color: #58a6ff; }
+.umg-stat-user  { color: #7ee787; }
+
 .umg-toolbar {
   display: flex;
   flex-direction: row;
@@ -1448,9 +1483,8 @@
   margin-bottom: 12rpx;
 }
 .umg-list {
-  flex: 1;
+  height: 520rpx;
   overflow-y: auto;
-  max-height: 50vh;
 }
 .umg-hint {
   padding: 16rpx 0 0;
@@ -2103,6 +2137,13 @@
   transform: scale(0.96);
 }
 
+.ecm-btn-loading {
+  background: #30363d !important;
+  color: #8b949e !important;
+  box-shadow: none !important;
+  pointer-events: none;
+}
+
 /* 报名人数上限选项 - 分行布局 */
 .ecm-limit-row {
   display: flex;
@@ -2183,21 +2224,10 @@
 .user-count { font-size: 24rpx; color: #484f58; font-weight: 400; }
 .subtitle { display: block; font-size: 22rpx; color: #484f58; padding: 0 36rpx; margin-bottom: 16rpx; }
 
-/* 搜索结果区 */
+/* 搜索结果区（权限管理弹窗内搜索复用上方 .search-bar/.search-input） */
 .home-search-bar { position: relative; margin: 0 36rpx 20rpx; }
-.search-bar { position: relative; margin: 0 36rpx 20rpx; }
-.search-input {
-  width: 100%; height: 76rpx; padding: 0 72rpx 0 28rpx;
-  border: 1rpx solid rgba(255,255,255,0.08); border-radius: 16rpx;
-  background-color: rgba(255,255,255,0.04); color: #e6edf3; font-size: 28rpx;
-  box-sizing: border-box;
-}
-.search-clear {
-  position: absolute; right: 0; top: 0; width: 72rpx; height: 76rpx;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 28rpx; color: #8b949e; z-index: 2;
-}
-.search-clear:active { color: #e6edf3; }
+.umg-search { margin: 0 0 12rpx; }
+.umg-search .search-input { height: 72rpx; background-color: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.08); }
 
 /* 用户列表 */
 .user-list { padding: 0 36rpx; }
@@ -2215,12 +2245,13 @@
 .badge-user { background-color: rgba(119,141,169,0.15); color: #778da9; border: 1rpx solid rgba(119,141,169,0.2); }
 .user-nick {
   font-size: 28rpx; color: #e6edf3; overflow: hidden; text-overflow: ellipsis;
-  white-space: nowrap; margin-right: 8rpx;
+  white-space: nowrap; margin-right: 8rpx; max-width: 200rpx; flex-shrink: 1; min-width: 0;
 }
 .user-me { font-size: 22rpx; color: #f39c12; margin-left: 8rpx; }
 .nick-count-info { margin-left: 8rpx; }
 .nick-count-text { font-size: 20rpx; color: #8b949e; }
 .user-nick.unregistered { color: #484f58; font-style: italic; }
+.user-created { font-size: 20rpx; color: #484f58; margin-left: 8rpx; flex-shrink: 0; }
 
 /* 操作按钮 */
 .user-actions { display: flex; flex-direction: row; flex-shrink: 0; margin-left: 12rpx; }
@@ -2253,8 +2284,89 @@
 .hint-title { display: block; font-size: 26rpx; font-weight: 600; color: #3498db; margin-bottom: 8rpx; }
 .hint-desc { display: block; font-size: 22rpx; color: #8b949e; line-height: 1.6; }
 
-/* 空状态 */
-.empty-state { display: flex; flex-direction: column; align-items: center; padding: 80rpx 40rpx; }
-.empty-text { font-size: 28rpx; color: #8b949e; }
-.empty-hint { font-size: 22rpx; color: #484f58; margin-top: 8rpx; }
-.loading-state { display: flex; justify-content: center; padding: 80rpx 0; font-size: 28rpx; color: #8b949e; }
+/* ===== 重复样式已合并到上方加载状态 ===== */
+
+/* ===== 首页加载失败提示 ===== */
+.home-load-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 60rpx 40rpx 40rpx;
+}
+.hle-icon {
+  font-size: 64rpx;
+  margin-bottom: 16rpx;
+  opacity: 0.5;
+}
+.hle-text {
+  font-size: 28rpx;
+  color: #e6edf3;
+  font-weight: 600;
+  margin-bottom: 6rpx;
+}
+.hle-sub {
+  font-size: 24rpx;
+  color: #8b949e;
+  margin-bottom: 28rpx;
+}
+.hle-retry-btn {
+  padding: 14rpx 48rpx;
+  border-radius: 24rpx;
+  background: linear-gradient(135deg, rgba(79, 140, 255, 0.15), rgba(124, 92, 252, 0.1));
+  border: 1rpx solid rgba(79, 140, 255, 0.25);
+  font-size: 26rpx;
+  color: #58a6ff;
+  font-weight: 600;
+}
+.hle-retry-btn:active {
+  background: linear-gradient(135deg, rgba(79, 140, 255, 0.25), rgba(124, 92, 252, 0.18));
+}
+
+/* ===== 公告编辑弹窗 ===== */
+.ann-modal-mask {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background-color: rgba(0,0,0,0.65); z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+}
+.ann-modal {
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: 620rpx;
+  background-color: #1e2530; border-radius: 24rpx; z-index: 10000;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.ann-topbar {
+  display: flex; flex-direction: row; justify-content: space-between; align-items: center;
+  padding: 28rpx 36rpx 0; flex-shrink: 0;
+}
+.ann-title { font-size: 32rpx; font-weight: 700; color: #e6edf3; }
+
+.ann-close-btn {
+  width: 48rpx; height: 48rpx; border-radius: 24rpx;
+  display: flex; align-items: center; justify-content: center;
+  background-color: rgba(255,255,255,0.04);
+}
+.ann-close-btn:active { background-color: rgba(255,255,255,0.12); }
+.ann-close-icon { font-size: 24rpx; color: #8b949e; font-weight: 700; line-height: 1; }
+
+/* 文本域 */
+.ann-body { padding: 24rpx 36rpx 20rpx; }
+.ann-textarea {
+  width: 100%; min-height: 240rpx; padding: 20rpx 24rpx; box-sizing: border-box;
+  background-color: rgba(255,255,255,0.04); border-radius: 12rpx;
+  font-size: 28rpx; color: #e6edf3; line-height: 1.6;
+  border: 1rpx solid rgba(255,255,255,0.08);
+}
+
+/* 底部按钮 */
+.ann-footer {
+  display: flex; flex-direction: row; gap: 20rpx;
+  padding: 0 36rpx 32rpx; flex-shrink: 0;
+}
+.ann-btn {
+  flex: 1; padding: 20rpx 0; text-align: center;
+  border-radius: 12rpx; font-size: 28rpx; font-weight: 500;
+}
+.ann-btn-cancel { background-color: rgba(255,255,255,0.04); color: #8b949e; border: 1rpx solid rgba(255,255,255,0.08); }
+.ann-btn-cancel:active { background-color: rgba(255,255,255,0.08); }
+.ann-btn-confirm { background-color: rgba(52,152,219,0.15); color: #3498db; border: 1rpx solid rgba(52,152,219,0.25); }
+.ann-btn-confirm:active { background-color: rgba(52,152,219,0.25); }

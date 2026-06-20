@@ -1,22 +1,24 @@
-// pages/index/index.js
-// 核心页面 — 按功能导入选手/赛事/首页模块并合并
+// ====== 蜀国争霸系统 · 首页核心页面 ======
+// 按功能拆分为 3 个子模块: player(选手档案) / event(赛事) / home(首页数据+权限管理)
+// 模块的 data 和 methods 通过 Object.assign 合并到本 Page 配置
 
 const perm = require('../../utils/permission.js')
 const C = require('../../utils/constants.js')
 const api = require('../../utils/api.js')
+const modal = require('../../utils/modal.js')
 
 const playerModule = require('./modules/player-module.js')
 const eventModule = require('./modules/event-module.js')
 const homeModule = require('./modules/home-module.js')
 
-// ———— 合并 data ————
+// ====== 合并模块 data ======
 const mergedData = Object.assign({},
   playerModule.data,
   eventModule.data,
   homeModule.data
 )
 
-// ———— 核心 Page 配置 ————
+// ====== Page 核心配置 ======
 const pageConfig = {
   data: Object.assign({
     currentGame: 'home',
@@ -37,10 +39,9 @@ const pageConfig = {
     _superAdminOnly: [],
     _adminOnly: [],
     statusBarHeight: 44,
-    marqueeOffset: 0,
   }, mergedData),
 
-  // ———— 生命周期 ————
+  // ====== 生命周期 ======
   onLoad(options) {
     const sysInfo = wx.getSystemInfoSync()
     this.setData({ statusBarHeight: sysInfo.statusBarHeight || 44 })
@@ -55,14 +56,9 @@ const pageConfig = {
     this.loadHomeData()
   },
 
-  onReady() {
-    this.startMarquee()
-  },
+  onReady() {},
 
   onShow() {
-    if (this.data.currentGame === 'home') {
-      this.startMarquee()
-    }
     if (this._needsReload) {
       this._needsReload = false
       if (this._reloadTimer) clearTimeout(this._reloadTimer)
@@ -87,12 +83,14 @@ const pageConfig = {
     }
   },
 
-  // ———— 用户/昵称 ————
+  // ====== 用户信息 / 昵称管理 ======
   loadUserInfo() {
     try {
       const info = wx.getStorageSync('user_info') || {}
       if (info.avatarUrl) { this.setData({ userInfo: info }) }
-    } catch (e) { }
+    } catch (e) {
+      console.warn('[首页] 读取用户信息缓存失败', e)
+    }
   },
 
   async loadSuperAdminInfo() {
@@ -185,7 +183,9 @@ const pageConfig = {
         const app = getApp()
         if (!app.globalData.openid) { await app.getOpenId() }
         openid = app.globalData.openid || ''
-      } catch (e) { }
+      } catch (e) {
+        console.warn('[首页] 获取openid失败', e)
+      }
     }
     this.setData({
       showNickModal: true,
@@ -206,7 +206,7 @@ const pageConfig = {
     if (!openid) return
     wx.setClipboardData({
       data: openid,
-      success: () => { wx.showToast({ title: '已复制 OpenID', icon: 'success' }) }
+      success: () => { modal.toast(this, { theme: 'success', content: '已复制 OpenID' }) }
     })
   },
 
@@ -214,10 +214,10 @@ const pageConfig = {
     const newNick = this.data.nickInputValue.trim()
     const currentNick = this.data.nickName
     if (currentNick && !this.data.unlimitedNick && this.data.nickChangeCount >= this.data.nickChangeLimit) {
-      wx.showToast({ title: '修改次数已用完，请联系超级管理员重置', icon: 'none', duration: 3000 })
+      modal.toast(this, { theme: 'warning', content: '修改次数已用完，请联系超级管理员重置', duration: 3000 })
       return
     }
-    if (!newNick) { wx.showToast({ title: '昵称不能为空', icon: 'none' }); return }
+    if (!newNick) { modal.toast(this, { theme: 'warning', content: '昵称不能为空' }); return }
     if (newNick === currentNick) { this.closeNickModal(); return }
     this.closeNickModal()
     this.doSaveNickname(newNick)
@@ -238,19 +238,19 @@ const pageConfig = {
           nickChangeCount: newCount,
           remainingCount: Math.max(0, this.data.nickChangeLimit - newCount)
         })
-        setTimeout(() => { wx.showToast({ title: '昵称已更新', icon: 'success' }) }, 300)
+        modal.toast(this, { theme: 'success', content: '昵称已更新' })
       } else {
         if (res.nickChangeCount !== undefined) { this.setData({ nickChangeCount: res.nickChangeCount }) }
-        setTimeout(() => { wx.showToast({ title: res.message || '修改失败', icon: 'none', duration: 2500 }) }, 300)
+        modal.toast(this, { theme: 'danger', content: res.message || '修改失败', duration: 2500 })
       }
     } catch (err) {
       wx.hideLoading()
       console.error('保存昵称失败', err)
-      setTimeout(() => { wx.showToast({ title: '保存失败', icon: 'none' }) }, 300)
+      modal.toast(this, { theme: 'danger', content: '保存失败' })
     }
   },
 
-  // ———— 全局导航 ————
+  // ====== 全局导航 / 下拉刷新 / 触底 ======
   onPullDownRefresh() {
     let promise
     if (this.data.currentGame === 'home') {
@@ -265,29 +265,7 @@ const pageConfig = {
     else { wx.stopPullDownRefresh() }
   },
 
-  onHide() {
-    this.stopMarquee()
-  },
-
-  // ———— 公告栏跑马灯 ————
-  startMarquee() {
-    this.stopMarquee()
-    const text = this.data.homeAnnounceText
-    if (!text || text.length === 0) return
-    const speed = 1.5; // rpx per tick
-    this._marqueeTimer = setInterval(() => {
-      let offset = this.data.marqueeOffset + speed
-      if (offset > 6000) offset = 0
-      this.setData({ marqueeOffset: offset })
-    }, 30)
-  },
-
-  stopMarquee() {
-    if (this._marqueeTimer) {
-      clearInterval(this._marqueeTimer)
-      this._marqueeTimer = null
-    }
-  },
+  onHide() {},
 
   onReachBottom() {
     if (this.data.currentGame === 'home') return
@@ -306,19 +284,26 @@ const pageConfig = {
   },
 
   onGamePlusTap() {
-    wx.showToast({ title: '更多精彩内容后续开放', icon: 'none', duration: 2000 })
+    modal.toast(this, { theme: 'default', content: '更多精彩内容后续开放', duration: 2000 })
   },
 
   async onRefreshTap() {
     wx.showLoading({ title: '刷新中...' })
     try {
-      const tab = this.data.subTab
-      if (tab === 'profile') { await this.loadAllPlayers() }
-      else if (tab === 'rules') { await this.loadRuleEvents() }
-      else if (tab === 'history') { await this.loadEvents(true) }
-      else { await this.loadHomeData() }
+      if (this.data.currentGame === 'home') {
+        await this.loadHomeData(true)
+      } else {
+        const tab = this.data.subTab
+        if (tab === 'profile') { await this.loadAllPlayers() }
+        else if (tab === 'rules') { await this.loadRuleEvents() }
+        else if (tab === 'history') { await this.loadEvents(true) }
+      }
       wx.hideLoading()
-    } catch (e) { wx.hideLoading() }
+      modal.toast(this, { theme: 'success', content: '已刷新', duration: 1000 })
+    } catch (e) {
+      wx.hideLoading()
+      modal.toast(this, { theme: 'danger', content: '刷新失败' })
+    }
   },
 
   switchSubTab(e) {
@@ -334,7 +319,13 @@ const pageConfig = {
     }
   },
 
-  // ———— 分享 ————
+  // ====== 首页加载失败重试 ======
+  retryLoadHome() {
+    this.setData({ homeLoadError: false, homeDataLoaded: false })
+    this.loadHomeData()
+  },
+
+  // ====== 分享 ======
   onShareAppMessage() {
     return {
       title: '蜀国争霸系统 - 看看大家的Dota2段位！',
@@ -343,7 +334,7 @@ const pageConfig = {
   }
 }
 
-// ———— 合并所有模块的 methods ————
+// ====== 合并所有模块 methods 并创建 Page 实例 ======
 Object.assign(pageConfig,
   playerModule.methods,
   eventModule.methods,

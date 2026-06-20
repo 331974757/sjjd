@@ -49,6 +49,7 @@ const pool = mysql.createPool({
   password: process.env.DB_PASSWORD || 'Yang8728135@',
   database: process.env.DB_NAME || 'dota2',
   charset: 'utf8mb4',              // 确保中文正常存储
+  dateStrings: true,               // DATETIME 直接返回字符串，无需 JS Date 转换
   waitForConnections: true,
   connectionLimit: 10,
   connectTimeout: 10000,           // 10秒连接超时

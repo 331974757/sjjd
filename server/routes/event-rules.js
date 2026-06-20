@@ -114,8 +114,8 @@ module.exports = function (app, h) {
 
       const ruleId = h.genId();
       await h.pool.query(
-        'INSERT INTO dota2_event_rules (rule_id, event_id, rule_title, rule_content, version, rule_status, creator_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)',
-        [ruleId, eventId || null, ruleTitle, ruleContent, version || 1, req._openid || '', Date.now(), Date.now()]
+        'INSERT INTO dota2_event_rules (rule_id, event_id, rule_title, rule_content, version, rule_status, creator_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, ?, NOW(), NOW())',
+        [ruleId, eventId || null, ruleTitle, ruleContent, version || 1, req._openid || '']
       );
 
       res.json({ success: true, data: { ruleId } });
@@ -146,8 +146,8 @@ module.exports = function (app, h) {
       if (ruleStatus !== undefined) { sets.push('rule_status = ?'); values.push(ruleStatus); }
 
       if (sets.length > 0) {
-        sets.push('updated_at = ?');
-        values.push(Date.now(), ruleId);
+        sets.push('updated_at = NOW()');
+        values.push(ruleId);
         await h.pool.query('UPDATE dota2_event_rules SET ' + sets.join(', ') + ' WHERE rule_id = ?', values);
       }
       res.json({ success: true });

@@ -5,6 +5,7 @@ const perm = require('../../../utils/permission.js')
 const C = require('../../../utils/constants.js')
 const api = require('../../../utils/api.js')
 const dt = require('../../../utils/datetime-picker.js')
+const modal = require('../../../utils/modal.js')
 
 module.exports = {
   data: {
@@ -24,6 +25,7 @@ module.exports = {
     eventStatusMap: perm.STATUS_NAMES,
     // 赛事创建弹窗
     showCreateModal: false,
+    creatingEvent: false,
     createEventName: '',
     createEventDesc: '',
     createEventLimit: 0,
@@ -226,10 +228,12 @@ module.exports = {
     },
 
     async submitCreateEvent() {
+      // 防重复提交锁
+      if (this._creatingEvent) return
       const name = (this.data.createEventName || '').trim()
-      if (!name) { wx.showToast({ title: '请输入赛事名称', icon: 'none' }); return }
-      if (name.length < 2) { wx.showToast({ title: '赛事名称至少需要2个字符', icon: 'none' }); return }
-      if (name.length > 50) { wx.showToast({ title: '赛事名称不能超过50个字符', icon: 'none' }); return }
+      if (!name) { modal.toast(this, { theme: 'warning', content: '请输入赛事名称' }); return }
+      if (name.length < 2) { modal.toast(this, { theme: 'warning', content: '赛事名称至少需要2个字符' }); return }
+      if (name.length > 50) { modal.toast(this, { theme: 'warning', content: '赛事名称不能超过50个字符' }); return }
 
       let startTime = null
       if (this.data.createDateTimeRange.length > 0 && this.data.createDateTimeIndex.length > 0) {
@@ -247,6 +251,8 @@ module.exports = {
         if (!isNaN(custom) && custom > 0) { signupLimit = custom }
       }
 
+      this._creatingEvent = true
+      this.setData({ creatingEvent: true })
       wx.showLoading({ title: '创建中...', mask: true })
       try {
         const res = await api.post('/events', {
@@ -259,7 +265,7 @@ module.exports = {
 
         if (res.success) {
           this.setData({ showCreateModal: false })
-          wx.showToast({ title: '赛事创建成功', icon: 'success', duration: 1500 })
+          modal.toast(this, { theme: 'success', content: '赛事创建成功', duration: 1500 })
           this.loadRuleEvents()
 
           const eventId = (res.data && res.data.eventId) ? res.data.eventId : null
@@ -271,12 +277,15 @@ module.exports = {
             console.warn('[赛事创建] API 成功但未返回 eventId，跳过详情跳转')
           }
         } else {
-          wx.showToast({ title: res.error || '创建失败', icon: 'none', duration: 2000 })
+          modal.toast(this, { theme: 'danger', content: res.error || '创建失败', duration: 2000 })
         }
       } catch (err) {
         wx.hideLoading()
         console.error('[赛事创建] 失败', err)
-        wx.showToast({ title: '网络错误，请重试', icon: 'none' })
+        modal.toast(this, { theme: 'danger', content: '网络错误，请重试' })
+      } finally {
+        this._creatingEvent = false
+        this.setData({ creatingEvent: false })
       }
     }
   }

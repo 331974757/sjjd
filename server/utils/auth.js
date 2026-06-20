@@ -490,7 +490,7 @@ const PERMISSION_MATRIX = [
 
   // ─── 用户管理 ───
   { method: 'GET',    path: '/api/users/me',                    roles: ['user','admin','super_admin'],   status: null,      note: '当前用户信息' },
-  { method: 'GET',    path: '/api/users/admins/list',           roles: ['admin','super_admin'],          status: null,      note: '管理员列表' },
+  { method: 'GET',    path: '/api/users/admins/list',           roles: ['user','admin','super_admin'],   status: null,      note: '管理员列表' },
   { method: 'PUT',    path: '/api/users/:openid/role',          roles: ['super_admin'],                  status: null,      note: '修改角色（仅超管）' },
   { method: 'PUT',    path: '/api/users/me/nickname',           roles: ['user','admin','super_admin'],   status: null,      note: '修改昵称' },
   { method: 'PUT',    path: '/api/users/:openid/reset-nickcount', roles: ['super_admin'],                status: null,      note: '重置改名次数（仅超管）' },

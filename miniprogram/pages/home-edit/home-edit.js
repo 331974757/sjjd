@@ -116,10 +116,10 @@ Page({
             wx.hideLoading()
             try {
               const data = JSON.parse(uploadRes.data)
-              if (data.success && data.url) {
+              if (data.success && data.data && data.data.url) {
                 const blocks = [...this.data.blocks]
                 if (blocks[index] && blocks[index].type === 'image') {
-                  blocks[index].url = data.url
+                  blocks[index].url = api.BASE_URL + data.data.url
                 }
                 this.setData({ blocks })
                 wx.showToast({ title: '上传成功', icon: 'success' })

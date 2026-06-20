@@ -15,10 +15,12 @@ function genId() {
   return crypto.randomBytes(16).toString('hex');
 }
 
-/** 将时间戳 (Number) 转为可读字符串 */
+/** 将时间戳或MySQL datetime字符串转为可读字符串 */
 function formatTimestamp(ts) {
   if (!ts) return null;
-  const d = new Date(Number(ts));
+  // MySQL datetime 字符串 "2026-06-21 12:00:00" 或 毫秒时间戳
+  const d = isNaN(Number(ts)) ? new Date(ts) : new Date(Number(ts));
+  if (isNaN(d.getTime())) return null;
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
@@ -36,20 +38,20 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
       // 首页介绍表（单行数据）
       await conn.query(`
         CREATE TABLE IF NOT EXISTS home_intro (
-          id       INT          NOT NULL DEFAULT 1 PRIMARY KEY,
-          content  LONGTEXT     DEFAULT NULL COMMENT 'JSON图文内容 [{type, content/url}]',
-          updated_at DATETIME   DEFAULT NULL
+          id          INT          NOT NULL DEFAULT 1 PRIMARY KEY COMMENT '行ID（固定为1，单行数据）',
+          content     LONGTEXT     DEFAULT NULL COMMENT 'JSON图文内容 [{type: text/image, content/url}]',
+          updated_at  DATETIME     DEFAULT NULL COMMENT '更新时间'
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
       `);
       // 公告表
       await conn.query(`
         CREATE TABLE IF NOT EXISTS announcements (
-          id          VARCHAR(64)  NOT NULL PRIMARY KEY,
-          content     TEXT         NOT NULL COMMENT '公告文字',
-          is_pinned   TINYINT      NOT NULL DEFAULT 0 COMMENT '是否置顶:0否1是',
-          sort_order  INT          NOT NULL DEFAULT 0 COMMENT '排序权重(越大越前)',
-          created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          updated_at  DATETIME     DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
+          id          VARCHAR(64)  NOT NULL PRIMARY KEY COMMENT '公告ID（主键）',
+          content     TEXT         NOT NULL COMMENT '公告文字内容',
+          is_pinned   TINYINT      NOT NULL DEFAULT 0 COMMENT '是否置顶：0否/1是',
+          sort_order  INT          NOT NULL DEFAULT 0 COMMENT '排序权重（越大越靠前）',
+          created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+          updated_at  DATETIME     DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
       `);
     } finally {
@@ -288,7 +290,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
    */
   app.get('/api/events/dynamic', async (req, res) => {
     try {
-      const limit = Math.min(parseInt(req.query.limit) || 8, 20);
+      const limit = Math.min(parseInt(req.query.limit) || 5, 20);
       const [rows] = await pool.query(`
         SELECT e.event_id AS id, e.event_name, e.event_status AS status,
                e.start_time, e.is_archived,

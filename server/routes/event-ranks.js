@@ -182,7 +182,6 @@ module.exports = function (app, h) {
       }
 
       const openid = req._openid || '';
-      const now = Date.now();
 
       // 事务操作：删除旧数据 + 批量插入新数据
       const conn = await h.pool.getConnection();
@@ -197,8 +196,8 @@ module.exports = function (app, h) {
           const rankId = h.genId();
           const rankNum = parseInt(r.rankNum);
           await conn.query(
-            'INSERT INTO dota2_event_ranks (rank_id, event_id, rank_num, team_id, operator_id, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-            [rankId, eventId, rankNum, r.teamId, openid, now]
+            'INSERT INTO dota2_event_ranks (rank_id, event_id, rank_num, team_id, operator_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
+            [rankId, eventId, rankNum, r.teamId, openid]
           );
         }
 
@@ -255,8 +254,8 @@ module.exports = function (app, h) {
       try {
         const rankId = h.genId();
         await h.pool.query(
-          'INSERT INTO dota2_event_ranks (rank_id, event_id, rank_num, team_id, operator_id, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-          [rankId, eventId, rankNum, teamId, req._openid || '', Date.now()]
+          'INSERT INTO dota2_event_ranks (rank_id, event_id, rank_num, team_id, operator_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
+          [rankId, eventId, rankNum, teamId, req._openid || '']
         );
         res.json({ success: true, data: { rankId } });
       } catch (e) {

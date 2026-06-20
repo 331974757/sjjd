@@ -167,15 +167,14 @@ module.exports = function (app, h) {
       );
       const nextRound = maxRound + 1;
 
-      const now = Date.now();
       const createdMatches = [];
       const insertValues = [];
       const insertParams = [];
 
       for (const pair of matchPairs) {
         const matchId = h.genId();
-        insertValues.push('(?, ?, ?, ?, ?, 0, ?)');
-        insertParams.push(matchId, eventId, nextRound, pair.teamA.team_id, pair.teamB.team_id, now);
+        insertValues.push('(?, ?, ?, ?, ?, 0, NOW())');
+        insertParams.push(matchId, eventId, nextRound, pair.teamA.team_id, pair.teamB.team_id);
         createdMatches.push({
           matchId, roundNum: nextRound,
           teamAId: pair.teamA.team_id, teamAName: pair.teamA.team_name, teamAMmr: pair.teamA.total_mmr,
@@ -194,7 +193,7 @@ module.exports = function (app, h) {
       let advanced = false;
       if (nextRound === 1 && battleCheck.event.event_status === 3) {
         await h.pool.query(
-          'UPDATE dota2_events SET event_status = 4, updated_at = ? WHERE event_id = ? AND event_status = 3', [now, eventId]
+          'UPDATE dota2_events SET event_status = 4, updated_at = NOW() WHERE event_id = ? AND event_status = 3', [eventId]
         );
         advanced = true;
       }
@@ -235,7 +234,7 @@ module.exports = function (app, h) {
 
       if (battleCheck.event.event_status === 3) {
         await h.pool.query(
-          'UPDATE dota2_events SET event_status = 4, updated_at = ? WHERE event_id = ? AND event_status = 3', [Date.now(), eventId]
+          'UPDATE dota2_events SET event_status = 4, updated_at = NOW() WHERE event_id = ? AND event_status = 3', [eventId]
         );
       }
 
@@ -309,11 +308,11 @@ module.exports = function (app, h) {
         return res.status(400).json({ success: false, error: '胜方队伍不是本场对战的参赛队伍' });
       }
 
-      const judgeTime = Date.now();
+      const judgeTime = new Date().toISOString();
       const judgeId = req._openid || '';
       await h.pool.query(
-        'UPDATE dota2_event_matches SET winner_id = ?, match_status = 2, judge_id = ?, judge_time = ? WHERE match_id = ? AND event_id = ?',
-        [winnerId, judgeId, judgeTime, matchId, eventId]
+        'UPDATE dota2_event_matches SET winner_id = ?, match_status = 2, judge_id = ?, judge_time = NOW() WHERE match_id = ? AND event_id = ?',
+        [winnerId, judgeId, matchId, eventId]
       );
 
       res.json({ success: true, data: { matchId, winnerId, judgeTime, message: '胜负已判定，结果不可修改' } });
@@ -442,10 +441,9 @@ module.exports = function (app, h) {
       );
       if (totalMatches === 0) return res.status(400).json({ success: false, error: '当前赛事无对战记录，无法归档' });
 
-      const now = Date.now();
       const openid = req._openid || '';
       await h.pool.query(
-        'UPDATE dota2_events SET event_status = 5, ended_by = ?, ended_at = ?, updated_at = ? WHERE event_id = ?', [openid, now, now, eventId]
+        'UPDATE dota2_events SET event_status = 5, ended_by = ?, ended_at = NOW(), updated_at = NOW() WHERE event_id = ?', [openid, eventId]
       );
 
       const [roundStats] = await h.pool.query(
@@ -477,7 +475,6 @@ module.exports = function (app, h) {
         return res.status(400).json({ success: false, error: '赛事已归档，无需重复操作', code: 'ALREADY_ARCHIVED' });
       }
 
-      const now = Date.now();
       const openid = req._openid || '';
 
       const [[{ signupCount }]] = await h.pool.query('SELECT COUNT(*) as signupCount FROM dota2_event_signup WHERE event_id = ? AND signup_status = 1', [eventId]);
@@ -499,12 +496,12 @@ module.exports = function (app, h) {
         }
 
         await conn.query(
-          'UPDATE dota2_events SET is_archived = 1, event_status = 6, archived_by = ?, archived_at = ?, updated_at = ? WHERE event_id = ?',
-          [openid, now, now, eventId]
+          'UPDATE dota2_events SET is_archived = 1, event_status = 6, archived_by = ?, archived_at = NOW(), updated_at = NOW() WHERE event_id = ?',
+          [openid, eventId]
         );
         await conn.query(
-          'UPDATE dota2_events_his SET is_archived = 1, archived_by = ?, archived_at = ? WHERE event_id = ?',
-          [openid, now, eventId]
+          'UPDATE dota2_events_his SET is_archived = 1, archived_by = ?, archived_at = NOW() WHERE event_id = ?',
+          [openid, eventId]
         );
 
         await conn.commit();
@@ -520,7 +517,7 @@ module.exports = function (app, h) {
       res.json({
         success: true,
         data: {
-          eventId, archivedAt: now, archivedBy: nickMap.get(openid) || '',
+          eventId, archivedAt: new Date().toISOString(), archivedBy: nickMap.get(openid) || '',
           summary: { signups: signupCount, teams: teamCount, matches: matchCount, ranks: rankCount },
           message: '赛事已归档，所有数据固化为只读状态，不可再修改。'
         }

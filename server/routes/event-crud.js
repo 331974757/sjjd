@@ -173,7 +173,11 @@ module.exports = function (app, h) {
       if (!await h.assertAdmin(req, res)) return;
 
       const eventName = (req.body.event_name || req.body.eventName || '').trim();
-      const startTime = req.body.start_time || req.body.startTime || null;
+      let startTime = req.body.start_time || req.body.startTime || null;
+      // 毫秒时间戳 → MySQL datetime 格式
+      if (startTime && !isNaN(Number(startTime))) {
+        startTime = new Date(Number(startTime)).toISOString().slice(0, 19).replace('T', ' ');
+      }
       const eventDesc = (req.body.event_desc || req.body.eventDesc || '').trim();
       const signupLimitRaw = req.body.signup_limit || req.body.signupLimit || 0;
       const signupLimitVal = parseInt(signupLimitRaw) || 0;
@@ -183,18 +187,17 @@ module.exports = function (app, h) {
       if (eventName.length > 50) return res.status(400).json({ success: false, error: '赛事名称不能超过50个字符' });
 
       const eventId = h.genId();
-      const now = Date.now();
       const openid = req._openid || '';
       const limitDb = signupLimitVal > 0 ? signupLimitVal : null;
 
       // 尝试完整表结构插入，失败则逐步降级（兼容旧表缺少列的迁移场景）
       const insertSteps = [
-        { sql: 'INSERT INTO dota2_events (event_id, event_name, event_desc, creator_id, event_status, start_time, signup_limit, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?, 0, ?, ?)',
-          params: [eventId, eventName, eventDesc || null, openid, startTime, limitDb, now, now] },
-        { sql: 'INSERT INTO dota2_events (event_id, event_name, event_desc, creator_id, event_status, start_time, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, 0, ?, ?)',
-          params: [eventId, eventName, eventDesc || null, openid, startTime, now, now] },
-        { sql: 'INSERT INTO dota2_events (event_id, event_name, creator_id, event_status, start_time, is_archived, created_at, updated_at) VALUES (?, ?, ?, 0, ?, 0, ?, ?)',
-          params: [eventId, eventName, openid, startTime, now, now] },
+        { sql: 'INSERT INTO dota2_events (event_id, event_name, event_desc, creator_id, event_status, start_time, signup_limit, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?, 0, NOW(), NOW())',
+          params: [eventId, eventName, eventDesc || null, openid, startTime, limitDb] },
+        { sql: 'INSERT INTO dota2_events (event_id, event_name, event_desc, creator_id, event_status, start_time, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, 0, NOW(), NOW())',
+          params: [eventId, eventName, eventDesc || null, openid, startTime] },
+        { sql: 'INSERT INTO dota2_events (event_id, event_name, creator_id, event_status, start_time, is_archived, created_at, updated_at) VALUES (?, ?, ?, 0, ?, 0, NOW(), NOW())',
+          params: [eventId, eventName, openid, startTime] },
       ];
 
       let inserted = false;
@@ -211,7 +214,7 @@ module.exports = function (app, h) {
 
       res.json({
         success: true,
-        data: { eventId, eventName, eventDesc: eventDesc || '', startTime, signupLimit: signupLimitVal > 0 ? signupLimitVal : null, eventStatus: 0, isArchived: 0, creatorId: openid, createdAt: now, message: '赛事创建成功' }
+        data: { eventId, eventName, eventDesc: eventDesc || '', startTime, signupLimit: signupLimitVal > 0 ? signupLimitVal : null, eventStatus: 0, isArchived: 0, creatorId: openid, createdAt: new Date().toISOString(), message: '赛事创建成功' }
       });
     } catch (e) {
       console.error('[创建赛事] 未预期错误', e);
@@ -241,8 +244,8 @@ module.exports = function (app, h) {
       if (startTime !== undefined) { sets.push('start_time = ?'); values.push(startTime); }
 
       if (sets.length > 0) {
-        sets.push('updated_at = ?');
-        values.push(Date.now(), eventId);
+        sets.push('updated_at = NOW()');
+        values.push(eventId);
         await h.pool.query('UPDATE dota2_events SET ' + sets.join(', ') + ' WHERE event_id = ?', values);
       }
       res.json({ success: true });
@@ -284,21 +287,21 @@ module.exports = function (app, h) {
         const setLimit = (limitVal === 0 ? null : limitVal);
         try {
           await h.pool.query(
-            'UPDATE dota2_events SET event_status = ?, signup_limit = ?, updated_at = ? WHERE event_id = ?',
-            [eventStatus, setLimit, Date.now(), eventId]
+            'UPDATE dota2_events SET event_status = ?, signup_limit = ?, updated_at = NOW() WHERE event_id = ?',
+            [eventStatus, setLimit, eventId]
           );
         } catch (e) {
           if (e.code === 'ER_BAD_FIELD_ERROR') {
             await h.pool.query(
-              'UPDATE dota2_events SET event_status = ?, updated_at = ? WHERE event_id = ?',
-              [eventStatus, Date.now(), eventId]
+              'UPDATE dota2_events SET event_status = ?, updated_at = NOW() WHERE event_id = ?',
+              [eventStatus, eventId]
             );
           } else { throw e; }
         }
       } else {
         await h.pool.query(
-          'UPDATE dota2_events SET event_status = ?, updated_at = ? WHERE event_id = ?',
-          [eventStatus, Date.now(), eventId]
+          'UPDATE dota2_events SET event_status = ?, updated_at = NOW() WHERE event_id = ?',
+          [eventStatus, eventId]
         );
       }
       res.json({
@@ -347,8 +350,8 @@ module.exports = function (app, h) {
       );
 
       await h.pool.query(
-        'UPDATE dota2_events SET signup_limit = ?, updated_at = ? WHERE event_id = ?',
-        [limitVal === 0 ? null : limitVal, Date.now(), eventId]
+        'UPDATE dota2_events SET signup_limit = ?, updated_at = NOW() WHERE event_id = ?',
+        [limitVal === 0 ? null : limitVal, eventId]
       );
 
       res.json({

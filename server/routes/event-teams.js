@@ -91,8 +91,8 @@ module.exports = function (app, h) {
           const players = await h.getPlayersByIds(team.playerIds);
           const totalMmr = players.reduce((sum, p) => sum + (p.calibrate_mmr || 0), 0);
           await conn.query(
-            'INSERT INTO dota2_event_teams (team_id, event_id, team_name, captain_id, player_ids, total_mmr, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [teamId, eventId, team.teamName, captainId, playerIdsJson, totalMmr, Date.now()]
+            'INSERT INTO dota2_event_teams (team_id, event_id, team_name, captain_id, player_ids, total_mmr, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())',
+            [teamId, eventId, team.teamName, captainId, playerIdsJson, totalMmr]
           );
         }
 
@@ -139,8 +139,8 @@ module.exports = function (app, h) {
           const playerIdsJson = JSON.stringify(team.playerIds);
           const totalMmr = team.totalMmr || 0;
           await conn.query(
-            'INSERT INTO dota2_event_teams (team_id, event_id, team_name, captain_id, player_ids, total_mmr, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [teamId, eventId, team.name, team.captainId || team.playerIds[0], playerIdsJson, totalMmr, Date.now()]
+            'INSERT INTO dota2_event_teams (team_id, event_id, team_name, captain_id, player_ids, total_mmr, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())',
+            [teamId, eventId, team.name, team.captainId || team.playerIds[0], playerIdsJson, totalMmr]
           );
         }
 
@@ -176,7 +176,7 @@ module.exports = function (app, h) {
       const transition = h.validateStatusTransition(2, 3);
       if (!transition.valid) return res.status(400).json({ success: false, error: transition.error });
 
-      await h.pool.query('UPDATE dota2_events SET event_status = 3, updated_at = ? WHERE event_id = ?', [Date.now(), eventId]);
+      await h.pool.query('UPDATE dota2_events SET event_status = 3, updated_at = NOW() WHERE event_id = ?', [eventId]);
       res.json({ success: true, data: { eventStatus: 3, message: '编组已锁定，进入对战预备阶段' } });
     } catch (e) {
       res.status(500).json({ success: false, error: e.message });
@@ -198,7 +198,7 @@ module.exports = function (app, h) {
         return res.status(400).json({ success: false, error: '已有对战记录，需先删除所有对战才可退回到编组阶段' });
       }
 
-      await h.pool.query('UPDATE dota2_events SET event_status = 2, updated_at = ? WHERE event_id = ?', [Date.now(), eventId]);
+      await h.pool.query('UPDATE dota2_events SET event_status = 2, updated_at = NOW() WHERE event_id = ?', [eventId]);
       res.json({ success: true, data: { eventStatus: 2, message: '已退回到分组编队阶段' } });
     } catch (e) {
       res.status(500).json({ success: false, error: e.message });

@@ -38,3 +38,12 @@
 
   </view>
 </view>
+
+<!-- Toast 轻提示（独立遮罩层） -->
+<view class="toast-overlay {{toastVisible ? 'toast-show' : ''}}" wx:if="{{toastVisible}}" catchtouchmove="preventTouchMove">
+  <view class="toast-box toast-theme-{{toastTheme}}">
+    <view class="toast-accent"></view>
+    <image class="toast-icon-img" src="{{toastIcon}}" mode="aspectFit" wx:if="{{toastIcon}}"/>
+    <text class="toast-msg">{{toastMessage}}</text>
+  </view>
+</view>

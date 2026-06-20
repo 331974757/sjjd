@@ -1,5 +1,5 @@
 <!--pages/index/index.wxml-->
-<view class="page">
+<view class="page" catchtouchmove="{{pageLocked ? 'preventMove' : ''}}">
   <!-- 自定义导航栏：金色大标题居中 -->
   <view class="nav-custom" style="padding-top:{{statusBarHeight}}px;">
     <view class="nav-inner">
@@ -51,6 +51,15 @@
     </view>
 
     <!-- 模块1：图文介绍 -->
+
+    <!-- 首页加载中 -->
+    <view class="loading-state" wx:if="{{!homeDataLoaded && !homeLoadError}}">
+      <view class="loading-spinner"></view>
+      <text class="loading-text">加载中...</text>
+    </view>
+
+    <block wx:if="{{homeDataLoaded}}">
+    <!-- 模块1：图文介绍 -->
     <view class="home-module home-intro-area">
       <view class="hm-bar" wx:if="{{userRole === 'super_admin'}}">
         <view class="hm-bar-spacer"></view>
@@ -80,9 +89,9 @@
         </view>
       </view>
       <view class="marquee-box" wx:if="{{homeAnnounceText.length > 0}}">
-        <view class="marquee-track" style="transform: translateX({{-marqueeOffset}}rpx); transition: none;">
+        <view class="marquee-track">
+          <view class="marquee-spacer"></view>
           <text class="marquee-text">{{homeAnnounceText}}</text>
-          <text class="marquee-text" style="margin-left: 80rpx;">{{homeAnnounceText}}</text>
         </view>
       </view>
       <view class="marquee-empty" wx:else>
@@ -162,6 +171,19 @@
           <text class="stat-num">{{homeStats.finishedEvents}}</text>
           <text class="stat-label">已完结赛事</text>
         </view>
+      </view>
+    </view>
+
+    </block>
+    <!-- 首页模块区块结束 -->
+
+    <!-- 加载失败提示 -->
+    <view class="home-load-error" wx:if="{{homeLoadError}}">
+      <text class="hle-icon">⚠️</text>
+      <text class="hle-text">加载失败</text>
+      <text class="hle-sub">请检查网络连接</text>
+      <view class="hle-retry-btn" bindtap="retryLoadHome">
+        <text>重新加载</text>
       </view>
     </view>
 
@@ -611,8 +633,8 @@
         <view class="ecm-btn ecm-btn-cancel" bindtap="closeCreateEventModal">
           <text>取消</text>
         </view>
-        <view class="ecm-btn ecm-btn-confirm" bindtap="submitCreateEvent">
-          <text>确认创建</text>
+        <view class="ecm-btn ecm-btn-confirm {{creatingEvent ? 'ecm-btn-loading' : ''}}" bindtap="submitCreateEvent">
+          <text>{{creatingEvent ? '创建中...' : '确认创建'}}</text>
         </view>
       </view>
     </view>
@@ -624,7 +646,7 @@
       <view class="admin-modal-close" bindtap="closeAdminModal">
         <text class="admin-close-icon">✕</text>
       </view>
-      <text class="admin-modal-title">超级管理员</text>
+      <text class="admin-modal-title">管理员列表</text>
       <view class="admin-list">
         <view class="admin-section" wx:if="{{_superAdminOnly.length > 0}}">
           <view class="admin-section-header">
@@ -657,19 +679,20 @@
   </view>
 
   <!-- 权限管理弹窗（仅超管可见） -->
-  <view class="admin-modal-mask" wx:if="{{showUserMgmtModal}}" catchtouchmove="preventMove" bindtap="closeUserMgmtModal">
-    <view class="umg-modal" catchtap="">
-      <view class="admin-modal-close" bindtap="closeUserMgmtModal">
+  <view class="admin-modal-mask" wx:if="{{showUserMgmtModal}}" catchtouchmove="preventMove" catchtap="">
+    <view class="umg-modal" catchtap="preventInputClose">
+      <view class="admin-modal-close" catchtap="closeUserMgmtModal">
         <text class="admin-close-icon">✕</text>
       </view>
-      <text class="admin-modal-title">权限管理</text>
+      <view class="admin-modal-header">
+        <text class="admin-modal-title">权限管理</text>
+      </view>
 
-      <!-- 操作栏：刷新 + 人数 -->
-      <view class="umg-toolbar">
-        <view class="admin-refresh" bindtap="homeRefreshUsers">
-          <image class="icon-img-sm" src="/images/icons/refresh.svg" mode="aspectFit"/>
-        </view>
-        <text class="user-count">{{homeKeyword ? homeFilteredTotal : homeAllUsers.length}} 人</text>
+      <!-- 统计行：各角色人数（仅统计已命名用户） -->
+      <view class="umg-stats-row">
+        <text class="umg-stat umg-stat-super">超管 {{homeAllSuperCount}} 人</text>
+        <text class="umg-stat umg-stat-admin">管理 {{homeAllAdminCount}} 人</text>
+        <text class="umg-stat umg-stat-user">用户 {{homeAllUserCount}} 人</text>
       </view>
 
       <!-- 搜索栏 -->
@@ -741,6 +764,28 @@
       <!-- 提示 -->
       <view class="umg-hint">
         <text>让对方打开小程序即可自动注册。注册后你就能在这里看到他，点击设为管理员。</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 公告编辑弹窗 -->
+  <view class="ann-modal-mask" wx:if="{{showAnnounceModal}}" catchtouchmove="preventMove" bindtap="annCloseModal"></view>
+  <view class="ann-modal" wx:if="{{showAnnounceModal}}" catchtap="">
+    <view class="ann-topbar">
+      <text class="ann-title">编辑公告</text>
+      <view class="ann-close-btn" bindtap="annCloseModal">
+        <text class="ann-close-icon">✕</text>
+      </view>
+    </view>
+    <view class="ann-body">
+      <textarea class="ann-textarea" value="{{annEditContent}}" bindinput="annOnInput" placeholder="输入公告内容..." placeholder-style="color:#484f58" maxlength="500" auto-height auto-focus />
+    </view>
+    <view class="ann-footer">
+      <view class="ann-btn ann-btn-cancel" bindtap="annCloseModal">
+        <text>取消</text>
+      </view>
+      <view class="ann-btn ann-btn-confirm" bindtap="annOnSave">
+        <text>{{annOperating ? '保存中...' : '保存'}}</text>
       </view>
     </view>
   </view>

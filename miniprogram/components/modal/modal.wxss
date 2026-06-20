@@ -205,3 +205,57 @@
 .sheet-cancel:active {
   background: #30363d;
 }
+
+/* ===== Toast 轻提示 ===== */
+.toast-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.toast-overlay.toast-show {
+  opacity: 1;
+}
+.toast-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 200rpx;
+  max-width: 500rpx;
+  padding: 32rpx 40rpx;
+  background: #1c2333;
+  border-radius: 16rpx;
+  box-shadow: 0 8rpx 32rpx rgba(0,0,0,0.5);
+  animation: toastIn 0.25s ease;
+  overflow: hidden;
+  position: relative;
+}
+@keyframes toastIn {
+  from { transform: scale(0.85); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+.toast-accent {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4rpx;
+}
+.toast-theme-success .toast-accent { background: linear-gradient(90deg, #3fb950, #2ea043); }
+.toast-theme-danger .toast-accent  { background: linear-gradient(90deg, #f85149, #da3633); }
+.toast-theme-warning .toast-accent { background: linear-gradient(90deg, #d29922, #e3b341); }
+.toast-theme-default .toast-accent { background: linear-gradient(90deg, #4f8cff, #7c5cfc); }
+.toast-icon-img {
+  width: 48rpx; height: 48rpx;
+  margin-bottom: 12rpx;
+}
+.toast-msg {
+  font-size: 28rpx;
+  color: #e6edf3;
+  text-align: center;
+  line-height: 1.5;
+}

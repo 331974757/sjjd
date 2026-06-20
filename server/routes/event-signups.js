@@ -117,14 +117,13 @@ module.exports = function (app, h) {
         [eventId, playerId]
       );
 
-      const now = Date.now();
       if (existing.length > 0) {
         if (existing[0].signup_status === 1) {
           return res.status(400).json({ success: false, error: '您已报名本赛事，请勿重复报名', code: 'ALREADY_SIGNED' });
         }
         await h.pool.query(
-          'UPDATE dota2_event_signup SET signup_status = 1, signup_type = 0, operator_id = ?, created_at = ? WHERE signup_id = ?',
-          [openid, now, existing[0].signup_id]
+          'UPDATE dota2_event_signup SET signup_status = 1, signup_type = 0, operator_id = ?, created_at = NOW() WHERE signup_id = ?',
+          [openid, existing[0].signup_id]
         );
         return res.json({
           success: true,
@@ -134,8 +133,8 @@ module.exports = function (app, h) {
 
       const signupId = h.genId();
       await h.pool.query(
-        'INSERT INTO dota2_event_signup (signup_id, event_id, player_id, signup_type, signup_status, operator_id, created_at) VALUES (?, ?, ?, 0, 1, ?, ?)',
-        [signupId, eventId, playerId, openid, now]
+        'INSERT INTO dota2_event_signup (signup_id, event_id, player_id, signup_type, signup_status, operator_id, created_at) VALUES (?, ?, ?, 0, 1, ?, NOW())',
+        [signupId, eventId, playerId, openid]
       );
 
       res.json({
@@ -173,15 +172,14 @@ module.exports = function (app, h) {
         [eventId, playerId]
       );
 
-      const now = Date.now();
       if (existing.length > 0) {
         const row = existing[0];
         if (row.signup_status === 1) {
           return res.status(400).json({ success: false, error: '该选手已报名本赛事', code: 'ALREADY_SIGNED' });
         }
         await h.pool.query(
-          'UPDATE dota2_event_signup SET signup_status = 1, signup_type = 1, operator_id = ?, created_at = ? WHERE signup_id = ?',
-          [openid, now, row.signup_id]
+          'UPDATE dota2_event_signup SET signup_status = 1, signup_type = 1, operator_id = ?, created_at = NOW() WHERE signup_id = ?',
+          [openid, row.signup_id]
         );
         return res.json({
           success: true,
@@ -191,8 +189,8 @@ module.exports = function (app, h) {
 
       const signupId = h.genId();
       await h.pool.query(
-        'INSERT INTO dota2_event_signup (signup_id, event_id, player_id, signup_type, signup_status, operator_id, created_at) VALUES (?, ?, ?, 1, 1, ?, ?)',
-        [signupId, eventId, playerId, openid, now]
+        'INSERT INTO dota2_event_signup (signup_id, event_id, player_id, signup_type, signup_status, operator_id, created_at) VALUES (?, ?, ?, 1, 1, ?, NOW())',
+        [signupId, eventId, playerId, openid]
       );
       res.json({
         success: true,
@@ -220,7 +218,6 @@ module.exports = function (app, h) {
       }
 
       const openid = req._openid || '';
-      const now = Date.now();
       const results = [];
       let successCount = 0, skipCount = 0, failCount = 0;
 
@@ -238,14 +235,14 @@ module.exports = function (app, h) {
 
           if (existing.length > 0) {
             await h.pool.query(
-              'UPDATE dota2_event_signup SET signup_status = 1, signup_type = 1, operator_id = ?, created_at = ? WHERE signup_id = ?',
-              [openid, now, existing[0].signup_id]
+              'UPDATE dota2_event_signup SET signup_status = 1, signup_type = 1, operator_id = ?, created_at = NOW() WHERE signup_id = ?',
+              [openid, existing[0].signup_id]
             );
           } else {
             const signupId = h.genId();
             await h.pool.query(
-              'INSERT INTO dota2_event_signup (signup_id, event_id, player_id, signup_type, signup_status, operator_id, created_at) VALUES (?, ?, ?, 1, 1, ?, ?)',
-              [signupId, eventId, playerId, openid, now]
+              'INSERT INTO dota2_event_signup (signup_id, event_id, player_id, signup_type, signup_status, operator_id, created_at) VALUES (?, ?, ?, 1, 1, ?, NOW())',
+              [signupId, eventId, playerId, openid]
             );
           }
           successCount++;

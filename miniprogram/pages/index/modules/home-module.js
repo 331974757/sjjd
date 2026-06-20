@@ -7,9 +7,12 @@ const modal = require('../../../utils/modal.js')
 
 module.exports = {
   data: {
+    // 分页（与选手模块共用 C.PAGE_SIZE）
+    pageSize: C.PAGE_SIZE,
     // 首页用户管理（超管权限）
     homeAllUsers: [],
     homeUsers: [],
+    homePageSize: 10,
     homeKeyword: '',
     homePage: 1,
     homeTotalPages: 0,
@@ -17,6 +20,9 @@ module.exports = {
     homeFiltered: [],
     homeUsersLoading: false,
     homeOperating: false,
+    homeAllSuperCount: 0,
+    homeAllAdminCount: 0,
+    homeAllUserCount: 0,
     // 首页模块数据
     homeIntro: [],
     homeAnnouncements: [],
@@ -43,7 +49,13 @@ module.exports = {
     homeLoadError: false,
     homeDataLoaded: false,
     showUserMgmtModal: false,
+    pageLocked: false,
     myOpenId: '',
+    // 公告编辑弹窗
+    showAnnounceModal: false,
+    annEditId: '',
+    annEditContent: '',
+    annOperating: false,
   },
 
   methods: {
@@ -62,10 +74,22 @@ module.exports = {
           openid: u.openid,
           role: u.role,
           nickName: u.nickName || '',
+          createdAt: u.createdAt || '',
           isMe: !!(openid && u.openid === openid),
           nickChangeCount: u.nickChangeCount || 0
         }))
-        this.setData({ homeAllUsers: raw, homeUsersLoading: false, myOpenId: openid || '' })
+        const namedUsers = raw.filter(u => u.nickName)
+        const superCount = namedUsers.filter(u => u.role === 'super_admin').length
+        const adminCount = namedUsers.filter(u => u.role === 'admin').length
+        const userCount = namedUsers.filter(u => u.role === 'user').length
+        this.setData({
+          homeAllUsers: raw,
+          homeAllSuperCount: superCount,
+          homeAllAdminCount: adminCount,
+          homeAllUserCount: userCount,
+          homeUsersLoading: false,
+          myOpenId: openid || ''
+        })
         this.homeFilterUsers()
       } catch (err) {
         wx.hideLoading()
@@ -93,12 +117,14 @@ module.exports = {
 
     homeGetFiltered() {
       let list = this.data.homeAllUsers.filter(u => u.nickName)
-      list = [...list].sort((a, b) => {
-        if (a.role === 'super_admin' && b.role !== 'super_admin') return -1
-        if (a.role !== 'super_admin' && b.role === 'super_admin') return 1
-        if (a.role === 'admin' && b.role === 'user') return -1
-        if (a.role === 'user' && b.role === 'admin') return 1
-        return 0
+      // 角色优先级：super_admin > admin > user，同角色按创建时间倒序
+      const roleOrder = { super_admin: 0, admin: 1, user: 2 }
+      list.sort((a, b) => {
+        const roleDiff = (roleOrder[a.role] ?? 99) - (roleOrder[b.role] ?? 99)
+        if (roleDiff !== 0) return roleDiff
+        const ta = String(a.createdAt || '')
+        const tb = String(b.createdAt || '')
+        return ta > tb ? -1 : ta < tb ? 1 : 0
       })
       const kw = this.data.homeKeyword.toLowerCase()
       if (kw) {
@@ -112,13 +138,14 @@ module.exports = {
 
     homeFilterUsers() {
       const list = this.homeGetFiltered()
-      const totalPages = Math.ceil(list.length / this.data.pageSize)
+      const pageSize = this.data.homePageSize
+      const totalPages = Math.ceil(list.length / pageSize)
       let page = this.data.homePage
       if (page > totalPages && totalPages > 0) page = totalPages
       if (page < 1) page = 1
-      const start = (page - 1) * this.data.pageSize
+      const start = (page - 1) * pageSize
       this.setData({
-        homeUsers: list.slice(start, start + this.data.pageSize),
+        homeUsers: list.slice(start, start + pageSize),
         homePage: page,
         homeTotalPages: totalPages,
         homeFilteredTotal: list.length,
@@ -144,7 +171,7 @@ module.exports = {
       const role = e.currentTarget.dataset.role
       const isMe = e.currentTarget.dataset.isme
       const nickName = e.currentTarget.dataset.nickname
-      if (isMe === true || isMe === 'true') { wx.showToast({ title: '不能操作自己', icon: 'none' }); return }
+      if (isMe === true || isMe === 'true') { modal.toast(this, { theme: 'warning', content: '不能操作自己' }); return }
       let itemList = [], actions = []
       if (role === 'super_admin') { itemList = ['取消超级管理员']; actions = ['removeSuper'] }
       else if (role === 'admin') { itemList = ['设为超级管理员', '取消管理员']; actions = ['setSuper', 'removeAdmin'] }
@@ -170,10 +197,11 @@ module.exports = {
       try {
         const res = await api.put('/users/' + openid + '/role', { role })
         wx.hideLoading()
-        wx.showToast({ title: res.success ? '已' + label : (res.message || '失败'), icon: res.success ? 'success' : 'none' })
+        modal.toast(this, { theme: res.success ? 'success' : 'danger', content: res.success ? '已' + label : (res.message || '失败') })
         if (res.success) this.homeLoadUsers()
       } catch (e) {
-        wx.hideLoading(); wx.showToast({ title: '操作失败', icon: 'none' })
+        wx.hideLoading()
+        modal.toast(this, { theme: 'danger', content: '操作失败' })
       } finally {
         this.setData({ homeOperating: false })
       }
@@ -190,10 +218,11 @@ module.exports = {
       try {
         const res = await api.put('/users/' + openid + '/reset-nickcount')
         wx.hideLoading()
-        wx.showToast({ title: res.success ? '已重置' : (res.message || '失败'), icon: res.success ? 'success' : 'none' })
+        modal.toast(this, { theme: res.success ? 'success' : 'danger', content: res.success ? '已重置' : (res.message || '失败') })
         if (res.success) this.homeLoadUsers()
       } catch (e) {
-        wx.hideLoading(); wx.showToast({ title: '操作失败', icon: 'none' })
+        wx.hideLoading()
+        modal.toast(this, { theme: 'danger', content: '操作失败' })
       } finally {
         this.setData({ homeOperating: false })
       }
@@ -208,7 +237,7 @@ module.exports = {
         const [introRes, annRes, dynRes, statsRes] = await Promise.all([
           api.get('/home/intro').catch(() => ({ success: false })),
           api.get('/announcements').catch(() => ({ success: false, data: [] })),
-          api.get('/events/dynamic', { limit: 8 }).catch(() => ({ success: false, data: [] })),
+          api.get('/events/dynamic', { limit: 5 }).catch(() => ({ success: false, data: [] })),
           api.get('/stats/platform').catch(() => ({ success: false, data: {} }))
         ])
         this.setData({
@@ -217,7 +246,6 @@ module.exports = {
           homeAnnounceText: (annRes && annRes.success && annRes.data)
             ? annRes.data.map(function(a, i) { return (a.is_pinned ? '📌' : '') + a.content; }).join('　　|　　')
             : '',
-          marqueeOffset: 0,
           eventDynamicList: (dynRes && dynRes.success) ? (dynRes.data || []) : [],
           homeStats: (statsRes && statsRes.success) ? Object.assign({
             registeredPlayers: 0, totalEvents: 0, activeEvents: 0, finishedEvents: 0
@@ -225,7 +253,6 @@ module.exports = {
           homeDataLoaded: true,
           homeLoadError: false
         })
-        this.startMarquee()
       } catch (e) {
         console.error('[home] 加载首页数据失败', e)
         this.setData({ homeLoadError: true, homeDataLoaded: true })
@@ -237,7 +264,7 @@ module.exports = {
     async refreshHomeData() {
       this.setData({ homeDataLoaded: false })
       await this.loadHomeData()
-      wx.showToast({ title: '已刷新', icon: 'success', duration: 1000 })
+      modal.toast(this, { theme: 'success', content: '已刷新', duration: 1000 })
     },
 
     // ====== 首页跳转方法 ======
@@ -245,17 +272,78 @@ module.exports = {
       wx.navigateTo({ url: '/pages/home-edit/home-edit' })
     },
 
+    preventInputClose() {
+      // 阻止输入框点击冒泡到遮罩层关闭弹窗
+    },
+
     goManageAnnounce() {
-      wx.navigateTo({ url: '/pages/announce-manage/announce-manage' })
+      this.setData({ showAnnounceModal: true, pageLocked: true })
+      this.loadAnnounceForEdit()
     },
 
     showUserMgmtModal() {
-      this.setData({ showUserMgmtModal: true })
+      this.setData({ showUserMgmtModal: true, pageLocked: true })
       this.homeLoadUsers()
     },
 
     closeUserMgmtModal() {
-      this.setData({ showUserMgmtModal: false })
+      this.setData({ showUserMgmtModal: false, pageLocked: false })
+    },
+
+    // ====== 公告编辑弹窗方法 ======
+    async loadAnnounceForEdit() {
+      try {
+        const res = await api.get('/announcements')
+        const list = (res && res.success) ? (res.data || []) : []
+        // 只取最新一条
+        const latest = list[0]
+        if (latest) {
+          this.setData({ annEditId: latest.id, annEditContent: latest.content || '' })
+        }
+      } catch (e) {
+        console.error('[home] 加载公告失败', e)
+      }
+    },
+
+    /** 输入变更 */
+    annOnInput(e) {
+      this.setData({ annEditContent: e.detail.value })
+    },
+
+    /** 关闭弹窗 */
+    annCloseModal() {
+      if (this.data.annOperating) return
+      this.setData({ showAnnounceModal: false, pageLocked: false })
+    },
+
+    /** 保存 */
+    async annOnSave() {
+      if (this.data.annOperating) return
+      const content = (this.data.annEditContent || '').trim()
+      if (!content) {
+        modal.toast(this, { theme: 'warning', content: '请输入公告内容' })
+        return
+      }
+      this.setData({ annOperating: true })
+      wx.showLoading({ title: '保存中...' })
+      try {
+        const res = this.data.annEditId
+          ? await api.put('/announcements/' + this.data.annEditId, { content })
+          : await api.post('/announcements', { content })
+        wx.hideLoading()
+        if (res && res.success) {
+          modal.toast(this, { theme: 'success', content: '已保存' })
+          this.setData({ showAnnounceModal: false, pageLocked: false })
+          await this.loadHomeData(true)
+        } else {
+          modal.toast(this, { theme: 'danger', content: res.message || '保存失败' })
+        }
+      } catch (e) {
+        wx.hideLoading()
+        modal.toast(this, { theme: 'danger', content: '保存失败' })
+      } finally {
+        this.setData({ annOperating: false })
+      }
     },
 
     homeJumpToGame(e) {

@@ -38,7 +38,7 @@ module.exports = {
     async loadAllPlayers() {
       if (this._loading) return
       this._loading = true
-      const lockTimer = setTimeout(() => { this._loading = false }, 5000)
+      const lockTimer = setTimeout(() => { this._loading = false }, 8000)
       try {
         const res = await api.get('/players', { pageSize: 1000 })
         const all = (res.data || []).map(p => ({
@@ -50,7 +50,7 @@ module.exports = {
       } catch (err) {
         console.error('[选手数据] 加载失败', err)
         this.setData({ loaded: true })
-        wx.showToast({ title: '加载失败', icon: 'none' })
+        modal.toast(this, { theme: 'danger', content: '加载失败' })
       } finally {
         clearTimeout(lockTimer)
         this._loading = false
@@ -325,7 +325,7 @@ module.exports = {
     async batchDelete() {
       const ids = Object.keys(this.data.selectedIds)
       if (ids.length === 0) {
-        wx.showToast({ title: '请先选择要删除的选手', icon: 'none' })
+        modal.toast(this, { theme: 'warning', content: '请先选择要删除的选手' })
         return
       }
       const players = this.data.allPlayers
@@ -347,16 +347,16 @@ module.exports = {
         const res = await api.post('/players/batch-delete', { ids: ids })
         wx.hideLoading()
         if (res.success) {
-          setTimeout(() => { wx.showToast({ title: '已删除 ' + (res.deleted || ids.length) + ' 名选手', icon: 'success' }) }, 300)
+          modal.toast(this, { theme: 'success', content: '已删除 ' + (res.deleted || ids.length) + ' 名选手' })
           this.setData({ deleteMode: false, selectedIds: {}, selectedCount: 0 })
           this.loadAllPlayers()
         } else {
-          setTimeout(() => { wx.showToast({ title: res.message || '删除失败', icon: 'none' }) }, 300)
+          modal.toast(this, { theme: 'danger', content: res.message || '删除失败' })
         }
       } catch (err) {
         wx.hideLoading()
         console.error('批量删除失败', err)
-        setTimeout(() => { wx.showToast({ title: '删除失败', icon: 'none' }) }, 300)
+        modal.toast(this, { theme: 'danger', content: '删除失败' })
       }
     },
 
@@ -368,16 +368,16 @@ module.exports = {
         wx.hideLoading()
 
         if (!res) {
-          wx.showToast({ title: '服务器无响应', icon: 'none' })
+          modal.toast(this, { theme: 'danger', content: '服务器无响应' })
           return
         }
         if (!res.success) {
-          wx.showToast({ title: res.error || res.message || '导出失败', icon: 'none' })
+          modal.toast(this, { theme: 'danger', content: res.error || res.message || '导出失败' })
           return
         }
         const players = res.data
         if (!players || !Array.isArray(players) || players.length === 0) {
-          wx.showToast({ title: '暂无选手数据', icon: 'none' })
+          modal.toast(this, { theme: 'default', content: '暂无选手数据' })
           return
         }
 
@@ -405,10 +405,10 @@ module.exports = {
           wx.setClipboardData({
             data: csv,
             success: () => {
-              wx.showToast({ title: '已复制 ' + count + ' 条数据到剪贴板', icon: 'success', duration: 2500 })
+              modal.toast(this, { theme: 'success', content: '已复制 ' + count + ' 条数据到剪贴板', duration: 2500 })
             },
             fail: () => {
-              wx.showToast({ title: '导出失败，请重试', icon: 'none' })
+              modal.toast(this, { theme: 'danger', content: '导出失败，请重试' })
             }
           })
           return
@@ -428,7 +428,7 @@ module.exports = {
               showMenu: true,
               fail: (err) => {
                 console.error('[导出] 打开文件失败:', err)
-                wx.showToast({ title: '打开失败，文件已保存', icon: 'none' })
+                modal.toast(this, { theme: 'warning', content: '打开失败，文件已保存' })
               }
             })
           }
@@ -436,7 +436,7 @@ module.exports = {
       } catch (err) {
         wx.hideLoading()
         console.error('[导出] 异常:', err)
-        wx.showToast({ title: '导出失败: ' + (err.message || '未知错误'), icon: 'none', duration: 2500 })
+        modal.toast(this, { theme: 'danger', content: '导出失败: ' + (err.message || '未知错误'), duration: 2500 })
       }
     }
   }
