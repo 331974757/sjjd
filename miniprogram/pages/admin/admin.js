@@ -19,15 +19,9 @@ Page({
   },
 
   async onLoad() {
-    // 仅超级管理员可访问权限设置
-    const isSuper = await perm.isSuperAdmin()
-    if (!isSuper) {
-      modal.toast(this, { title: '仅超级管理员可访问', icon: 'none' })
-      setTimeout(() => { wx.navigateBack() }, 1500)
-      return
-    }
-    this.setData({ isSuperAdmin: true })
-    this.loadPage()
+    // 用户管理已整合到首页权限管理弹窗，无需独立页面
+    modal.toast(this, { title: '用户管理已整合到首页', icon: 'none' })
+    setTimeout(() => { wx.switchTab({ url: '/pages/index/index?subTab=home' }) }, 1000)
   },
 
   onShow() {

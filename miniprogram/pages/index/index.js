@@ -51,10 +51,8 @@ const pageConfig = {
     }
     this.loadNickname()
     this.loadUserInfo()
-    this.loadAllPlayers()
-    this.loadSuperAdminInfo()
-    this.homeLoadUsers()
     this.loadHomeData()
+    // 选手列表和用户管理延迟到用户切换到对应 Tab 时加载
   },
 
   onShow() {
