@@ -865,7 +865,8 @@ app.put('/api/users/:openid/reset-nickcount', async (req, res) => {
 const auth = require('./utils/auth');
 auth.init(pool, getCallerRole);
 
-// 【调试接口】接口权限矩阵app.get('/api/_debug/permissions', async (req, res) => {
+// 【调试接口】接口权限矩阵
+app.get('/api/_debug/permissions', async (req, res) => {
   try {
     // 【安全修复】仅信任 JWT 验证的 openid
     const operatorOpenid = req._openid || '';
