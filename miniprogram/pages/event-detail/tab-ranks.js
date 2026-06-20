@@ -29,7 +29,7 @@ module.exports = {
         if (res.success) this.setData({ ranks: res.data || [] })
       } catch (e) {
         console.error('[名次] 加载失败', e)
-        wx.showToast({ title: '加载名次数据失败', icon: 'none' })
+        modal.toast(this, { title: '加载名次数据失败', icon: 'none' })
       }
     },
 
@@ -295,11 +295,11 @@ module.exports = {
           this.setData({ ranksEditing: false, _rankUsedTeamMap: {}, rankSelectedTeamId: '' })
           await this.loadRanks()
         } else {
-          wx.showToast({ title: res.error || '保存失败', icon: 'none' })
+          modal.toast(this, { title: res.error || '保存失败', icon: 'none' })
         }
       } catch (e) {
         this.setData({ ranksSaving: false })
-        wx.showToast({ title: '保存失败，请重试', icon: 'none' })
+        modal.toast(this, { title: '保存失败，请重试', icon: 'none' })
       }
     },
 
@@ -316,11 +316,11 @@ module.exports = {
             wx.redirectTo({ url: '/pages/index/index?subTab=history' })
           }, 1500)
         } else {
-          wx.showToast({ title: res.error || '归档失败', icon: 'none' })
+          modal.toast(this, { title: res.error || '归档失败', icon: 'none' })
         }
       } catch (e) {
         this.setData({ archiveSubmitting: false, showArchiveConfirm: false })
-        wx.showToast({ title: '归档失败，请重试', icon: 'none' })
+        modal.toast(this, { title: '归档失败，请重试', icon: 'none' })
       }
     },
   }

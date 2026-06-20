@@ -341,8 +341,8 @@
 }
 
 .rank-chip-active {
-  background: linear-gradient(135deg, #d4a843, #e8c776);
-  border-color: #d4a843;
+  background: linear-gradient(135deg, #d4a03a, #e8c776);
+  border-color: #d4a03a;
 }
 
 .rank-chip-text {

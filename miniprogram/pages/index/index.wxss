@@ -99,7 +99,7 @@
   padding: 0 36rpx; margin-bottom: 12rpx;
 }
 .hm-tag {
-  font-size: 22rpx; font-weight: 600; color: #3498db;
+  font-size: 22rpx; font-weight: 600; color: #58a6ff;
   background-color: rgba(52,152,219,0.12); border-radius: 8rpx;
   padding: 4rpx 16rpx;
 }
@@ -117,7 +117,7 @@
   font-size: 32rpx; font-weight: 700; color: #e6edf3;
   padding: 0 36rpx; margin-bottom: 16rpx;
 }
-.hsr-more { font-size: 24rpx; color: #3498db; font-weight: 400; }
+.hsr-more { font-size: 24rpx; color: #58a6ff; font-weight: 400; }
 
 /* ===== 模块1：图文介绍区 ===== */
 .home-intro-area { padding: 0 36rpx; }
@@ -252,10 +252,10 @@
 .ed-meta { display: flex; flex-direction: row; align-items: center; gap: 12rpx; }
 .ed-status-tag { font-size: 20rpx; padding: 2rpx 12rpx; border-radius: 6rpx; font-weight: 600; }
 .ed-status-0 { background-color: rgba(119,141,169,0.15); color: #778da9; } /* 创建中 */
-.ed-status-1 { background-color: rgba(39,174,96,0.15); color: #27ae60; }  /* 报名中 */
+.ed-status-1 { background-color: rgba(39,174,96,0.15); color: #3fb950; }  /* 报名中 */
 .ed-status-2 { background-color: rgba(243,156,18,0.15); color: #f39c12; } /* 报名截止 */
 .ed-status-3 { background-color: rgba(155,89,182,0.15); color: #bb86fc; } /* 分组锁定 */
-.ed-status-4 { background-color: rgba(231,76,60,0.15); color: #e74c3c; }  /* 对战中 */
+.ed-status-4 { background-color: rgba(231,76,60,0.15); color: #f85149; }  /* 对战中 */
 .ed-time { font-size: 22rpx; color: #8b949e; }
 .ed-count { font-size: 22rpx; color: #484f58; }
 .ed-arrow { font-size: 32rpx; color: #21262d; flex-shrink: 0; margin-left: 12rpx; }
@@ -2041,7 +2041,7 @@
   flex-shrink: 0; margin-right: 12rpx;
 }
 .badge-super { background-color: rgba(155,89,182,0.2); color: #bb86fc; border: 1rpx solid rgba(155,89,182,0.3); }
-.badge-admin { background-color: rgba(52,152,219,0.2); color: #3498db; border: 1rpx solid rgba(52,152,219,0.3); }
+.badge-admin { background-color: rgba(52,152,219,0.2); color: #58a6ff; border: 1rpx solid rgba(52,152,219,0.3); }
 .badge-user { background-color: rgba(119,141,169,0.15); color: #778da9; border: 1rpx solid rgba(119,141,169,0.2); }
 .user-nick {
   font-size: 28rpx; color: #e6edf3; overflow: hidden; text-overflow: ellipsis;
@@ -2059,8 +2059,8 @@
   border: 1rpx solid rgba(243,156,18,0.2); font-size: 22rpx; color: #f39c12; margin-right: 8rpx;
 }
 .toggle-btn { padding: 8rpx 20rpx; border-radius: 8rpx; font-size: 22rpx; }
-.toggle-on { background-color: rgba(39,174,96,0.15); border: 1rpx solid rgba(39,174,96,0.3); color: #27ae60; }
-.toggle-off { background-color: rgba(231,76,60,0.15); border: 1rpx solid rgba(231,76,60,0.3); color: #e74c3c; }
+.toggle-on { background-color: rgba(39,174,96,0.15); border: 1rpx solid rgba(39,174,96,0.3); color: #3fb950; }
+.toggle-off { background-color: rgba(231,76,60,0.15); border: 1rpx solid rgba(231,76,60,0.3); color: #f85149; }
 .toggle-super { background-color: rgba(155,89,182,0.15); border: 1rpx solid rgba(155,89,182,0.3); color: #bb86fc; }
 .toggle-disabled { background-color: rgba(119,141,169,0.08); border: 1rpx solid rgba(119,141,169,0.15); color: #415a77; }
 .toggle-loading { background-color: rgba(119,141,169,0.04); border: 1rpx solid rgba(119,141,169,0.1); color: #8b949e !important; opacity: 0.6; }
@@ -2069,7 +2069,7 @@
 .pagination { display: flex; flex-direction: row; justify-content: center; align-items: center; padding: 24rpx 0 8rpx; gap: 24rpx; }
 .page-btn {
   padding: 12rpx 32rpx; border-radius: 12rpx; background-color: rgba(52,152,219,0.12);
-  border: 1rpx solid rgba(52,152,219,0.25); font-size: 24rpx; color: #3498db;
+  border: 1rpx solid rgba(52,152,219,0.25); font-size: 24rpx; color: #58a6ff;
 }
 .page-btn-disabled { background-color: rgba(119,141,169,0.06); border-color: rgba(119,141,169,0.12); color: #415a77; }
 .page-btn:active:not(.page-btn-disabled) { background-color: rgba(52,152,219,0.22); }
@@ -2157,5 +2157,5 @@
 }
 .ann-btn-cancel { background-color: rgba(255,255,255,0.04); color: #8b949e; border: 1rpx solid rgba(255,255,255,0.08); }
 .ann-btn-cancel:active { background-color: rgba(255,255,255,0.08); }
-.ann-btn-confirm { background-color: rgba(52,152,219,0.15); color: #3498db; border: 1rpx solid rgba(52,152,219,0.25); }
+.ann-btn-confirm { background-color: rgba(52,152,219,0.15); color: #58a6ff; border: 1rpx solid rgba(52,152,219,0.25); }
 .ann-btn-confirm:active { background-color: rgba(52,152,219,0.25); }

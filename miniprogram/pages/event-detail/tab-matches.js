@@ -109,7 +109,7 @@ module.exports = {
       } catch (e) {
         this.setData({ battleLoading: false })
         console.error('[对战] 加载失败', e)
-        wx.showToast({ title: '加载对战数据失败', icon: 'none' })
+        modal.toast(this, { title: '加载对战数据失败', icon: 'none' })
       }
     },
 
@@ -307,7 +307,7 @@ module.exports = {
       const { battleScoreboard, battleSelectedIds } = this.data
       const selectedIds = battleSelectedIds.length > 0 ? battleSelectedIds : battleScoreboard.map(t => t.teamId)
       if (selectedIds.length < 2) {
-        wx.showToast({ title: '至少选择2支队伍才能自动匹配', icon: 'none' })
+        modal.toast(this, { title: '至少选择2支队伍才能自动匹配', icon: 'none' })
         return
       }
       const teamMap = {}; battleScoreboard.forEach(t => { teamMap[t.teamId] = t })
@@ -423,7 +423,7 @@ module.exports = {
         const results = await Promise.all(apiCalls)
         const failed = results.filter(r => !r.success)
         if (failed.length > 0) {
-          wx.showToast({ title: failed[0].error || '换队失败', icon: 'none' })
+          modal.toast(this, { title: failed[0].error || '换队失败', icon: 'none' })
           this.setData({ battleMatches })
         } else {
           this._markScoreboardMatchInfo(updated)
@@ -432,7 +432,7 @@ module.exports = {
           this._syncBattleSelected([...ids])
         }
       } catch (e) {
-        wx.showToast({ title: '换队失败，请重试', icon: 'none' })
+        modal.toast(this, { title: '换队失败，请重试', icon: 'none' })
         this.setData({ battleMatches })
       }
     },
@@ -463,9 +463,9 @@ module.exports = {
     // ============ 生成对战 + 开战 ============
     async doGenerateMatches() {
       const { battlePairs } = this.data
-      if (battlePairs.length === 0) { wx.showToast({ title: '请先选择参战队伍进行配对', icon: 'none' }); return }
+      if (battlePairs.length === 0) { modal.toast(this, { title: '请先选择参战队伍进行配对', icon: 'none' }); return }
       const incomplete = battlePairs.some(p => !p.teamA || !p.teamB)
-      if (incomplete) { wx.showToast({ title: '存在未配对完整的对战，请检查', icon: 'none' }); return }
+      if (incomplete) { modal.toast(this, { title: '存在未配对完整的对战，请检查', icon: 'none' }); return }
       const pairLines = battlePairs.map((p) => { const a = p.teamA || {}; const b = p.teamB || {}; return (a.teamName || '?') + '  VS  ' + (b.teamName || '?') })
       const confirmRes = await this.showBattleConfirm('确认生成第' + this.data.battleRoundNum + '轮对战', pairLines, '确认后队伍锁定，直接进入胜负判定')
       if (!confirmRes) return
@@ -486,14 +486,14 @@ module.exports = {
             this.setData({ battleRoundStatus: 'fighting' })
             await this.loadRoundMatches(newRound)
             await this.loadEvent(); this._updateTabLocks(); this._updateActions()
-            wx.showToast({ title: '第' + newRound + '轮对战已开启', icon: 'success' })
+            modal.toast(this, { title: '第' + newRound + '轮对战已开启', icon: 'success' })
           } else {
             await this.loadRoundMatches(newRound)
-            wx.showToast({ title: startRes.error || '开战失败，请点击"开始对战"重试', icon: 'none', duration: 3000 })
+            modal.toast(this, { title: startRes.error || '开战失败，请点击"开始对战"重试', icon: 'none', duration: 3000 })
           }
-        } else { wx.showToast({ title: res.error || '生成失败', icon: 'none', duration: 2500 }) }
+        } else { modal.toast(this, { title: res.error || '生成失败', icon: 'none', duration: 2500 }) }
         this.setData({ battlePairing: false })
-      } catch (e) { this.setData({ battlePairing: false }); wx.hideLoading(); wx.showToast({ title: '网络错误，生成失败', icon: 'none', duration: 2000 }) }
+      } catch (e) { this.setData({ battlePairing: false }); wx.hideLoading(); modal.toast(this, { title: '网络错误，生成失败', icon: 'none', duration: 2000 }) }
     },
 
     async doDeleteRoundMatches() {
@@ -513,7 +513,7 @@ module.exports = {
           if (targetRound > 0) { await this.loadRoundMatches(targetRound) }
           else { this.setData({ battleRoundStatus: 'select', battleRoundHasMatches: false, battleMatches: [], battlePairs: [] }); this._syncBattleSelected([]) }
         }
-      } catch (e) { this.setData({ battleDeleting: false }); wx.showToast({ title: '删除失败，请重试', icon: 'none' }) }
+      } catch (e) { this.setData({ battleDeleting: false }); modal.toast(this, { title: '删除失败，请重试', icon: 'none' }) }
     },
 
     async doStartRound() {
@@ -528,9 +528,9 @@ module.exports = {
         if (res.success) {
           this.setData({ battleRoundStatus: 'fighting' }); await this.loadRoundMatches(this.data.battleRound)
           await this.loadEvent(); this._updateTabLocks(); this._updateActions()
-          wx.showToast({ title: '第' + this.data.battleRound + '轮对战已开启', icon: 'success' })
-        } else { wx.showToast({ title: res.error || '开战失败', icon: 'none' }) }
-      } catch (e) { this.setData({ battleStarting: false }); wx.showToast({ title: '开战失败，请重试', icon: 'none' }) }
+          modal.toast(this, { title: '第' + this.data.battleRound + '轮对战已开启', icon: 'success' })
+        } else { modal.toast(this, { title: res.error || '开战失败', icon: 'none' }) }
+      } catch (e) { this.setData({ battleStarting: false }); modal.toast(this, { title: '开战失败，请重试', icon: 'none' }) }
     },
 
     // ============ 胜负判定 ============
@@ -563,8 +563,8 @@ module.exports = {
             this.setData({ battleScoreboard: sb })
           }
           await this._checkRoundComplete()
-        } else { wx.showToast({ title: res.error || '判定失败', icon: 'none' }) }
-      } catch (e) { this.setData({ loading: false }); wx.showToast({ title: '判定失败，请重试', icon: 'none' }) }
+        } else { modal.toast(this, { title: res.error || '判定失败', icon: 'none' }) }
+      } catch (e) { this.setData({ loading: false }); modal.toast(this, { title: '判定失败，请重试', icon: 'none' }) }
     },
     closeJudgeModal() { this.setData({ showJudgeModal: false, judgeMatch: null, judgeWinnerId: '', judgeStep: 0 }) },
 
@@ -616,8 +616,8 @@ module.exports = {
           const imageUrl = this._normalizeImageUrl(data.data.url)
           const matches = this.data.battleMatches.map(m => m.match_id === matchId ? { ...m, battle_image: imageUrl } : m)
           this.setData({ battleMatches: matches })
-        } else { wx.showToast({ title: data.error || '上传失败', icon: 'none' }) }
-      } catch (e) { wx.hideLoading(); wx.showToast({ title: '上传失败', icon: 'none' }) }
+        } else { modal.toast(this, { title: data.error || '上传失败', icon: 'none' }) }
+      } catch (e) { wx.hideLoading(); modal.toast(this, { title: '上传失败', icon: 'none' }) }
       finally { this._isUploading = false }
     },
 
@@ -672,8 +672,8 @@ module.exports = {
             this.setData({ battleRounds: rds, battleRound: nextRound, battleRoundNum: nextRound, battleAllDone: false, battleIsLatestRound: true, battleRoundStatus: 'select', battleRoundHasMatches: false, battleMatches: [], battlePairs: [] })
             this._syncBattleSelected([])
           }
-        } else { wx.showToast({ title: res.error || '操作失败', icon: 'none' }) }
-      } catch (e) { this.setData({ battleActionSubmitting: false, showBattleActionModal: false }); wx.showToast({ title: '操作失败，请重试', icon: 'none' }) }
+        } else { modal.toast(this, { title: res.error || '操作失败', icon: 'none' }) }
+      } catch (e) { this.setData({ battleActionSubmitting: false, showBattleActionModal: false }); modal.toast(this, { title: '操作失败，请重试', icon: 'none' }) }
     },
   }
 }

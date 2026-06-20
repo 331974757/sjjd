@@ -1,4 +1,10 @@
 /* app.wxss - 全局样式 */
+/* 颜色系统规范（所有页面引用下方色值保持一致）：
+   - 主蓝: #58a6ff     - 主绿: #3fb950
+   - 主红: #f85149     - 主橙: #f39c12
+   - 主紫: #bb86fc     - 金色: #d4a03a
+   - 背景: #0d1117     - 卡片: #161b22
+*/
 page {
   background-color: #0d1117;
   color: #c9d1d9;
@@ -85,17 +91,17 @@ page {
 }
 .pm-circle.pm-def .pm-num { color: #8b949e; font-size: 34rpx; font-weight: 700; }
 
-.pm-circle.pm-sel-1 { background-color: rgba(231, 76, 60, 0.2); border: 2rpx solid #e74c3c; }
-.pm-circle.pm-sel-1 .pm-num { color: #e74c3c; font-size: 34rpx; font-weight: 700; }
+.pm-circle.pm-sel-1 { background-color: rgba(231, 76, 60, 0.2); border: 2rpx solid #f85149; }
+.pm-circle.pm-sel-1 .pm-num { color: #f85149; font-size: 34rpx; font-weight: 700; }
 
 .pm-circle.pm-sel-2 { background-color: rgba(243, 156, 18, 0.2); border: 2rpx solid #f39c12; }
 .pm-circle.pm-sel-2 .pm-num { color: #f39c12; font-size: 34rpx; font-weight: 700; }
 
-.pm-circle.pm-sel-3 { background-color: rgba(39, 174, 96, 0.2); border: 2rpx solid #27ae60; }
-.pm-circle.pm-sel-3 .pm-num { color: #27ae60; font-size: 34rpx; font-weight: 700; }
+.pm-circle.pm-sel-3 { background-color: rgba(39, 174, 96, 0.2); border: 2rpx solid #3fb950; }
+.pm-circle.pm-sel-3 .pm-num { color: #3fb950; font-size: 34rpx; font-weight: 700; }
 
-.pm-circle.pm-sel-4 { background-color: rgba(52, 152, 219, 0.2); border: 2rpx solid #3498db; }
-.pm-circle.pm-sel-4 .pm-num { color: #3498db; font-size: 34rpx; font-weight: 700; }
+.pm-circle.pm-sel-4 { background-color: rgba(52, 152, 219, 0.2); border: 2rpx solid #58a6ff; }
+.pm-circle.pm-sel-4 .pm-num { color: #58a6ff; font-size: 34rpx; font-weight: 700; }
 
 .pm-circle.pm-sel-5 { background-color: rgba(155, 89, 182, 0.2); border: 2rpx solid #9b59b6; }
 .pm-circle.pm-sel-5 .pm-num { color: #9b59b6; font-size: 34rpx; font-weight: 700; }

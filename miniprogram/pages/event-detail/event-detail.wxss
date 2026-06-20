@@ -219,8 +219,8 @@
 .s-draft    { background: rgba(139,148,158,0.15); color: #8b949e; }
 .s-open     { background: rgba(39,174,96,0.15);  color: #3fb950; border: 1rpx solid rgba(39,174,96,0.2); }
 .s-closed   { background: rgba(243,156,18,0.15); color: #f39c12; border: 1rpx solid rgba(243,156,18,0.2); }
-.s-locked   { background: rgba(52,152,219,0.15); color: #3498db; border: 1rpx solid rgba(52,152,219,0.2); }
-.s-fighting { background: rgba(231,76,60,0.15);  color: #e74c3c; border: 1rpx solid rgba(231,76,60,0.2); }
+.s-locked   { background: rgba(52,152,219,0.15); color: #58a6ff; border: 1rpx solid rgba(52,152,219,0.2); }
+.s-fighting { background: rgba(231,76,60,0.15);  color: #f85149; border: 1rpx solid rgba(231,76,60,0.2); }
 .s-archived { background: rgba(119,141,169,0.12); color: #778da9; border: 1rpx solid rgba(119,141,169,0.2); }
 
 .event-meta {
@@ -743,7 +743,7 @@
 
 .btn-cancel {
   background: rgba(231,76,60,0.15);
-  color: #e74c3c;
+  color: #f85149;
   border: 1rpx solid rgba(231,76,60,0.3);
 }
 
@@ -915,7 +915,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #e74c3c;
+  color: #f85149;
   font-size: 28rpx;
   flex-shrink: 0;
 }
@@ -1008,7 +1008,7 @@
   flex: 1;
   height: 72rpx;
   background: rgba(52,152,219,0.12);
-  color: #3498db;
+  color: #58a6ff;
   border: 1rpx solid rgba(52,152,219,0.25);
   border-radius: 14rpx;
   font-size: 26rpx;
@@ -1692,7 +1692,7 @@
 
 .bb-rh-status.s-select { background: rgba(139,148,158,0.12); color: #8b949e; }
 .bb-rh-status.s-pairing { background: rgba(243,156,18,0.12); color: #f39c12; }
-.bb-rh-status.s-fighting { background: rgba(231,76,60,0.12); color: #e74c3c; }
+.bb-rh-status.s-fighting { background: rgba(231,76,60,0.12); color: #f85149; }
 .bb-rh-status.s-done { background: rgba(39,174,96,0.12); color: #3fb950; }
 
 /* ── 轮次切换（保留原样式） ── */
@@ -2183,7 +2183,7 @@
 .rank-edit-btn {
   font-size: 24rpx !important;
   background: rgba(52,152,219,0.12) !important;
-  color: #3498db !important;
+  color: #58a6ff !important;
   border: 1rpx solid rgba(52,152,219,0.2) !important;
 }
 
@@ -2372,7 +2372,7 @@
 }
 .rsr-clear-btn text {
   font-size: 20rpx;
-  color: #e74c3c;
+  color: #f85149;
   padding: 4rpx 8rpx;
 }
 
@@ -2421,7 +2421,7 @@
 }
 .rsr-rank-remove {
   font-size: 20rpx;
-  color: #e74c3c;
+  color: #f85149;
   padding: 4rpx 8rpx;
 }
 
@@ -2756,7 +2756,7 @@
 }
 
 .btn-secondary { background: rgba(255,255,255,0.06); color: #8b949e; }
-.btn-danger { background: rgba(231,76,60,0.15); color: #e74c3c; border: 1rpx solid rgba(231,76,60,0.3); }
+.btn-danger { background: rgba(231,76,60,0.15); color: #f85149; border: 1rpx solid rgba(231,76,60,0.3); }
 .btn-primary-confirm { background: linear-gradient(135deg, #1f6feb, #58a6ff); color: #fff; }
 
 /* ── 对战确认弹窗 ── */

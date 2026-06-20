@@ -47,7 +47,7 @@ module.exports = {
       } catch (e) {
         this.setData({ teamsLoading: false })
         console.error('[编组] 加载失败', e)
-        wx.showToast({ title: '加载队伍数据失败', icon: 'none' })
+        modal.toast(this, { title: '加载队伍数据失败', icon: 'none' })
       }
     },
 
@@ -298,11 +298,11 @@ module.exports = {
           })
           this.setData({ teams })
         } else {
-          wx.showToast({ title: res.error || '更新失败', icon: 'none' })
+          modal.toast(this, { title: res.error || '更新失败', icon: 'none' })
         }
       } catch (e) {
         wx.hideLoading()
-        wx.showToast({ title: '更新失败，请重试', icon: 'none' })
+        modal.toast(this, { title: '更新失败，请重试', icon: 'none' })
       }
     },
 
@@ -311,11 +311,11 @@ module.exports = {
     // 保存编组到服务器
     async saveTeams() {
       if (!this.data.actions.manage_teams || !this.data.actions.manage_teams.allowed) {
-        wx.showToast({ title: '当前不可保存编组', icon: 'none' })
+        modal.toast(this, { title: '当前不可保存编组', icon: 'none' })
         return
       }
       if (this.data.teams.length === 0) {
-        wx.showToast({ title: '请至少创建一支队伍', icon: 'none' })
+        modal.toast(this, { title: '请至少创建一支队伍', icon: 'none' })
         return
       }
 
@@ -323,15 +323,15 @@ module.exports = {
       for (const team of this.data.teams) {
         const members = team.members || team.players || []
         if (members.length < 5) {
-          wx.showToast({ title: `队伍「${team.team_name}」至少需要5名队员，当前${members.length}人`, icon: 'none' })
+          modal.toast(this, { title: `队伍「${team.team_name}」至少需要5名队员，当前${members.length}人`, icon: 'none' })
           return
         }
         if (!team.captain_id) {
-          wx.showToast({ title: `队伍「${team.team_name}」未指定队长`, icon: 'none' })
+          modal.toast(this, { title: `队伍「${team.team_name}」未指定队长`, icon: 'none' })
           return
         }
         if (!members.some(m => String(m.id) === String(team.captain_id))) {
-          wx.showToast({ title: `队伍「${team.team_name}」的队长不在队员列表中`, icon: 'none' })
+          modal.toast(this, { title: `队伍「${team.team_name}」的队长不在队员列表中`, icon: 'none' })
           return
         }
       }
@@ -356,11 +356,11 @@ module.exports = {
             this.loadEvent().then(() => { this._updateTabLocks(); this._updateActions() })
           }, 800)
         } else {
-          wx.showToast({ title: res.error || '保存失败', icon: 'none' })
+          modal.toast(this, { title: res.error || '保存失败', icon: 'none' })
         }
       } catch (e) {
         this.setData({ teamsSaving: false })
-        wx.showToast({ title: '保存失败，请重试', icon: 'none' })
+        modal.toast(this, { title: '保存失败，请重试', icon: 'none' })
       }
     },
 
@@ -387,12 +387,12 @@ module.exports = {
     async confirmAutoAllocate() {
       const count = parseInt(this.data.autoTeamCount)
       if (isNaN(count) || count < 1) {
-        wx.showToast({ title: '请输入有效的队伍数量', icon: 'none' })
+        modal.toast(this, { title: '请输入有效的队伍数量', icon: 'none' })
         return
       }
       const totalPlayers = this.data.signupTotal || this.data.signupCount || 0
       if (count > totalPlayers) {
-        wx.showToast({ title: `队伍数量(${count})不能超过报名人数(${totalPlayers})`, icon: 'none' })
+        modal.toast(this, { title: `队伍数量(${count})不能超过报名人数(${totalPlayers})`, icon: 'none' })
         return
       }
       this.setData({ showTeamCountModal: false, allocating: true })
@@ -415,11 +415,11 @@ module.exports = {
 
           this.setData({ teams: this._normalizeTeams(teams), freeAgents, selectedPlayerId: '', teamsDirty: true })
         } else {
-          wx.showToast({ title: res.error || '分队失败', icon: 'none' })
+          modal.toast(this, { title: res.error || '分队失败', icon: 'none' })
         }
       } catch (e) {
         this.setData({ allocating: false })
-        wx.showToast({ title: '分队失败，请重试', icon: 'none' })
+        modal.toast(this, { title: '分队失败，请重试', icon: 'none' })
       }
     },
 
@@ -427,7 +427,7 @@ module.exports = {
     async doLockTeams() {
       const lockAction = this.data.actions.lock_teams
       if (!lockAction || !lockAction.allowed) {
-        wx.showToast({ title: lockAction?.reason || '当前不可锁定开赛', icon: 'none' })
+        modal.toast(this, { title: lockAction?.reason || '当前不可锁定开赛', icon: 'none' })
         return
       }
       const r = await modal.confirm(this, {
@@ -446,11 +446,11 @@ module.exports = {
           this._updateActions()
           setTimeout(() => this._switchToTab('matches'), 800)
         } else {
-          wx.showToast({ title: res.error || '开赛失败', icon: 'none' })
+          modal.toast(this, { title: res.error || '开赛失败', icon: 'none' })
         }
       } catch (e) {
         this.setData({ locking: false })
-        wx.showToast({ title: '操作失败，请重试', icon: 'none' })
+        modal.toast(this, { title: '操作失败，请重试', icon: 'none' })
       }
     },
 
@@ -470,10 +470,10 @@ module.exports = {
           this._updateActions()
           setTimeout(() => this._switchToTab('teams'), 400)
         } else {
-          wx.showToast({ title: res.error || '返回失败', icon: 'none' })
+          modal.toast(this, { title: res.error || '返回失败', icon: 'none' })
         }
       } catch (e) {
-        wx.showToast({ title: '返回失败，请重试', icon: 'none' })
+        modal.toast(this, { title: '返回失败，请重试', icon: 'none' })
       }
     },
 

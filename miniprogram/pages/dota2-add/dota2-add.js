@@ -46,7 +46,7 @@ Page({
     } catch (err) {
       console.error('权限检查失败', err)
       this.setData({ accessChecked: true, accessDenied: true })
-      wx.showToast({ title: '权限检查失败，请重试', icon: 'none' })
+      modal.toast(this, { title: '权限检查失败，请重试', icon: 'none' })
       setTimeout(() => { wx.navigateBack() }, 1500)
     }
   },
@@ -79,14 +79,14 @@ Page({
               if (data.success && data.data) {
                 this.setData({ avatarUrl: api.API_BASE.replace(/\/api$/, '') + data.data.url })
               } else {
-                wx.showToast({ title: '头像上传失败', icon: 'none' })
+                modal.toast(this, { title: '头像上传失败', icon: 'none' })
               }
             } catch (e) {
-              wx.showToast({ title: '头像上传失败', icon: 'none' })
+              modal.toast(this, { title: '头像上传失败', icon: 'none' })
             }
           },
           fail: () => {
-            wx.showToast({ title: '头像上传失败', icon: 'none' })
+            modal.toast(this, { title: '头像上传失败', icon: 'none' })
           },
           complete: () => { wx.hideLoading() }
         })
@@ -139,11 +139,11 @@ Page({
     const gameId = this.data.gameId.trim()
 
     if (!wxNickname) {
-      wx.showToast({ title: '请输入微信群昵称', icon: 'none' })
+      modal.toast(this, { title: '请输入微信群昵称', icon: 'none' })
       return
     }
     if (!gameId) {
-      wx.showToast({ title: '请输入Dota2游戏昵称', icon: 'none' })
+      modal.toast(this, { title: '请输入Dota2游戏昵称', icon: 'none' })
       return
     }
 
@@ -162,13 +162,13 @@ Page({
 
     // 验证段位必选
     if (this.data.rankIndex < 0) {
-      wx.showToast({ title: '请选择核准段位', icon: 'none' })
+      modal.toast(this, { title: '请选择核准段位', icon: 'none' })
       return
     }
     // 验证非冠绝时必须选星数
     const isEmperor = this.data.rankIndex === RANK_OPTIONS.length - 1
     if (!isEmperor && this.data.rankStars <= 0) {
-      wx.showToast({ title: '请选择核准星数', icon: 'none' })
+      modal.toast(this, { title: '请选择核准星数', icon: 'none' })
       return
     }
 
@@ -194,14 +194,14 @@ Page({
         this._notifyHomeRefresh()
         const action = res.action
         const msg = action === 'updated' ? '已更新已有选手信息' : '添加成功！'
-        wx.showToast({ title: msg, icon: 'success' })
+        modal.toast(this, { title: msg, icon: 'success' })
         setTimeout(() => { wx.navigateBack() }, 800)
       } else {
-        wx.showToast({ title: res.error || res.message || '添加失败', icon: 'none' })
+        modal.toast(this, { title: res.error || res.message || '添加失败', icon: 'none' })
       }
     } catch (err) {
       console.error('添加失败', err)
-      wx.showToast({ title: '添加失败', icon: 'none' })
+      modal.toast(this, { title: '添加失败', icon: 'none' })
     } finally {
       this.setData({ submitting: false })
     }

@@ -87,11 +87,11 @@ module.exports = {
           this._updateTabLocks()
           this._updateActions()
         } else {
-          wx.showToast({ title: res.error || '操作失败', icon: 'none' })
+          modal.toast(this, { title: res.error || '操作失败', icon: 'none' })
         }
       } catch (e) {
         this.setData({ loading: false })
-        wx.showToast({ title: '操作失败，请重试', icon: 'none' })
+        modal.toast(this, { title: '操作失败，请重试', icon: 'none' })
       }
     },
     hideStatusConfirm() {
@@ -116,17 +116,17 @@ module.exports = {
           this._updateActions()
           // 如果进入报名截止状态，自动切到分组编组
           if (this.data.targetStatus === 2) {
-            wx.showToast({ title: '报名已截止，进入分组编队', icon: 'success' })
+            modal.toast(this, { title: '报名已截止，进入分组编队', icon: 'success' })
             setTimeout(() => this._switchToTab('teams'), 800)
           } else {
-            wx.showToast({ title: '操作成功', icon: 'success' })
+            modal.toast(this, { title: '操作成功', icon: 'success' })
           }
         } else {
-          wx.showToast({ title: res.error || '操作失败', icon: 'none' })
+          modal.toast(this, { title: res.error || '操作失败', icon: 'none' })
         }
       } catch (e) {
         this.setData({ loading: false })
-        wx.showToast({ title: '操作失败，请重试', icon: 'none' })
+        modal.toast(this, { title: '操作失败，请重试', icon: 'none' })
       }
     },
 
@@ -181,11 +181,11 @@ module.exports = {
           await this.loadSignups()
           this._updateActions()
         } else {
-          wx.showToast({ title: res.error || '更新失败', icon: 'none' })
+          modal.toast(this, { title: res.error || '更新失败', icon: 'none' })
         }
       } catch (e) {
         this.setData({ loading: false })
-        wx.showToast({ title: '更新失败，请重试', icon: 'none' })
+        modal.toast(this, { title: '更新失败，请重试', icon: 'none' })
       }
     },
 

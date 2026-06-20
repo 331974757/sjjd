@@ -82,7 +82,7 @@ const coreMethods = {
   onLoad(options) {
     const eventId = options.eventId || options.id || ''
     if (!eventId) {
-      wx.showToast({ title: '赛事ID缺失', icon: 'none' })
+      modal.toast(this, { title: '赛事ID缺失', icon: 'none' })
       setTimeout(() => wx.navigateBack(), 1500)
       return
     }
@@ -124,7 +124,7 @@ const coreMethods = {
       this._updateActions()
       await this._loadTabData(this.data.activeTab)
     } catch (e) {
-      wx.showToast({ title: '刷新失败', icon: 'none' })
+      modal.toast(this, { title: '刷新失败', icon: 'none' })
     } finally {
       wx.hideLoading()
     }
@@ -149,7 +149,7 @@ const coreMethods = {
       this.setData({ loaded: true })
     } catch (e) {
       console.error('[赛事详情] 初始化失败', e)
-      wx.showToast({ title: '加载失败，请重试', icon: 'none' })
+      modal.toast(this, { title: '加载失败，请重试', icon: 'none' })
     }
   },
 
@@ -165,12 +165,12 @@ const coreMethods = {
         this._updateProgressSteps()
         this._computeOverviewJump()
       } else {
-        wx.showToast({ title: '赛事不存在或已删除', icon: 'none' })
+        modal.toast(this, { title: '赛事不存在或已删除', icon: 'none' })
         setTimeout(() => wx.navigateBack(), 1500)
       }
     } catch (e) {
       console.error('[赛事详情] 加载失败', e)
-      wx.showToast({ title: '加载赛事失败', icon: 'none' })
+      modal.toast(this, { title: '加载赛事失败', icon: 'none' })
     }
   },
 
@@ -209,7 +209,7 @@ const coreMethods = {
     if (idx < 0) return
     const tabDef = this.data.tabs[idx]
     if (tabDef._locked) {
-      wx.showToast({ title: '当前赛事状态未到"' + tabDef.label + '"阶段', icon: 'none' })
+      modal.toast(this, { title: '当前赛事状态未到"' + tabDef.label + '"阶段', icon: 'none' })
       return
     }
     // 如果 Tab 已解锁但未到完全开放（status < unlockStatus），给提示但不阻止
@@ -291,8 +291,8 @@ const coreMethods = {
     try {
       const res = await api.put('/events/' + this.data.eventId, { eventName: val })
       if (res.success) { await this.loadEvent() }
-      else { wx.showToast({ title: res.error || '更新失败', icon: 'none' }) }
-    } catch (e) { wx.showToast({ title: '更新失败，请重试', icon: 'none' }) }
+      else { modal.toast(this, { title: res.error || '更新失败', icon: 'none' }) }
+    } catch (e) { modal.toast(this, { title: '更新失败，请重试', icon: 'none' }) }
   },
 
   // 赛事简介编辑
@@ -305,8 +305,8 @@ const coreMethods = {
     try {
       const res = await api.put('/events/' + this.data.eventId, { eventDesc: val })
       if (res.success) { await this.loadEvent() }
-      else { wx.showToast({ title: res.error || '更新失败', icon: 'none' }) }
-    } catch (e) { wx.showToast({ title: '更新失败，请重试', icon: 'none' }) }
+      else { modal.toast(this, { title: res.error || '更新失败', icon: 'none' }) }
+    } catch (e) { modal.toast(this, { title: '更新失败，请重试', icon: 'none' }) }
   },
 
   // 比赛时间编辑
@@ -340,8 +340,8 @@ const coreMethods = {
     try {
       const res = await api.put('/events/' + this.data.eventId, { startTime: ts })
       if (res.success) { await this.loadEvent() }
-      else { wx.showToast({ title: res.error || '更新失败', icon: 'none' }) }
-    } catch (e) { wx.showToast({ title: '更新失败，请重试', icon: 'none' }) }
+      else { modal.toast(this, { title: res.error || '更新失败', icon: 'none' }) }
+    } catch (e) { modal.toast(this, { title: '更新失败，请重试', icon: 'none' }) }
   },
 
   // 取消赛事弹窗
@@ -352,9 +352,9 @@ const coreMethods = {
     try {
       const res = await api.del('/events/' + this.data.eventId)
       this.setData({ loading: false })
-      if (res.success) { wx.showToast({ title: '赛事已取消', icon: 'success' }); setTimeout(() => wx.navigateBack(), 1500) }
-      else { wx.showToast({ title: res.error || '取消失败', icon: 'none' }) }
-    } catch (e) { this.setData({ loading: false }); wx.showToast({ title: '取消失败，请重试', icon: 'none' }) }
+      if (res.success) { modal.toast(this, { title: '赛事已取消', icon: 'success' }); setTimeout(() => wx.navigateBack(), 1500) }
+      else { modal.toast(this, { title: res.error || '取消失败', icon: 'none' }) }
+    } catch (e) { this.setData({ loading: false }); modal.toast(this, { title: '取消失败，请重试', icon: 'none' }) }
   },
 
   // 确认开战弹窗（供Tab4 method调用）

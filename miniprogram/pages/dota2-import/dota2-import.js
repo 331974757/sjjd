@@ -35,7 +35,7 @@ Page({
     } catch (err) {
       console.error('权限检查失败', err)
       this.setData({ accessChecked: true, accessDenied: true })
-      wx.showToast({ title: '权限检查失败，请重试', icon: 'none' })
+      modal.toast(this, { title: '权限检查失败，请重试', icon: 'none' })
       setTimeout(() => { wx.navigateBack() }, 1500)
     }
   },
@@ -72,10 +72,10 @@ Page({
             filePath: res.tempFilePath,
             showMenu: true,
             success: () => {
-              wx.showToast({ title: '模板已打开', icon: 'success' })
+              modal.toast(this, { title: '模板已打开', icon: 'success' })
             },
             fail: () => {
-              wx.showToast({ title: '模板已下载，请到文件管理查看', icon: 'none', duration: 2500 })
+              modal.toast(this, { title: '模板已下载，请到文件管理查看', icon: 'none', duration: 2500 })
             }
           })
         } else {
@@ -106,7 +106,7 @@ Page({
         })
       },
       fail: () => {
-        wx.showToast({ title: '复制失败，请手动输入', icon: 'none' })
+        modal.toast(this, { title: '复制失败，请手动输入', icon: 'none' })
       }
     })
   },
@@ -133,7 +133,7 @@ Page({
         })
 
         if (isXlsx) {
-          wx.showToast({ title: '请点击"上传并导入"', icon: 'none' })
+          modal.toast(this, { title: '请点击"上传并导入"', icon: 'none' })
         } else {
           this.readAndParse(file.path, name)
         }
@@ -153,7 +153,7 @@ Page({
       }
     } catch (err) {
       console.error('读取文件失败', err)
-      wx.showToast({ title: '读取文件失败', icon: 'none' })
+      modal.toast(this, { title: '读取文件失败', icon: 'none' })
     }
   },
 
@@ -161,7 +161,7 @@ Page({
     try {
       const data = JSON.parse(content)
       if (!Array.isArray(data)) {
-        wx.showToast({ title: 'JSON需为数组格式', icon: 'none' })
+        modal.toast(this, { title: 'JSON需为数组格式', icon: 'none' })
         return
       }
       const parsedData = []
@@ -176,14 +176,14 @@ Page({
       }
       this.setData({ parsedData: parsedData, errorRows: errorRows })
     } catch (err) {
-      wx.showToast({ title: 'JSON解析失败', icon: 'none' })
+      modal.toast(this, { title: 'JSON解析失败', icon: 'none' })
     }
   },
 
   parseCSV(content) {
     const lines = content.split(/\r?\n/).filter(l => { return l.trim() !== '' })
     if (lines.length < 2) {
-      wx.showToast({ title: 'CSV文件无数据行', icon: 'none' })
+      modal.toast(this, { title: 'CSV文件无数据行', icon: 'none' })
       return
     }
 
@@ -264,12 +264,12 @@ Page({
 
       let tip = '导入完成！'
       if (res.updated > 0) tip = '导入完成，更新' + res.updated + '条已有记录'
-      wx.showToast({ title: tip, icon: 'success' })
+      modal.toast(this, { title: tip, icon: 'success' })
     } catch (err) {
       wx.hideLoading()
       this.setData({ importing: false })
       console.error('导入失败', err)
-      wx.showToast({ title: '导入失败', icon: 'none' })
+      modal.toast(this, { title: '导入失败', icon: 'none' })
     }
   },
 
@@ -306,11 +306,11 @@ Page({
       }
       let tip = '导入完成！'
       if (result.updated > 0) tip = '导入完成，更新' + result.updated + '条已有记录'
-      wx.showToast({ title: tip, icon: 'success' })
+      modal.toast(this, { title: tip, icon: 'success' })
     } catch (e) {
       wx.hideLoading()
       this.setData({ importing: false })
-      wx.showToast({ title: '上传失败', icon: 'none' })
+      modal.toast(this, { title: '上传失败', icon: 'none' })
     }
   },
 

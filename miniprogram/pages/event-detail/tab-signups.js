@@ -53,7 +53,7 @@ module.exports = {
         }
       } catch (e) {
         console.error('[报名] 加载列表失败', e)
-        wx.showToast({ title: '加载报名列表失败', icon: 'none' })
+        modal.toast(this, { title: '加载报名列表失败', icon: 'none' })
       }
     },
 
@@ -82,7 +82,7 @@ module.exports = {
       } catch (e) {
         console.error('[报名] 加载状态失败', e)
         this.setData({ mySignupLoaded: true })
-        wx.showToast({ title: '加载报名状态失败', icon: 'none' })
+        modal.toast(this, { title: '加载报名状态失败', icon: 'none' })
       }
     },
 
@@ -90,16 +90,16 @@ module.exports = {
     async doSignup() {
       const { event, mySignup, signupCount } = this.data
       if (event.event_status !== 1) {
-        wx.showToast({ title: '当前赛事不在报名阶段', icon: 'none' })
+        modal.toast(this, { title: '当前赛事不在报名阶段', icon: 'none' })
         return
       }
       if (mySignup && mySignup.signedUp) {
-        wx.showToast({ title: '您已报名', icon: 'none' })
+        modal.toast(this, { title: '您已报名', icon: 'none' })
         return
       }
       // 前端校验：报名人数上限（仅自主报名受限，管理员添加不受限）
       if (event.signup_limit && event.signup_limit > 0 && signupCount >= event.signup_limit) {
-        wx.showToast({ title: '报名人数已满', icon: 'none' })
+        modal.toast(this, { title: '报名人数已满', icon: 'none' })
         return
       }
       this.setData({ loading: true })
@@ -114,7 +114,7 @@ module.exports = {
         }
       } catch (e) {
         this.setData({ loading: false })
-        wx.showToast({ title: '报名失败，请重试', icon: 'none' })
+        modal.toast(this, { title: '报名失败，请重试', icon: 'none' })
       }
     },
 
@@ -128,16 +128,16 @@ module.exports = {
         case 'MULTIPLE_MATCH':
           await modal.confirm(this, { theme: 'warning', title: '匹配到多条记录', content: '您的昵称匹配到多个选手档案，请联系管理员手动添加报名。', showCancel: false }); break
         case 'ALREADY_SIGNED':
-          wx.showToast({ title: '您已报名该赛事', icon: 'none' })
+          modal.toast(this, { title: '您已报名该赛事', icon: 'none' })
           break
         case 'EVENT_NOT_OPEN':
-          wx.showToast({ title: '赛事报名未开启', icon: 'none' })
+          modal.toast(this, { title: '赛事报名未开启', icon: 'none' })
           break
         case 'SIGNUP_FULL':
-          wx.showToast({ title: '报名人数已满', icon: 'none' })
+          modal.toast(this, { title: '报名人数已满', icon: 'none' })
           break
         default:
-          wx.showToast({ title: res.error || '报名失败', icon: 'none' })
+          modal.toast(this, { title: res.error || '报名失败', icon: 'none' })
       }
     },
 
@@ -152,11 +152,11 @@ module.exports = {
         if (res.success) {
           await Promise.all([this.loadMySignup(), this.loadSignups()])
         } else {
-          wx.showToast({ title: res.error || '取消失败', icon: 'none' })
+          modal.toast(this, { title: res.error || '取消失败', icon: 'none' })
         }
       } catch (e) {
         this.setData({ loading: false })
-        wx.showToast({ title: '取消失败，请重试', icon: 'none' })
+        modal.toast(this, { title: '取消失败，请重试', icon: 'none' })
       }
     },
 
@@ -196,7 +196,7 @@ module.exports = {
         }
       } catch (e) {
         this.setData({ searchLoading: false })
-        wx.showToast({ title: '搜索失败', icon: 'none' })
+        modal.toast(this, { title: '搜索失败', icon: 'none' })
       }
     },
 
@@ -217,7 +217,7 @@ module.exports = {
             String(p._id) == String(pid) ? { ...p, _alreadySigned: true } : p
           )
           this.setData({ searchResults: results, addLoading: false })
-          wx.showToast({ title: '已添加报名', icon: 'success' })
+          modal.toast(this, { title: '已添加报名', icon: 'success' })
           await this.loadSignups()
         } else if (res.success && skipped > 0) {
           this.setData({ addLoading: false })
@@ -226,17 +226,17 @@ module.exports = {
             String(p._id) == String(pid) ? { ...p, _alreadySigned: true } : p
           )
           this.setData({ searchResults: results })
-          wx.showToast({ title: '该选手已报名', icon: 'none' })
+          modal.toast(this, { title: '该选手已报名', icon: 'none' })
         } else if (res.success && failed > 0) {
           this.setData({ addLoading: false })
-          wx.showToast({ title: '添加失败：' + (result.errors ? result.errors.join(',') : '未知原因'), icon: 'none' })
+          modal.toast(this, { title: '添加失败：' + (result.errors ? result.errors.join(',') : '未知原因'), icon: 'none' })
         } else {
           this.setData({ addLoading: false })
-          wx.showToast({ title: '添加失败，请重试', icon: 'none' })
+          modal.toast(this, { title: '添加失败，请重试', icon: 'none' })
         }
       } catch (e) {
         this.setData({ addLoading: false })
-        wx.showToast({ title: '添加失败，请重试', icon: 'none' })
+        modal.toast(this, { title: '添加失败，请重试', icon: 'none' })
       }
     },
 
@@ -259,11 +259,11 @@ module.exports = {
           // 已剔除，静默处理
           await this.loadSignups()
         } else {
-          wx.showToast({ title: res.error || '操作失败', icon: 'none' })
+          modal.toast(this, { title: res.error || '操作失败', icon: 'none' })
         }
       } catch (e) {
         this.setData({ loading: false })
-        wx.showToast({ title: '操作失败，请重试', icon: 'none' })
+        modal.toast(this, { title: '操作失败，请重试', icon: 'none' })
       }
     },
   }

@@ -52,21 +52,40 @@ function sheet(ctx, opts = {}) {
 }
 
 /**
- * 自定义 Toast 轻提示
+ * 自定义 Toast 轻提示（兼容 wx.showToast 参数格式）
+ *
  * @param {Object} ctx - 页面/组件上下文 (this)
- * @param {Object} opts - { theme: 'success'|'danger'|'warning'|'default', content: '提示文本', duration: 2000 }
+ * @param {Object} opts
+ * @param {string}  opts.content  - 提示文本（新风格，推荐）
+ * @param {string}  opts.title    - 提示文本（兼容 wx.showToast，优先级低于 content）
+ * @param {string}  opts.theme    - 主题: 'success'|'danger'|'warning'|'default'（新风格）
+ * @param {string}  opts.icon     - 图标: 'success'|'error'|'none'（兼容 wx.showToast，自动映射到 theme）
+ * @param {number}  opts.duration - 显示时长，默认 2000
+ *
+ * 使用示例：
+ *   modal.toast(this, { content: '操作成功',          theme: 'success' })   // 推荐
+ *   modal.toast(this, { title: '操作成功',            icon: 'success' })    // 兼容
+ *   modal.toast(this, { title: '网络错误',            icon: 'error' })      // 兼容
+ *   modal.toast(this, { title: '信息已保存',          icon: 'none' })       // 兼容
  */
 function toast(ctx, opts = {}) {
+  // 兼容 wx.showToast 参数格式：icon -> theme, title -> content
+  const themeMap = { success: 'success', error: 'danger', none: 'default' };
+  const resolvedOpts = {
+    content: opts.content || opts.title || '',
+    theme: opts.theme || themeMap[opts.icon] || 'default',
+    duration: opts.duration || 2000,
+  };
   const m = getModalSafe(ctx)
   if (m) {
-    m.show({ type: 'toast', ...opts })
+    m.show({ type: 'toast', ...resolvedOpts })
   } else {
     // 降级：使用系统原生 Toast
     const iconMap = { success: 'success', danger: 'error', warning: 'none', default: 'none' }
     wx.showToast({
-      title: opts.content || opts.title || '',
-      icon: iconMap[opts.theme] || 'none',
-      duration: opts.duration || 2000
+      title: resolvedOpts.content,
+      icon: iconMap[resolvedOpts.theme] || 'none',
+      duration: resolvedOpts.duration
     })
   }
 }

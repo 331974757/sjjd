@@ -51,7 +51,7 @@ Page({
       })
     } catch (err) {
       console.error('[选手详情] 加载失败', err)
-      wx.showToast({ title: '加载失败', icon: 'none' })
+      modal.toast(this, { title: '加载失败', icon: 'none' })
     }
   },
 
@@ -108,14 +108,14 @@ Page({
                 const fullUrl = api.API_BASE.replace(/\/api$/, '') + data.data.url
                 this.updateField('avatarUrl', fullUrl)
               } else {
-                wx.showToast({ title: data.error || '上传失败', icon: 'none' })
+                modal.toast(this, { title: data.error || '上传失败', icon: 'none' })
               }
             } catch (e) {
-              wx.showToast({ title: '上传失败', icon: 'none' })
+              modal.toast(this, { title: '上传失败', icon: 'none' })
             }
           },
           fail: () => {
-            wx.showToast({ title: '上传失败，请检查网络', icon: 'none' })
+            modal.toast(this, { title: '上传失败，请检查网络', icon: 'none' })
           },
           complete: () => { wx.hideLoading() }
         })
@@ -152,13 +152,13 @@ Page({
     let val = this.data.editingFieldValue.trim()
 
     if (!val && !isNumberField) {
-      wx.showToast({ title: getFieldLabel(field) + '不能为空', icon: 'none' })
+      modal.toast(this, { title: getFieldLabel(field) + '不能为空', icon: 'none' })
       return
     }
     if (isNumberField) {
       val = val ? parseInt(val) : null
       if (val !== null && (isNaN(val) || val < 0 || val > 20000)) {
-        wx.showToast({ title: '请输入有效的天梯分（0-20000）', icon: 'none' })
+        modal.toast(this, { title: '请输入有效的天梯分（0-20000）', icon: 'none' })
         return
       }
     }
@@ -301,16 +301,16 @@ Page({
 
       if (res.success) {
         this._notifyHomeRefresh()
-        wx.showToast({ title: '已更新', icon: 'success' })
+        modal.toast(this, { title: '已更新', icon: 'success' })
         // 不可变更新：展开旧对象 + 覆盖字段
         this.setData({ player: { ...this.data.player, [field]: value } })
       } else {
-        wx.showToast({ title: res.error || res.message || '更新失败', icon: 'none' })
+        modal.toast(this, { title: res.error || res.message || '更新失败', icon: 'none' })
       }
     } catch (err) {
       wx.hideLoading()
       console.error('[选手详情] 更新失败', err)
-      wx.showToast({ title: '更新失败', icon: 'none' })
+      modal.toast(this, { title: '更新失败', icon: 'none' })
     }
   },
 
@@ -324,16 +324,16 @@ Page({
       wx.hideLoading()
       if (res.success) {
         this._notifyHomeRefresh()
-        wx.showToast({ title: '已更新', icon: 'success' })
+        modal.toast(this, { title: '已更新', icon: 'success' })
         // 不可变更新
         this.setData({ player: { ...this.data.player, ...data } })
       } else {
-        wx.showToast({ title: res.error || res.message || '更新失败', icon: 'none' })
+        modal.toast(this, { title: res.error || res.message || '更新失败', icon: 'none' })
       }
     } catch (err) {
       wx.hideLoading()
       console.error('[选手详情] 批量更新失败', err)
-      wx.showToast({ title: '更新失败', icon: 'none' })
+      modal.toast(this, { title: '更新失败', icon: 'none' })
     }
   },
 
@@ -359,15 +359,15 @@ Page({
       wx.hideLoading()
       if (res.success) {
         this._notifyHomeRefresh()
-        wx.showToast({ title: '已删除', icon: 'success' })
+        modal.toast(this, { title: '已删除', icon: 'success' })
         setTimeout(() => { wx.navigateBack() }, 800)
       } else {
-        wx.showToast({ title: res.error || res.message || '删除失败', icon: 'none' })
+        modal.toast(this, { title: res.error || res.message || '删除失败', icon: 'none' })
       }
     } catch (err) {
       wx.hideLoading()
       console.error('[选手详情] 删除失败', err)
-      wx.showToast({ title: '删除失败', icon: 'none' })
+      modal.toast(this, { title: '删除失败', icon: 'none' })
     }
   },
 

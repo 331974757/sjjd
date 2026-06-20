@@ -22,7 +22,7 @@ Page({
     // 仅超级管理员可访问权限设置
     const isSuper = await perm.isSuperAdmin()
     if (!isSuper) {
-      wx.showToast({ title: '仅超级管理员可访问', icon: 'none' })
+      modal.toast(this, { title: '仅超级管理员可访问', icon: 'none' })
       setTimeout(() => { wx.navigateBack() }, 1500)
       return
     }
@@ -49,9 +49,9 @@ Page({
     wx.showLoading({ title: '刷新中...', mask: true })
     try {
       await this.loadPage()
-      wx.showToast({ title: '已刷新', icon: 'success', duration: 1200 })
+      modal.toast(this, { title: '已刷新', icon: 'success', duration: 1200 })
     } catch (e) {
-      wx.showToast({ title: '刷新失败', icon: 'none' })
+      modal.toast(this, { title: '刷新失败', icon: 'none' })
     } finally {
       wx.hideLoading()
     }
@@ -100,7 +100,7 @@ Page({
       } catch (err) {
         console.error('加载用户列表失败', err)
         this.setData({ loading: false })
-        wx.showToast({ title: '加载失败', icon: 'none' })
+        modal.toast(this, { title: '加载失败', icon: 'none' })
       } finally {
         this._loadingPromise = null
       }
@@ -149,7 +149,7 @@ Page({
     const nickName = e.currentTarget.dataset.nickname
 
     if (isMe === true || isMe === 'true') {
-      wx.showToast({ title: '不能操作自己', icon: 'none' })
+      modal.toast(this, { title: '不能操作自己', icon: 'none' })
       return
     }
 
@@ -213,7 +213,7 @@ Page({
       const res = await api.put('/users/' + openid + '/role', { role: role, operatorOpenid: this.data.myOpenId })
       wx.hideLoading()
       const text = res.success ? '已' + label : (res.error || res.message || '失败')
-      wx.showToast({ title: text, icon: res.success ? 'success' : 'none' })
+      modal.toast(this, { title: text, icon: res.success ? 'success' : 'none' })
       if (res.success) {
         // 权限变更后清除本地角色缓存，确保其他页面的权限判断能立即生效
         perm.clearCache()
@@ -221,7 +221,7 @@ Page({
       }
     } catch (e) {
       wx.hideLoading()
-      wx.showToast({ title: '操作失败', icon: 'none' })
+      modal.toast(this, { title: '操作失败', icon: 'none' })
     }
   },
 
@@ -257,11 +257,11 @@ Page({
     try {
       const res = await api.put('/users/' + openid + '/reset-nickcount')
       wx.hideLoading()
-      wx.showToast({ title: res.success ? '已重置' : (res.error || res.message || '失败'), icon: res.success ? 'success' : 'none' })
+      modal.toast(this, { title: res.success ? '已重置' : (res.error || res.message || '失败'), icon: res.success ? 'success' : 'none' })
       if (res.success) this.loadPage()
     } catch (e) {
       wx.hideLoading()
-      wx.showToast({ title: '操作失败', icon: 'none' })
+      modal.toast(this, { title: '操作失败', icon: 'none' })
     }
   }
 })

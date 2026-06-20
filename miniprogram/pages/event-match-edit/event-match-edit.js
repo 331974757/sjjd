@@ -53,7 +53,7 @@ Page({
   onLoad(options) {
     const { eventId } = options
     if (!eventId) {
-      wx.showToast({ title: '缺少赛事ID', icon: 'none' })
+      modal.toast(this, { title: '缺少赛事ID', icon: 'none' })
       wx.navigateBack()
       return
     }
@@ -76,9 +76,9 @@ Page({
         pairs: [],
         unpairedTeamIds: []
       })
-      wx.showToast({ title: '已刷新', icon: 'success', duration: 1200 })
+      modal.toast(this, { title: '已刷新', icon: 'success', duration: 1200 })
     } catch (e) {
-      wx.showToast({ title: '刷新失败', icon: 'none' })
+      modal.toast(this, { title: '刷新失败', icon: 'none' })
     } finally {
       wx.hideLoading()
     }
@@ -91,7 +91,7 @@ Page({
       this.setData({ isAdmin })
 
       if (!isAdmin) {
-        wx.showToast({ title: '仅管理员可操作', icon: 'none' })
+        modal.toast(this, { title: '仅管理员可操作', icon: 'none' })
         setTimeout(() => wx.navigateBack(), 1500)
         return
       }
@@ -105,7 +105,7 @@ Page({
     } catch (e) {
       console.error('[对战编排] 初始化失败', e)
       this.setData({ loading: false })
-      wx.showToast({ title: '加载失败', icon: 'none' })
+      modal.toast(this, { title: '加载失败', icon: 'none' })
     }
   },
 
@@ -245,7 +245,7 @@ Page({
     const { selectedTeamIds, teams, pairs } = this.data
 
     if (selectedTeamIds.length < 2) {
-      wx.showToast({ title: '请至少勾选2支队伍进行配对', icon: 'none' })
+      modal.toast(this, { title: '请至少勾选2支队伍进行配对', icon: 'none' })
       return
     }
 
@@ -258,7 +258,7 @@ Page({
 
     const unpaired = selectedTeamIds.filter(id => !alreadyPairedIds.has(id))
     if (unpaired.length < 2) {
-      wx.showToast({ title: '已全部配对完成', icon: 'none' })
+      modal.toast(this, { title: '已全部配对完成', icon: 'none' })
       return
     }
 
@@ -274,7 +274,7 @@ Page({
     }
 
     this.setData({ pairs: newPairs })
-    wx.showToast({ title: `已配对 ${newPairs.length} 组`, icon: 'success', duration: 1000 })
+    modal.toast(this, { title: `已配对 ${newPairs.length} 组`, icon: 'success', duration: 1000 })
   },
 
   /** 清除某组配对 */
@@ -284,7 +284,7 @@ Page({
     const removed = pairs.splice(idx, 1)[0]
 
     // 被移除的队伍的ID仍然保留在选中列表中
-    wx.showToast({
+    modal.toast(this, {
       title: `已取消「${removed.teamA.teamName}」vs「${removed.teamB.teamName}」`,
       icon: 'none',
       duration: 1500,
@@ -301,7 +301,7 @@ Page({
   autoMatch() {
     const { teams } = this.data
     if (teams.length < 2) {
-      wx.showToast({ title: '至少需要2支队伍', icon: 'none' })
+      modal.toast(this, { title: '至少需要2支队伍', icon: 'none' })
       return
     }
 
@@ -328,7 +328,7 @@ Page({
       unpairedTeamIds,
     })
 
-    wx.showToast({
+    modal.toast(this, {
       title: `已匹配 ${pairs.length} 组对战（按MMR排列）`,
       icon: 'success',
       duration: 2000,
@@ -344,7 +344,7 @@ Page({
     const { pairs, nextRound, unpairedTeamIds } = this.data
 
     if (pairs.length === 0) {
-      wx.showToast({ title: '请先配对至少1组对战', icon: 'none' })
+      modal.toast(this, { title: '请先配对至少1组对战', icon: 'none' })
       return
     }
 
@@ -407,12 +407,12 @@ Page({
         })
         wx.navigateBack()
       } else {
-        wx.showToast({ title: res.error || '生成失败', icon: 'none' })
+        modal.toast(this, { title: res.error || '生成失败', icon: 'none' })
       }
     } catch (e) {
       this.setData({ generating: false })
       console.error('[生成对阵] 失败', e)
-      wx.showToast({ title: '生成失败，请重试', icon: 'none' })
+      modal.toast(this, { title: '生成失败，请重试', icon: 'none' })
     }
   },
 
@@ -420,7 +420,7 @@ Page({
   async autoGenerate() {
     const { teams } = this.data
     if (teams.length < 2) {
-      wx.showToast({ title: '至少需要2支队伍', icon: 'none' })
+      modal.toast(this, { title: '至少需要2支队伍', icon: 'none' })
       return
     }
 
@@ -449,12 +449,12 @@ Page({
         })
         wx.navigateBack()
       } else {
-        wx.showToast({ title: res.error || '生成失败', icon: 'none' })
+        modal.toast(this, { title: res.error || '生成失败', icon: 'none' })
       }
     } catch (e) {
       this.setData({ generating: false })
       console.error('[自动匹配] 失败', e)
-      wx.showToast({ title: '生成失败，请重试', icon: 'none' })
+      modal.toast(this, { title: '生成失败，请重试', icon: 'none' })
     }
   },
 

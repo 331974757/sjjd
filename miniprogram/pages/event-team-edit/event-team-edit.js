@@ -54,7 +54,7 @@ Page({
   onLoad(options) {
     const { eventId } = options
     if (!eventId) {
-      wx.showToast({ title: '缺少赛事ID', icon: 'none' })
+      modal.toast(this, { title: '缺少赛事ID', icon: 'none' })
       wx.navigateBack()
       return
     }
@@ -81,9 +81,9 @@ Page({
         this.loadEventStatus(),
         this.loadTeamData()
       ])
-      wx.showToast({ title: '已刷新', icon: 'success', duration: 1200 })
+      modal.toast(this, { title: '已刷新', icon: 'success', duration: 1200 })
     } catch (e) {
-      wx.showToast({ title: '刷新失败', icon: 'none' })
+      modal.toast(this, { title: '刷新失败', icon: 'none' })
     } finally {
       wx.hideLoading()
     }
@@ -103,7 +103,7 @@ Page({
       await this.loadTeamData()
     } catch (e) {
       console.error('[队伍编组] 初始化失败', e)
-      wx.showToast({ title: '加载失败', icon: 'none' })
+      modal.toast(this, { title: '加载失败', icon: 'none' })
       // 不阻塞后续 onShow 刷新
       this.setData({ loading: false })
     }
@@ -170,7 +170,7 @@ Page({
         }
       } else {
         this.setData({ loading: false })
-        wx.showToast({ title: res.error || '加载失败', icon: 'none' })
+        modal.toast(this, { title: res.error || '加载失败', icon: 'none' })
       }
     } catch (e) {
       console.error('[队伍编组] 加载队伍失败', e)
@@ -190,13 +190,13 @@ Page({
     // 如果已选中同一个，取消选中；否则选中新选手
     if (this.data.selectedPlayerId === playerId) {
       this.setData({ selectedPlayerId: '' })
-      wx.showToast({ title: '已取消选择', icon: 'none', duration: 1000 })
+      modal.toast(this, { title: '已取消选择', icon: 'none', duration: 1000 })
     } else {
       this.setData({ selectedPlayerId: playerId })
       // 从自由选手中找到昵称做提示
       const player = this.data.freePlayers.find(p => p.id === playerId)
       if (player) {
-        wx.showToast({ title: `已选「${player.wx_nickname}」，点击队伍放入`, icon: 'none', duration: 1500 })
+        modal.toast(this, { title: `已选「${player.wx_nickname}」，点击队伍放入`, icon: 'none', duration: 1500 })
       }
     }
   },
@@ -223,7 +223,7 @@ Page({
     if (targetTeam) {
       const alreadyIn = targetTeam.players.some(p => p.id === selectedId)
       if (alreadyIn) {
-        wx.showToast({ title: '该选手已在队伍中', icon: 'none' })
+        modal.toast(this, { title: '该选手已在队伍中', icon: 'none' })
         return
       }
     }
@@ -247,7 +247,7 @@ Page({
       selectedPlayerId: '',
     })
 
-    wx.showToast({ title: `已加入「${targetTeam?.teamName}」`, icon: 'success', duration: 1200 })
+    modal.toast(this, { title: `已加入「${targetTeam?.teamName}」`, icon: 'success', duration: 1200 })
   },
 
   // =====================================================
@@ -281,7 +281,7 @@ Page({
 
     // 【修复】取消队长后 captain 为 null，所以 captain?.id !== playerId 才是移除操作
     const isRemoving = teams.find(t => t.teamId === teamId)?.captain?.id !== playerId
-    wx.showToast({
+    modal.toast(this, {
       title: isRemoving ? '已取消队长' : '已设为队长',
       icon: 'success',
       duration: 1000
@@ -323,7 +323,7 @@ Page({
     })
 
     this.setData({ teams, freePlayers })
-    wx.showToast({ title: '已移出队伍', icon: 'success', duration: 1000 })
+    modal.toast(this, { title: '已移出队伍', icon: 'success', duration: 1000 })
   },
 
   // =====================================================
@@ -349,7 +349,7 @@ Page({
     }]
 
     this.setData({ teams })
-    wx.showToast({ title: `已创建「${teamName}」`, icon: 'success', duration: 1000 })
+    modal.toast(this, { title: `已创建「${teamName}」`, icon: 'success', duration: 1000 })
   },
 
   /**
@@ -378,7 +378,7 @@ Page({
     const teams = this.data.teams.filter(t => t.teamId !== teamId)
 
     this.setData({ teams, freePlayers, selectedPlayerId: '' })
-    wx.showToast({ title: '已删除', icon: 'success' })
+    modal.toast(this, { title: '已删除', icon: 'success' })
   },
 
   // =====================================================
@@ -431,7 +431,7 @@ Page({
   confirmTeamCount() {
     const val = parseInt(this.data.teamCountInput)
     if (isNaN(val) || val < 1) {
-      wx.showToast({ title: '队伍数量无效，请输入≥1的整数', icon: 'none' })
+      modal.toast(this, { title: '队伍数量无效，请输入≥1的整数', icon: 'none' })
       return
     }
     this.setData({ showTeamCountEditor: false })
@@ -497,12 +497,12 @@ Page({
         }
       } else {
         wx.hideLoading()
-        wx.showToast({ title: res.error || '分队失败', icon: 'none' })
+        modal.toast(this, { title: res.error || '分队失败', icon: 'none' })
       }
     } catch (e) {
       wx.hideLoading()
       console.error('[自动分队] 失败', e)
-      wx.showToast({ title: '自动分队失败', icon: 'none' })
+      modal.toast(this, { title: '自动分队失败', icon: 'none' })
     } finally {
       this.setData({ autoAllocating: false })
     }
@@ -520,15 +520,15 @@ Page({
     // 【前端校验】每队至少5人 + 必须有队长且队长在队员列表中
     for (const team of this.data.teams) {
       if (team.players.length < 5) {
-        wx.showToast({ title: `「${team.teamName}」至少需要5名队员，当前仅${team.players.length}人`, icon: 'none' })
+        modal.toast(this, { title: `「${team.teamName}」至少需要5名队员，当前仅${team.players.length}人`, icon: 'none' })
         return
       }
       if (!team.captain || !team.captain_id) {
-        wx.showToast({ title: `「${team.teamName}」未指定队长`, icon: 'none' })
+        modal.toast(this, { title: `「${team.teamName}」未指定队长`, icon: 'none' })
         return
       }
       if (!team.players.some(p => p.id === team.captain_id)) {
-        wx.showToast({ title: `「${team.teamName}」队长不在队员中`, icon: 'none' })
+        modal.toast(this, { title: `「${team.teamName}」队长不在队员中`, icon: 'none' })
         return
       }
     }
@@ -552,7 +552,7 @@ Page({
       this.setData({ saving: false })
 
       if (res.success) {
-        wx.showToast({ title: res.message || '保存成功', icon: 'success' })
+        modal.toast(this, { title: res.message || '保存成功', icon: 'success' })
 
         // 重新加载最新数据
         setTimeout(() => {
@@ -561,13 +561,13 @@ Page({
           this.loadEventStatus()
         }, 800)
       } else {
-        wx.showToast({ title: res.error || '保存失败', icon: 'none' })
+        modal.toast(this, { title: res.error || '保存失败', icon: 'none' })
       }
     } catch (e) {
       wx.hideLoading()
       this.setData({ saving: false })
       console.error('[保存编组] 失败', e)
-      wx.showToast({ title: '保存失败', icon: 'none' })
+      modal.toast(this, { title: '保存失败', icon: 'none' })
     }
   },
 
@@ -606,12 +606,12 @@ Page({
         this.loadTeamData()
         this.loadEventStatus()
       } else {
-        wx.showToast({ title: res.error || '操作失败', icon: 'none' })
+        modal.toast(this, { title: res.error || '操作失败', icon: 'none' })
       }
     } catch (e) {
       wx.hideLoading()
       console.error('[开始比赛] 失败', e)
-      wx.showToast({ title: '操作失败', icon: 'none' })
+      modal.toast(this, { title: '操作失败', icon: 'none' })
     }
   },
 })

@@ -32,7 +32,7 @@ Page({
   onLoad(options) {
     const eventId = options.eventId || ''
     if (!eventId) {
-      wx.showToast({ title: '赛事ID缺失', icon: 'none' })
+      modal.toast(this, { title: '赛事ID缺失', icon: 'none' })
       setTimeout(() => wx.navigateBack(), 1500)
       return
     }
@@ -45,7 +45,7 @@ Page({
       // 校验管理员权限
       const role = await perm.getRole()
       if (role !== 'admin' && role !== 'super_admin') {
-        wx.showToast({ title: '仅管理员可操作', icon: 'none' })
+        modal.toast(this, { title: '仅管理员可操作', icon: 'none' })
         setTimeout(() => wx.navigateBack(), 1500)
         return
       }
@@ -54,18 +54,18 @@ Page({
       await this.loadEvent()
       const event = this.data.event
       if (!event) {
-        wx.showToast({ title: '赛事不存在', icon: 'none' })
+        modal.toast(this, { title: '赛事不存在', icon: 'none' })
         setTimeout(() => wx.navigateBack(), 1500)
         return
       }
       // 【BUG-P2修复】已归档或对战中/已结束的赛事禁止报名管理操作
       if (event.is_archived === 1) {
-        wx.showToast({ title: '赛事已归档，不可管理报名', icon: 'none' })
+        modal.toast(this, { title: '赛事已归档，不可管理报名', icon: 'none' })
         setTimeout(() => wx.navigateBack(), 1500)
         return
       }
       if (event.event_status >= 4) {
-        wx.showToast({ title: '赛事已进入对战/结束阶段，不可管理报名', icon: 'none' })
+        modal.toast(this, { title: '赛事已进入对战/结束阶段，不可管理报名', icon: 'none' })
         setTimeout(() => wx.navigateBack(), 1500)
         return
       }
@@ -96,9 +96,9 @@ Page({
       if (this.data.searchResults.length > 0) {
         this.refreshSearchResults()
       }
-      wx.showToast({ title: '已刷新', icon: 'success', duration: 1200 })
+      modal.toast(this, { title: '已刷新', icon: 'success', duration: 1200 })
     } catch (e) {
-      wx.showToast({ title: '刷新失败', icon: 'none' })
+      modal.toast(this, { title: '刷新失败', icon: 'none' })
     } finally {
       wx.hideLoading()
     }
@@ -136,7 +136,7 @@ Page({
   async doSearch() {
     const keyword = this.data.searchKeyword.trim()
     if (!keyword) {
-      wx.showToast({ title: '请输入微信昵称', icon: 'none' })
+      modal.toast(this, { title: '请输入微信昵称', icon: 'none' })
       return
     }
 
@@ -163,12 +163,12 @@ Page({
         })
 
         if (results.length === 0) {
-          wx.showToast({ title: '未找到匹配选手', icon: 'none' })
+          modal.toast(this, { title: '未找到匹配选手', icon: 'none' })
         }
       }
     } catch (e) {
       this.setData({ searching: false, searched: true })
-      wx.showToast({ title: '搜索失败', icon: 'none' })
+      modal.toast(this, { title: '搜索失败', icon: 'none' })
     }
   },
 
@@ -182,7 +182,7 @@ Page({
     const playerId = String(e.currentTarget.dataset.id)
     const player = this.data.searchResults.find(p => String(p.id) === playerId)
     if (player && player._alreadySigned) {
-      wx.showToast({ title: '该选手已报名', icon: 'none', duration: 1500 })
+      modal.toast(this, { title: '该选手已报名', icon: 'none', duration: 1500 })
       return
     }
 
@@ -207,7 +207,7 @@ Page({
       return p && !p._alreadySigned
     })
     if (selectedIds.length === 0) {
-      wx.showToast({ title: '请先选择未报名选手', icon: 'none' })
+      modal.toast(this, { title: '请先选择未报名选手', icon: 'none' })
       return
     }
 
@@ -236,7 +236,7 @@ Page({
         let msg = `成功添加 ${result.success} 人`
         if (result.skipped > 0) msg += `，${result.skipped} 人已有报名`
         if (result.failed > 0) msg += `，${result.failed} 人失败`
-        wx.showToast({ title: msg, icon: 'none', duration: 2500 })
+        modal.toast(this, { title: msg, icon: 'none', duration: 2500 })
 
         // 清空选择 + 刷新列表
         this.setData({ selectedPlayers: {}, selectedCount: 0 })
@@ -244,11 +244,11 @@ Page({
         // 重新标记搜索结果中已报名的
         this.refreshSearchResults()
       } else {
-        wx.showToast({ title: res.error || '添加失败', icon: 'none' })
+        modal.toast(this, { title: res.error || '添加失败', icon: 'none' })
       }
     } catch (e) {
       this.setData({ loading: false })
-      wx.showToast({ title: '添加失败，请重试', icon: 'none' })
+      modal.toast(this, { title: '添加失败，请重试', icon: 'none' })
     }
   },
 
@@ -303,18 +303,18 @@ Page({
       this.setData({ loading: false })
 
       if (res.success) {
-        wx.showToast({ title: '已剔除 ' + playerName, icon: 'success' })
+        modal.toast(this, { title: '已剔除 ' + playerName, icon: 'success' })
         await this.loadSignups()
         // 同步刷新搜索结果的标记
         if (this.data.searchResults.length > 0) {
           this.refreshSearchResults()
         }
       } else {
-        wx.showToast({ title: res.error || '操作失败', icon: 'none' })
+        modal.toast(this, { title: res.error || '操作失败', icon: 'none' })
       }
     } catch (e) {
       this.setData({ loading: false })
-      wx.showToast({ title: '操作失败，请重试', icon: 'none' })
+      modal.toast(this, { title: '操作失败，请重试', icon: 'none' })
     }
   },
 

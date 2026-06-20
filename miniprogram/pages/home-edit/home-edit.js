@@ -122,17 +122,17 @@ Page({
                   blocks[index].url = api.BASE_URL + data.data.url
                 }
                 this.setData({ blocks })
-                wx.showToast({ title: '上传成功', icon: 'success' })
+                modal.toast(this, { title: '上传成功', icon: 'success' })
               } else {
-                wx.showToast({ title: data.error || data.message || '上传失败', icon: 'none' })
+                modal.toast(this, { title: data.error || data.message || '上传失败', icon: 'none' })
               }
             } catch (e) {
-              wx.showToast({ title: '上传异常', icon: 'none' })
+              modal.toast(this, { title: '上传异常', icon: 'none' })
             }
           },
           fail: () => {
             wx.hideLoading()
-            wx.showToast({ title: '上传失败', icon: 'none' })
+            modal.toast(this, { title: '上传失败', icon: 'none' })
           }
         })
       }
@@ -154,15 +154,15 @@ Page({
       const res = await api.put('/home/intro', { content: blocks })
       wx.hideLoading()
       if (res.success) {
-        wx.showToast({ title: '保存成功', icon: 'success' })
+        modal.toast(this, { title: '保存成功', icon: 'success' })
         // 延迟返回，让首页刷新数据
         setTimeout(() => { wx.navigateBack() }, 800)
       } else {
-        wx.showToast({ title: res.error || res.message || '保存失败', icon: 'none' })
+        modal.toast(this, { title: res.error || res.message || '保存失败', icon: 'none' })
       }
     } catch (e) {
       wx.hideLoading()
-      wx.showToast({ title: '保存失败', icon: 'none' })
+      modal.toast(this, { title: '保存失败', icon: 'none' })
     } finally {
       this.setData({ saving: false })
     }
