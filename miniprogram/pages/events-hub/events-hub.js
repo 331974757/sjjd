@@ -53,12 +53,13 @@ Page({
     const pages = getCurrentPages()
     const indexPage = pages.find(p => p.route === 'pages/index/index')
     if (indexPage) {
-      indexPage.setData({ currentGame: tab, subTab: subTab })
-      if (subTab === 'rules') indexPage.loadRuleEvents()
-      else if (subTab === 'history') indexPage.loadEvents()
+      indexPage.setData({ currentGame: tab, subTab: subTab }, () => {
+        // setData 完成后刷新数据
+        if (subTab === 'rules') indexPage.loadRuleEvents()
+        else if (subTab === 'history') indexPage.loadEvents()
+      })
       wx.navigateBack()
     } else {
-      // 兜底：直接跳转
       wx.redirectTo({ url: `/pages/index/index?subTab=${subTab}` })
     }
   }

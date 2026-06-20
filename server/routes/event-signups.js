@@ -86,60 +86,89 @@ module.exports = function (app, h) {
     }
   });
 
-  /** POST /api/events/:eventId/signups — 自主报名 */
+  /** POST /api/events/:eventId/signups — 自主报名（事务保护） */
   app.post('/api/events/:eventId/signups', async (req, res) => {
     try {
       const openid = req._openid || '';
       if (!openid) return res.status(401).json({ success: false, error: '请先登录' });
 
       const { eventId } = req.params;
-      const eventCheck = await h.validateSignupEvent(eventId);
-      if (!eventCheck.valid) {
-        return res.status(400).json({ success: false, error: eventCheck.error });
-      }
+      const conn = await h.pool.getConnection();
+      try {
+        await conn.beginTransaction();
 
-      const limitCheck = await h.checkSignupLimit(eventId);
-      if (limitCheck.full) {
-        return res.status(400).json({ success: false, error: limitCheck.error, code: 'LIMIT_FULL' });
-      }
-
-      const [userRows] = await h.pool.query('SELECT nick_name FROM users WHERE openid = ?', [openid]);
-      const userNick = (userRows.length && userRows[0].nick_name) ? userRows[0].nick_name : '';
-      const matchResult = await h.matchPlayerByNickname(userNick);
-      if (!matchResult.success) {
-        return res.status(400).json({ success: false, error: matchResult.message, code: matchResult.code });
-      }
-
-      const playerId = matchResult.playerId;
-      const [existing] = await h.pool.query(
-        'SELECT signup_id, signup_status FROM dota2_event_signup WHERE event_id = ? AND player_id = ?',
-        [eventId, playerId]
-      );
-
-      if (existing.length > 0) {
-        if (existing[0].signup_status === 1) {
-          return res.status(400).json({ success: false, error: '您已报名本赛事，请勿重复报名', code: 'ALREADY_SIGNED' });
-        }
-        await h.pool.query(
-          'UPDATE dota2_event_signup SET signup_status = 1, signup_type = 0, operator_id = ?, created_at = NOW() WHERE signup_id = ?',
-          [openid, existing[0].signup_id]
+        // 锁定赛事行，防止并发超限
+        const [eventRows] = await conn.query(
+          'SELECT event_id, event_status, is_archived, signup_limit FROM dota2_events WHERE event_id = ? FOR UPDATE',
+          [eventId]
         );
-        return res.json({
+        if (!eventRows.length) {
+          await h.safeRollback(conn, 'signup'); conn.release();
+          return res.status(404).json({ success: false, error: '赛事不存在' });
+        }
+        const event = eventRows[0];
+        if (event.is_archived === 1 || event.event_status !== 1) {
+          await h.safeRollback(conn, 'signup'); conn.release();
+          return res.status(400).json({ success: false, error: '当前不在报名阶段' });
+        }
+
+        // 校验报名人数上限
+        const limit = event.signup_limit;
+        if (limit && limit > 0) {
+          const [[{ cnt }]] = await conn.query(
+            'SELECT COUNT(*) AS cnt FROM dota2_event_signup WHERE event_id = ? AND signup_status = 1', [eventId]
+          );
+          if (cnt >= limit) {
+            await h.safeRollback(conn, 'signup'); conn.release();
+            return res.status(400).json({ success: false, error: `报名人数已满（上限${limit}人）`, code: 'LIMIT_FULL' });
+          }
+        }
+
+        const [userRows] = await conn.query('SELECT nick_name FROM users WHERE openid = ?', [openid]);
+        const userNick = (userRows.length && userRows[0].nick_name) ? userRows[0].nick_name.trim() : '';
+        const matchResult = await h.matchPlayerByNickname(userNick);
+        if (!matchResult.success) {
+          await h.safeRollback(conn, 'signup'); conn.release();
+          return res.status(400).json({ success: false, error: matchResult.message, code: matchResult.code });
+        }
+
+        const playerId = matchResult.playerId;
+        const [existing] = await conn.query(
+          'SELECT signup_id, signup_status FROM dota2_event_signup WHERE event_id = ? AND player_id = ?',
+          [eventId, playerId]
+        );
+
+        if (existing.length > 0) {
+          if (existing[0].signup_status === 1) {
+            await h.safeRollback(conn, 'signup'); conn.release();
+            return res.status(400).json({ success: false, error: '您已报名本赛事，请勿重复报名', code: 'ALREADY_SIGNED' });
+          }
+          await conn.query(
+            'UPDATE dota2_event_signup SET signup_status = 1, signup_type = 0, operator_id = ?, created_at = NOW() WHERE signup_id = ?',
+            [openid, existing[0].signup_id]
+          );
+          await conn.commit(); conn.release();
+          return res.json({
+            success: true,
+            data: { signupId: existing[0].signup_id, playerId, playerInfo: matchResult.playerInfo, signupType: 'self_signup', message: '报名成功' }
+          });
+        }
+
+        const signupId = h.genId();
+        await conn.query(
+          'INSERT INTO dota2_event_signup (signup_id, event_id, player_id, signup_type, signup_status, operator_id, created_at) VALUES (?, ?, ?, 0, 1, ?, NOW())',
+          [signupId, eventId, playerId, openid]
+        );
+        await conn.commit(); conn.release();
+
+        res.json({
           success: true,
-          data: { signupId: existing[0].signup_id, playerId, playerInfo: matchResult.playerInfo, signupType: 'self_signup', message: '报名成功' }
+          data: { signupId, playerId, playerInfo: matchResult.playerInfo, signupType: 'self_signup', message: '报名成功' }
         });
+      } catch (e) {
+        await h.safeRollback(conn, 'signup'); conn.release();
+        throw e;
       }
-
-      const signupId = h.genId();
-      await h.pool.query(
-        'INSERT INTO dota2_event_signup (signup_id, event_id, player_id, signup_type, signup_status, operator_id, created_at) VALUES (?, ?, ?, 0, 1, ?, NOW())',
-        [signupId, eventId, playerId, openid]
-      );
-
-      res.json({
-        success: true,
-        data: { signupId, playerId, playerInfo: matchResult.playerInfo, signupType: 'self_signup', message: '报名成功' }
-      });
     } catch (e) {
       res.status(500).json({ success: false, error: e.message });
     }
@@ -200,7 +229,7 @@ module.exports = function (app, h) {
     }
   });
 
-  /** POST /api/events/:eventId/signups/batch — 管理员批量添加报名 */
+  /** POST /api/events/:eventId/signups/batch — 管理员批量添加报名（事务保护） */
   app.post('/api/events/:eventId/signups/batch', async (req, res) => {
     try {
       if (!await h.assertAdmin(req, res)) return;
@@ -220,36 +249,52 @@ module.exports = function (app, h) {
       const results = [];
       let successCount = 0, skipCount = 0, failCount = 0;
 
-      for (const playerId of playerIds) {
-        try {
-          const [existing] = await h.pool.query(
-            'SELECT signup_id, signup_status FROM dota2_event_signup WHERE event_id = ? AND player_id = ?',
-            [eventId, playerId]
-          );
-          if (existing.length > 0 && existing[0].signup_status === 1) {
-            skipCount++;
-            results.push({ playerId, status: 'skipped', reason: '已报名' });
-            continue;
-          }
+      const conn = await h.pool.getConnection();
+      try {
+        await conn.beginTransaction();
 
-          if (existing.length > 0) {
-            await h.pool.query(
-              'UPDATE dota2_event_signup SET signup_status = 1, signup_type = 1, operator_id = ?, created_at = NOW() WHERE signup_id = ?',
-              [openid, existing[0].signup_id]
+        for (const playerId of playerIds) {
+          try {
+            const [existing] = await conn.query(
+              'SELECT signup_id, signup_status FROM dota2_event_signup WHERE event_id = ? AND player_id = ?',
+              [eventId, playerId]
             );
-          } else {
-            const signupId = h.genId();
-            await h.pool.query(
-              'INSERT INTO dota2_event_signup (signup_id, event_id, player_id, signup_type, signup_status, operator_id, created_at) VALUES (?, ?, ?, 1, 1, ?, NOW())',
-              [signupId, eventId, playerId, openid]
-            );
+            if (existing.length > 0 && existing[0].signup_status === 1) {
+              skipCount++;
+              results.push({ playerId, status: 'skipped', reason: '已报名' });
+              continue;
+            }
+
+            if (existing.length > 0) {
+              await conn.query(
+                'UPDATE dota2_event_signup SET signup_status = 1, signup_type = 1, operator_id = ?, created_at = NOW() WHERE signup_id = ?',
+                [openid, existing[0].signup_id]
+              );
+            } else {
+              const signupId = h.genId();
+              await conn.query(
+                'INSERT INTO dota2_event_signup (signup_id, event_id, player_id, signup_type, signup_status, operator_id, created_at) VALUES (?, ?, ?, 1, 1, ?, NOW())',
+                [signupId, eventId, playerId, openid]
+              );
+            }
+            successCount++;
+            results.push({ playerId, status: 'success' });
+          } catch (err) {
+            failCount++;
+            results.push({ playerId, status: 'failed', error: err.message });
           }
-          successCount++;
-          results.push({ playerId, status: 'success' });
-        } catch (err) {
-          failCount++;
-          results.push({ playerId, status: 'failed', error: err.message });
         }
+
+        if (failCount > 0 && successCount === 0) {
+          await conn.rollback();
+        } else {
+          await conn.commit();
+        }
+      } catch (e) {
+        await h.safeRollback(conn, 'batchSignup');
+        throw e;
+      } finally {
+        conn.release();
       }
 
       res.json({

@@ -423,10 +423,26 @@ app.put('/api/players/:id', async (req, res) => {
 app.delete('/api/players/:id', async (req, res) => {
   try {
     if (!await assertAdmin(req, res)) return;
-    // 软删除：标记为 deleted，保留参赛历史
-    const [result] = await pool.query("UPDATE dota2_players SET status='deleted', updated_at=NOW() WHERE id = ?", [req.params.id]);
-    if (result.affectedRows === 0) return res.status(404).json({ success: false, error: '选手不存在' });
-    res.json({ success: true });
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      // 软删除选手
+      const [result] = await conn.query("UPDATE dota2_players SET status='deleted', updated_at=NOW() WHERE id = ? AND status = 'active'", [req.params.id]);
+      if (result.affectedRows === 0) {
+        await safeRollback(conn, 'deletePlayer');
+        conn.release();
+        return res.status(404).json({ success: false, error: '选手不存在或已被删除' });
+      }
+      // 级联标记该选手未归档赛事的报名为无效
+      await conn.query("UPDATE dota2_event_signup SET signup_status = 0 WHERE player_id = ? AND signup_status = 1 AND event_id IN (SELECT event_id FROM dota2_events WHERE is_archived = 0)", [req.params.id]);
+      await conn.commit();
+      conn.release();
+      res.json({ success: true });
+    } catch (e) {
+      await safeRollback(conn, 'deletePlayer');
+      conn.release();
+      throw e;
+    }
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
@@ -435,9 +451,19 @@ app.post('/api/players/batch-delete', async (req, res) => {
     if (!await assertAdmin(req, res)) return;
     const { ids } = req.body;
     if (!ids || !ids.length) return res.status(400).json({ success: false, error: 'missing ids' });
-    // 软删除：批量标记为 deleted
-    const [result] = await pool.query("UPDATE dota2_players SET status='deleted', updated_at=NOW() WHERE id IN (?)", [ids]);
-    res.json({ success: true, deleted: result.affectedRows });
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      const [result] = await conn.query("UPDATE dota2_players SET status='deleted', updated_at=NOW() WHERE id IN (?) AND status = 'active'", [ids]);
+      await conn.query("UPDATE dota2_event_signup SET signup_status = 0 WHERE player_id IN (?) AND signup_status = 1 AND event_id IN (SELECT event_id FROM dota2_events WHERE is_archived = 0)", [ids]);
+      await conn.commit();
+      conn.release();
+      res.json({ success: true, deleted: result.affectedRows });
+    } catch (e) {
+      await safeRollback(conn, 'batchDelete');
+      conn.release();
+      throw e;
+    }
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
