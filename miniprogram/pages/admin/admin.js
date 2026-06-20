@@ -9,20 +9,17 @@ Page({
   data: {
     isSuperAdmin: false,
     myOpenId: '',
-    allUsers: [],
     users: [],          // 当前页数据
     keyword: '',
     currentPage: 1,     // 当前页码
     totalPages: 0,      // 总页数
+    total: 0,           // 服务端返回的总记录数
     loading: true,
-    _filteredTotal: 0,  // 筛选后总数
-    _filtered: [],       // 筛选后的全量列表（内存缓存）
-    _operating: false     // 操作锁（防止重复提交）
+    _operating: false   // 操作锁（防止重复提交）
   },
 
   async onLoad() {
     // 仅超级管理员可访问权限设置
-    // 始终异步校验（避免缓存过期导致权限错误）
     const isSuper = await perm.isSuperAdmin()
     if (!isSuper) {
       wx.showToast({ title: '仅超级管理员可访问', icon: 'none' })
@@ -30,15 +27,28 @@ Page({
       return
     }
     this.setData({ isSuperAdmin: true })
-    this.loadAll()
+    this.loadPage()
   },
 
-  /** 手动刷新按钮（带并发锁，防止重复请求） */
+  onShow() {
+    if (this.data.isSuperAdmin) {
+      this.loadPage()
+    }
+  },
+
+  onUnload() {
+    if (this._searchTimer) {
+      clearTimeout(this._searchTimer)
+      this._searchTimer = null
+    }
+  },
+
+  /** 手动刷新按钮 */
   async onRefreshTap() {
     if (this.data.loading) return
     wx.showLoading({ title: '刷新中...', mask: true })
     try {
-      await this.loadAll()
+      await this.loadPage()
       wx.showToast({ title: '已刷新', icon: 'success', duration: 1200 })
     } catch (e) {
       wx.showToast({ title: '刷新失败', icon: 'none' })
@@ -47,42 +57,56 @@ Page({
     }
   },
 
-  async loadAll() {
+  /** 服务端分页加载（含并发保护） */
+  async loadPage() {
+    if (this._loadingPromise) return this._loadingPromise
+
     this.setData({ loading: true })
-    try {
-      let openid = ''
+    this._loadingPromise = (async () => {
       try {
-        const app = getApp()
-        openid = await app.getOpenId()
-      } catch (e) {
-        console.warn('[admin] 获取openid失败', e)
-      }
-
-      wx.showLoading({ title: '加载用户列表...' })
-      const res = await api.get('/users')
-      wx.hideLoading()
-
-      let rawUsers = (res && res.data) ? res.data : []
-      rawUsers = rawUsers.map((u) => {
-        return {
-          _id: u._id,
-          openid: u.openid,
-          role: u.role,
-          nickName: u.nickName || '',
-          isMe: !!(openid && u.openid === openid),
-          createdAt: u.createdAt,
-          nickChangeCount: u.nickChangeCount || 0
+        let openid = ''
+        try {
+          const app = getApp()
+          openid = await app.getOpenId()
+        } catch (e) {
+          console.warn('[admin] 获取openid失败', e)
         }
-      })
 
-      this.setData({ myOpenId: openid || '', allUsers: rawUsers, loading: false })
-      this.filterUsers()
-    } catch (err) {
-      wx.hideLoading()
-      console.error('加载用户列表失败', err)
-      this.setData({ loading: false })
-      wx.showToast({ title: '加载失败', icon: 'none' })
-    }
+        const params = {
+          page: this.data.currentPage,
+          pageSize: PAGE_SIZE
+        }
+        if (this.data.keyword) params.keyword = this.data.keyword
+
+        const res = await api.get('/users', params)
+
+        const rawUsers = (res && Array.isArray(res.data) ? res.data : [])
+          .map(u => ({
+            _id: u._id,
+            openid: u.openid,
+            role: u.role,
+            nickName: u.nickName || '',
+            isMe: !!(openid && u.openid === openid),
+            nickChangeCount: u.nickChangeCount || 0
+          }))
+
+        this.setData({
+          myOpenId: openid || '',
+          users: rawUsers,
+          total: res.total || 0,
+          totalPages: res.totalPages || 0,
+          loading: false
+        })
+      } catch (err) {
+        console.error('加载用户列表失败', err)
+        this.setData({ loading: false })
+        wx.showToast({ title: '加载失败', icon: 'none' })
+      } finally {
+        this._loadingPromise = null
+      }
+    })()
+
+    return this._loadingPromise
   },
 
   // 搜索输入（防抖 300ms）
@@ -91,7 +115,7 @@ Page({
     if (this._searchTimer) clearTimeout(this._searchTimer)
     this._searchTimer = setTimeout(() => {
       this.setData({ keyword: value, currentPage: 1 })
-      this.filterUsers()
+      this.loadPage()
     }, 300)
   },
 
@@ -99,62 +123,21 @@ Page({
   onClearKeyword() {
     if (this._searchTimer) clearTimeout(this._searchTimer)
     this.setData({ keyword: '', currentPage: 1 })
-    this.filterUsers()
-  },
-
-  // 公共筛选方法：只展示已改名的用户，支持关键词搜索
-  _getFiltered() {
-    // 只展示有昵称的用户（已注册/已改名），排除无 nickName 的游客
-    let list = this.data.allUsers.filter(u => u.nickName);
-    list = [...list].sort((a, b) => {
-      // 有昵称的排前面（已经全部有昵称，此排序保持角色优先）
-      if (a.role === 'super_admin' && b.role !== 'super_admin') return -1;
-      if (a.role !== 'super_admin' && b.role === 'super_admin') return 1;
-      if (a.role === 'admin' && b.role === 'user') return -1;
-      if (a.role === 'user' && b.role === 'admin') return 1;
-      return 0;
-    });
-    const kw = this.data.keyword.toLowerCase()
-    if (kw) {
-      list = list.filter(u => {
-        return (u.nickName || '').toLowerCase().indexOf(kw) !== -1
-          || (u.openid || '').toLowerCase().indexOf(kw) !== -1
-      })
-    }
-    return list
-  },
-
-  // 筛选 + 分页
-  filterUsers() {
-    const list = this._getFiltered()
-    const totalPages = Math.ceil(list.length / PAGE_SIZE)
-    // 确保当前页不超出范围
-    let page = this.data.currentPage
-    if (page > totalPages && totalPages > 0) page = totalPages
-    if (page < 1) page = 1
-
-    const start = (page - 1) * PAGE_SIZE
-    this.setData({
-      users: list.slice(start, start + PAGE_SIZE),
-      currentPage: page,
-      totalPages: totalPages,
-      _filteredTotal: list.length,
-      _filtered: list   // 缓存筛选后全量，分页按钮用
-    })
+    this.loadPage()
   },
 
   // 上一页
   prevPage() {
     if (this.data.currentPage <= 1) return
     this.setData({ currentPage: this.data.currentPage - 1 })
-    this.filterUsers()
+    this.loadPage()
   },
 
   // 下一页
   nextPage() {
     if (this.data.currentPage >= this.data.totalPages) return
     this.setData({ currentPage: this.data.currentPage + 1 })
-    this.filterUsers()
+    this.loadPage()
   },
 
   // 切换权限（仅超级管理员可操作，ActionSheet 多选）
@@ -170,61 +153,75 @@ Page({
       return
     }
 
-    // 根据目标角色展示不同选项
-    let itemList = []
-    let actions = []
+    // 提前加锁，防止在弹窗期间重复点击
+    this.setData({ _operating: true })
 
-    if (role === 'super_admin') {
-      itemList = ['取消超级管理员']
-      actions = ['removeSuper']
-    } else if (role === 'admin') {
-      itemList = ['设为超级管理员', '取消管理员']
-      actions = ['setSuper', 'removeAdmin']
-    } else {
-      itemList = ['设为超级管理员', '设为管理员']
-      actions = ['setSuper', 'setAdmin']
-    }
+    try {
+      // 根据目标角色展示不同选项
+      let itemList = []
+      let actions = []
 
-    const res = await modal.sheet(this, { title: '选择操作', items: itemList.map(label => ({ label })) })
-    if (!res.confirm) return
-    const action = actions[res.tapIndex]
-    const name = nickName || '该用户'
-    switch (action) {
-      case 'setSuper':
-        this._confirmAction('设为超级管理员', '确定将「' + name + '」设为超级管理员吗？\n\n超管拥有最高权限。', 'default', '确认设置', () => { this.doSetSuperAdmin(openid) })
-        break
-      case 'removeSuper':
-        this._confirmAction('取消超级管理员', '确定取消「' + name + '」的超级管理员权限吗？\n\n将降为普通用户。', 'danger', '', () => { this.doRemoveSuperAdmin(openid) })
-        break
-      case 'setAdmin':
-        this._confirmAction('设为管理员', '确定将「' + name + '」设为管理员吗？', 'success', '', () => { this.doSetAdmin(openid) })
-        break
-      case 'removeAdmin':
-        this._confirmAction('取消管理员', '确定取消「' + name + '」的管理员权限吗？', 'danger', '', () => { this.doRemoveAdmin(openid) })
-        break
+      if (role === 'super_admin') {
+        itemList = ['取消超级管理员']
+        actions = ['removeSuper']
+      } else if (role === 'admin') {
+        itemList = ['设为超级管理员', '取消管理员']
+        actions = ['setSuper', 'removeAdmin']
+      } else {
+        itemList = ['设为超级管理员', '设为管理员']
+        actions = ['setSuper', 'setAdmin']
+      }
+
+      const res = await modal.sheet(this, { title: '选择操作', items: itemList.map(label => ({ label })) })
+      if (!res.confirm) return
+
+      // 边界检查 tapIndex
+      const tapIndex = res.tapIndex
+      if (tapIndex === undefined || tapIndex < 0 || tapIndex >= actions.length) {
+        return
+      }
+      const action = actions[tapIndex]
+      const name = nickName || '该用户'
+      switch (action) {
+        case 'setSuper':
+          await this._confirmAction('设为超级管理员', '确定将「' + name + '」设为超级管理员吗？\n\n超管拥有最高权限。', 'default', '确认设置', () => { this.doSetSuperAdmin(openid) })
+          break
+        case 'removeSuper':
+          await this._confirmAction('取消超级管理员', '确定取消「' + name + '」的超级管理员权限吗？\n\n将降为普通用户。', 'danger', '', () => { this.doRemoveSuperAdmin(openid) })
+          break
+        case 'setAdmin':
+          await this._confirmAction('设为管理员', '确定将「' + name + '」设为管理员吗？', 'success', '', () => { this.doSetAdmin(openid) })
+          break
+        case 'removeAdmin':
+          await this._confirmAction('取消管理员', '确定取消「' + name + '」的管理员权限吗？', 'danger', '', () => { this.doRemoveAdmin(openid) })
+          break
+      }
+    } finally {
+      this.setData({ _operating: false })
     }
   },
 
   async _confirmAction(title, content, theme, confirmText, callback) {
     const r = await modal.confirm(this, { theme, title, content, confirmText: confirmText || '确认' })
-    if (r.confirm) callback()
+    if (r.confirm) await callback()
   },
 
   // 【重构】统一角色修改方法，消除4个方法的重复代码
   async _doSetRole(openid, role, label) {
-    this.setData({ _operating: true })
     wx.showLoading({ title: '设置中...' })
     try {
       const res = await api.put('/users/' + openid + '/role', { role: role, operatorOpenid: this.data.myOpenId })
       wx.hideLoading()
-      const text = res.success ? '已' + label : (res.message || '失败')
+      const text = res.success ? '已' + label : (res.error || res.message || '失败')
       wx.showToast({ title: text, icon: res.success ? 'success' : 'none' })
-      if (res.success) this.loadAll()
+      if (res.success) {
+        // 权限变更后清除本地角色缓存，确保其他页面的权限判断能立即生效
+        perm.clearCache()
+        this.loadPage()
+      }
     } catch (e) {
       wx.hideLoading()
       wx.showToast({ title: '操作失败', icon: 'none' })
-    } finally {
-      this.setData({ _operating: false })
     }
   },
 
@@ -238,29 +235,33 @@ Page({
     if (this.data._operating) return
     const openid = e.currentTarget.dataset.openid
     const nickName = e.currentTarget.dataset.nickname
-    const r = await modal.confirm(this, {
-      theme: 'danger',
-      title: '重置修改次数',
-      content: '确定重置「' + nickName + '」的昵称修改次数吗？重置后可再修改' + C.NICK_CHANGE_LIMIT + '次。',
-      confirmText: '确定重置'
-    })
-    if (!r.confirm) return
-    this.doResetNickCount(openid)
+
+    // 提前加锁
+    this.setData({ _operating: true })
+    try {
+      const r = await modal.confirm(this, {
+        theme: 'danger',
+        title: '重置修改次数',
+        content: '确定重置「' + nickName + '」的昵称修改次数吗？重置后可再修改' + C.NICK_CHANGE_LIMIT + '次。',
+        confirmText: '确定重置'
+      })
+      if (!r.confirm) return
+      await this.doResetNickCount(openid)
+    } finally {
+      this.setData({ _operating: false })
+    }
   },
 
   async doResetNickCount(openid) {
-    this.setData({ _operating: true })
     wx.showLoading({ title: '重置中...' })
     try {
       const res = await api.put('/users/' + openid + '/reset-nickcount')
       wx.hideLoading()
-      wx.showToast({ title: res.success ? '已重置' : (res.message || '失败'), icon: res.success ? 'success' : 'none' })
-      if (res.success) this.loadAll()
+      wx.showToast({ title: res.success ? '已重置' : (res.error || res.message || '失败'), icon: res.success ? 'success' : 'none' })
+      if (res.success) this.loadPage()
     } catch (e) {
       wx.hideLoading()
       wx.showToast({ title: '操作失败', icon: 'none' })
-    } finally {
-      this.setData({ _operating: false })
     }
   }
 })

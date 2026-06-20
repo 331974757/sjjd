@@ -39,6 +39,7 @@ const pageConfig = {
     _superAdminOnly: [],
     _adminOnly: [],
     statusBarHeight: 44,
+    _popupCount: 0,
   }, mergedData),
 
   // ====== 生命周期 ======
@@ -55,8 +56,6 @@ const pageConfig = {
     this.homeLoadUsers()
     this.loadHomeData()
   },
-
-  onReady() {},
 
   onShow() {
     if (this._needsReload) {
@@ -80,6 +79,19 @@ const pageConfig = {
       } else if (this.data.subTab === 'history') {
         this.loadEvents()
       }
+    }
+  },
+
+  // ====== 页面锁定辅助（计数器模式，多个弹窗同时打开时不会误解锁） ======
+  _lockPage() {
+    this.data._popupCount = (this.data._popupCount || 0) + 1
+    this.setData({ pageLocked: true })
+  },
+  _unlockPage() {
+    this.data._popupCount = Math.max(0, (this.data._popupCount || 0) - 1)
+    if (this.data._popupCount <= 0) {
+      this.data._popupCount = 0
+      this.setData({ pageLocked: false })
     }
   },
 
@@ -123,9 +135,10 @@ const pageConfig = {
       wx.hideLoading()
     }
     this.setData({ showAdminModal: true })
+    this._lockPage()
   },
 
-  closeAdminModal() { this.setData({ showAdminModal: false }) },
+  closeAdminModal() { this.setData({ showAdminModal: false }); this._unlockPage() },
 
   loadNickname() {
     const nick = perm.getNickName() || ''
@@ -134,6 +147,7 @@ const pageConfig = {
       if (!this.data.nickName && !this._nickModalAutoShown) {
         this._nickModalAutoShown = true
         this.setData({ showNickModal: true, nickInputValue: '' })
+        this._lockPage()
       }
     })
   },
@@ -192,11 +206,13 @@ const pageConfig = {
       nickInputValue: currentNick || '',
       userOpenid: openid || ''
     })
+    this._lockPage()
   },
 
   closeNickModal() {
     this._nickModalAutoShown = true
     this.setData({ showNickModal: false, nickInputValue: '' })
+    this._unlockPage()
   },
 
   onNickInput(e) { this.setData({ nickInputValue: e.detail.value }) },
@@ -241,7 +257,7 @@ const pageConfig = {
         modal.toast(this, { theme: 'success', content: '昵称已更新' })
       } else {
         if (res.nickChangeCount !== undefined) { this.setData({ nickChangeCount: res.nickChangeCount }) }
-        modal.toast(this, { theme: 'danger', content: res.message || '修改失败', duration: 2500 })
+        modal.toast(this, { theme: 'danger', content: res.error || res.message || '修改失败', duration: 2500 })
       }
     } catch (err) {
       wx.hideLoading()
@@ -264,8 +280,6 @@ const pageConfig = {
     if (promise) { promise.then(() => wx.stopPullDownRefresh()).catch(() => wx.stopPullDownRefresh()) }
     else { wx.stopPullDownRefresh() }
   },
-
-  onHide() {},
 
   onReachBottom() {
     if (this.data.currentGame === 'home') return

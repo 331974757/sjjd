@@ -7,6 +7,7 @@ const fs = require('fs');
 const xlsx = require('xlsx');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const { genId, safeRollback } = require('./utils/helpers');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -19,7 +20,14 @@ app.use(cors({
   origin: (origin, callback) => {
     // 无 origin 的请求（小程序、服务端调用）直接放行
     if (!origin) return callback(null, true);
-    if (allowedOrigins.some(o => origin.startsWith(o))) return callback(null, true);
+    try {
+      const parsed = new URL(origin);
+      const hostname = parsed.hostname;
+      if (allowedOrigins.some(o => {
+        const allowedHost = new URL(o).hostname;
+        return hostname === allowedHost || hostname.endsWith('.' + allowedHost);
+      })) return callback(null, true);
+    } catch (_) {}
     callback(new Error('Not allowed by CORS'));
   }
 }));
@@ -65,17 +73,7 @@ const JWT_SECRET = process.env.JWT_SECRET
   || crypto.createHash('sha256').update(WECHAT_APPID + WECHAT_SECRET).digest('hex');
 const JWT_EXPIRES = '7d';
 
-// 使用 crypto 生成唯一 ID
-function genId() {
-  return crypto.randomBytes(16).toString('hex');
-}
-
-// 安全回滚辅助：避免回滚失败掩盖原始错误
-async function safeRollback(conn, ctx) {
-  try { await conn.rollback(); } catch (e) {
-    console.error(`[tx:rollback:${ctx}]`, e.message);
-  }
-}
+// genId / safeRollback 定义在 utils/helpers.js 中
 
 // Health check
 app.get('/', (req, res) => {
@@ -278,7 +276,7 @@ app.post('/api/players', async (req, res) => {
     // 检查是否已存在活跃选手（同名）
     const [dupActive] = await pool.query("SELECT id FROM dota2_players WHERE wx_nickname = ? AND status = 'active'", [wxNickname]);
     if (dupActive.length > 0) {
-      return res.status(400).json({ success: false, message: '该微信群昵称已存在，请使用其他昵称' });
+      return res.status(400).json({ success: false, error: '该微信群昵称已存在，请使用其他昵称' });
     }
 
     // 检查是否存在已删除的同名选手——恢复活跃并更新字段
@@ -327,7 +325,7 @@ app.put('/api/players/:id', async (req, res) => {
       if (!userNick) {
         return res.status(403).json({ success: false, error: '请先在首页设置您的游戏昵称，与选手的微信群昵称保持一致后即可自行编辑', code: 'NICK_NOT_SET' });
       }
-      if (playerRows[0].wx_nickname !== userNick) {
+      if ((playerRows[0].wx_nickname || '').trim() !== userNick.trim()) {
         return res.status(403).json({ success: false, error: '您的游戏昵称与选手微信群昵称不匹配，请确认或联系管理员修改' });
       }
       // 仅拦截实际修改的字段，避免误拒
@@ -354,7 +352,7 @@ app.put('/api/players/:id', async (req, res) => {
       if (!wxNickname) return res.status(400).json({ success: false, error: '微信群昵称不能为空' });
       const [dupWx] = await pool.query("SELECT id FROM dota2_players WHERE wx_nickname = ? AND id != ? AND status = 'active'", [wxNickname, playerId]);
       if (dupWx.length > 0) {
-        return res.status(400).json({ success: false, message: '该微信群昵称已被其他选手使用' });
+        return res.status(400).json({ success: false, error: '该微信群昵称已被其他选手使用' });
       }
     }
 
@@ -713,8 +711,42 @@ app.get('/api/users', async (req, res) => {
     if (callerRole !== 'super_admin') {
       return res.status(403).json({ success: false, error: '仅超级管理员可查看用户列表' });
     }
-    const [rows] = await pool.query('SELECT * FROM users ORDER BY created_at DESC');
-    res.json({ success: true, data: rows.map(mapUser) });
+
+    const page = Math.max(parseInt(req.query.page) || 1, 1);
+    const pageSize = Math.min(Math.max(parseInt(req.query.pageSize) || 20, 1), 200);
+    const keyword = (req.query.keyword || '').trim();
+
+    // 只返回有昵称的已注册用户
+    let whereClause = "WHERE nick_name IS NOT NULL AND nick_name != ''";
+    const params = [];
+
+    if (keyword) {
+      whereClause += ' AND (nick_name LIKE ? OR openid LIKE ?)';
+      params.push('%' + keyword + '%', '%' + keyword + '%');
+    }
+
+    // 角色优先级排序：超管 > 管理员 > 普通用户
+    const orderBy = "ORDER BY CASE role WHEN 'super_admin' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, nick_name ASC";
+    const limitClause = 'LIMIT ? OFFSET ?';
+    const offset = (page - 1) * pageSize;
+
+    // 并行执行：计数 + 分页数据
+    const [[countRows], [dataRows]] = await Promise.all([
+      pool.query('SELECT COUNT(*) AS total FROM users ' + whereClause, params),
+      pool.query('SELECT * FROM users ' + whereClause + ' ' + orderBy + ' ' + limitClause, [...params, pageSize, offset])
+    ]);
+
+    const total = countRows[0] ? countRows[0].total : 0;
+    const totalPages = Math.ceil(total / pageSize);
+
+    res.json({
+      success: true,
+      data: dataRows.map(mapUser),
+      total,
+      page,
+      pageSize,
+      totalPages
+    });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
@@ -774,7 +806,7 @@ app.put('/api/users/me/nickname', async (req, res) => {
 
     const [dups] = await pool.query('SELECT openid FROM users WHERE nick_name = ? AND openid != ?', [nickName, openid]);
     if (dups.length) {
-      return res.status(400).json({ success: false, message: '该昵称已被其他用户使用，请换一个' });
+      return res.status(400).json({ success: false, error: '该昵称已被其他用户使用，请换一个' });
     }
 
     const [rows] = await pool.query('SELECT * FROM users WHERE openid = ?', [openid]);
@@ -785,7 +817,7 @@ app.put('/api/users/me/nickname', async (req, res) => {
         res.json({ success: true, nickChangeCount: 0 });
       } catch (e) {
         if (e.code === 'ER_DUP_ENTRY') {
-          return res.status(400).json({ success: false, message: '该昵称已被其他用户使用，请换一个' });
+          return res.status(400).json({ success: false, error: '该昵称已被其他用户使用，请换一个' });
         }
         throw e;
       }
@@ -795,14 +827,14 @@ app.put('/api/users/me/nickname', async (req, res) => {
       const role = user.role || 'user';
       const MAX_CHANGES = 3;
       if (role !== 'admin' && role !== 'super_admin' && count >= MAX_CHANGES) {
-        return res.status(400).json({ success: false, message: '修改次数已用完，请联系超级管理员重置', nickChangeCount: count });
+        return res.status(400).json({ success: false, error: '修改次数已用完，请联系超级管理员重置', nickChangeCount: count });
       }
       try {
         await pool.query('UPDATE users SET nick_name=?,nick_change_count=nick_change_count+1,updated_at=NOW() WHERE openid=?', [nickName, openid]);
         res.json({ success: true, nickChangeCount: count + 1 });
       } catch (e) {
         if (e.code === 'ER_DUP_ENTRY') {
-          return res.status(400).json({ success: false, message: '该昵称已被其他用户使用，请换一个' });
+          return res.status(400).json({ success: false, error: '该昵称已被其他用户使用，请换一个' });
         }
         throw e;
       }

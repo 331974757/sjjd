@@ -1,25 +1,22 @@
 <!--pages/admin/admin.wxml-->
 <view class="admin-page">
+  <!-- 顶部固定区 -->
+  <view class="admin-top">
+    <view class="page-header">
+      <text class="page-header-title">权限管理</text>
+      <text class="page-header-sub">用户权限分配与角色管理</text>
+    </view>
 
-  <!-- 页面标题 -->
-  <view class="page-header">
-    <text class="page-header-title">权限管理</text>
-    <text class="page-header-sub">用户权限分配与角色管理</text>
-  </view>
-
-  <!-- 所有用户列表 -->
-  <view class="section">
     <view class="section-title">
       <text>用户列表</text>
       <view class="section-title-right">
         <view class="admin-refresh" bindtap="onRefreshTap">
           <image class="icon-img-sm" src="/images/icons/refresh.svg" mode="aspectFit"/>
         </view>
-        <text class="user-count">{{keyword ? _filteredTotal : allUsers.length}} 人</text>
+        <text class="user-count">{{total}} 人</text>
       </view>
     </view>
 
-    <!-- 搜索栏 -->
     <view class="search-bar">
       <input class="search-input" placeholder="搜索昵称或OpenID" value="{{keyword}}" bindinput="onKeywordInput" />
       <view class="search-clear" wx:if="{{keyword}}" bindtap="onClearKeyword">
@@ -28,12 +25,14 @@
     </view>
 
     <text class="subtitle" wx:if="{{isSuperAdmin}}">点击用户即可调整权限（管理员/超级管理员）</text>
+  </view>
 
-    <view class="loading-state" wx:if="{{loading}}">
-      <text>加载中...</text>
-    </view>
+  <!-- 用户列表区 -->
+  <view class="loading-state" wx:if="{{loading}}">
+    <text>加载中...</text>
+  </view>
 
-    <view class="user-list" wx:else>
+  <view class="user-list" wx:elif="{{users.length > 0}}">
       <view class="user-item" wx:for="{{users}}" wx:key="_id">
         <view class="user-info">
           <view class="user-badge {{item.role === 'super_admin' ? 'badge-super' : (item.role === 'admin' ? 'badge-admin' : 'badge-user')}}">
@@ -68,30 +67,29 @@
           </view>
         </view>
       </view>
+    </view>
 
-      <view class="empty-state" wx:if="{{users.length === 0 && !loading}}">
-        <text class="empty-text">{{keyword ? '未找到匹配的用户' : '暂无用户数据'}}</text>
-        <text class="empty-hint">{{keyword ? '请尝试其他关键词' : '其他用户打开小程序后会自动注册并出现在这里'}}</text>
+    <view class="empty-state" wx:elif="{{users.length === 0}}">
+      <text class="empty-text">{{keyword ? '未找到匹配的用户' : '暂无用户数据'}}</text>
+      <text class="empty-hint">{{keyword ? '请尝试其他关键词' : '其他用户打开小程序后会自动注册并出现在这里'}}</text>
+    </view>
+
+    <view class="pagination" wx:if="{{totalPages > 1}}">
+      <view class="page-btn {{currentPage <= 1 ? 'page-btn-disabled' : ''}}" bindtap="prevPage">
+        <text>上一页</text>
       </view>
-
-      <!-- 翻页按钮 -->
-      <view class="pagination" wx:if="{{totalPages > 1}}">
-        <view class="page-btn {{currentPage <= 1 ? 'page-btn-disabled' : ''}}" bindtap="prevPage">
-          <text>上一页</text>
-        </view>
-        <text class="page-info">{{currentPage}} / {{totalPages}}</text>
-        <view class="page-btn {{currentPage >= totalPages ? 'page-btn-disabled' : ''}}" bindtap="nextPage">
-          <text>下一页</text>
-        </view>
+      <text class="page-info">{{currentPage}} / {{totalPages}}</text>
+      <view class="page-btn {{currentPage >= totalPages ? 'page-btn-disabled' : ''}}" bindtap="nextPage">
+        <text>下一页</text>
       </view>
     </view>
-  </view>
 
-  <!-- 邀请说明 -->
-  <view class="section section-hint">
-    <text class="hint-title">怎么让别人注册？</text>
-    <text class="hint-desc">让对方打开小程序即可自动注册。注册后你就能在这里看到他，点击设为管理员。</text>
-  </view>
+    <!-- 邀请说明 -->
+    <view class="section-hint">
+      <text class="hint-title">怎么让别人注册？</text>
+      <text class="hint-desc">让对方打开小程序即可自动注册。注册后你就能在这里看到他，点击设为管理员。</text>
+    </view>
 
+  <!-- modal -->
   <modal id="modal"></modal>
 </view>

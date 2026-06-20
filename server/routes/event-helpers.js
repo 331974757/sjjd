@@ -2,20 +2,9 @@
  * 赛事系统公共工具函数
  * 供所有子路由模块共享使用
  */
-const crypto = require('crypto');
+const { genId, safeRollback } = require('../utils/helpers');
 
 // ———— 纯工具函数 ————
-
-/** 安全随机 ID 生成器 */
-function genId() {
-  return crypto.randomBytes(16).toString('hex');
-}
-
-/** 安全回滚辅助 */
-async function safeRollback(conn, ctx) {
-  try { await conn.rollback(); }
-  catch (e) { console.error(`[tx:rollback:${ctx}]`, e.message); }
-}
 
 /** 根据是否归档返回对应表名 */
 function tableFor(baseName, isArchived) {
@@ -191,7 +180,7 @@ module.exports = function (deps) {
       const [userRows] = await pool.query('SELECT nick_name FROM users WHERE openid = ?', [openid]);
       const userNick = (userRows.length && userRows[0].nick_name) ? userRows[0].nick_name : '';
       if (!userNick) return null;
-      const [playerRows] = await pool.query("SELECT id FROM dota2_players WHERE wx_nickname = ? AND status = 'active'", [userNick]);
+      const [playerRows] = await pool.query("SELECT id FROM dota2_players WHERE wx_nickname = ? AND status = 'active'", [userNick.trim()]);
       if (playerRows.length === 1) return playerRows[0].id;
       return null;
     } catch (_) { return null; }

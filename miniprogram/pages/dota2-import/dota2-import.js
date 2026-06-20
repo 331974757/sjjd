@@ -22,7 +22,7 @@ Page({
       const isAdmin = await perm.isAdmin()
       if (!isAdmin) {
         this.setData({ accessChecked: true, accessDenied: true })
-        modal.confirm(this, {
+        await modal.confirm(this, {
           theme: 'warning',
           title: '仅管理员可导入',
           content: '请联系管理员操作',
@@ -280,49 +280,50 @@ Page({
     const uploadUrl = api.API_BASE + '/players/import/xlsx'
 
     wx.showLoading({ title: '上传解析中...' })
-    wx.uploadFile({
-      url: uploadUrl,
-      filePath: this.data.filePath,
-      name: 'file',
-      header: api.getUploadHeaders(),
-      success: (uploadRes) => {
-        wx.hideLoading()
-        try {
-          const result = JSON.parse(uploadRes.data)
-          this.setData({
-            importing: false,
-            importDone: true,
-            importedCount: result.imported || 0,
-            replacedCount: result.updated || 0,
-            failCount: result.failed || 0
-          })
-          // 通知首页下次返回时刷新
-          this._notifyHomeRefresh()
-          if (result.errors && result.errors.length > 0) {
-            this.setData({ errorRows: result.errors })
-          }
-          let tip = '导入完成！'
-          if (result.updated > 0) tip = '导入完成，更新' + result.updated + '条已有记录'
-          wx.showToast({ title: tip, icon: 'success' })
-        } catch (e) {
-          wx.showToast({ title: '解析失败', icon: 'none' })
-        }
-      },
-      fail: () => {
-        wx.hideLoading()
-        this.setData({ importing: false })
-        wx.showToast({ title: '上传失败', icon: 'none' })
+    try {
+      const uploadRes = await new Promise((resolve, reject) => {
+        wx.uploadFile({
+          url: uploadUrl,
+          filePath: this.data.filePath,
+          name: 'file',
+          header: api.getUploadHeaders(),
+          success: resolve,
+          fail: reject
+        })
+      })
+      wx.hideLoading()
+      const result = JSON.parse(uploadRes.data)
+      this.setData({
+        importing: false,
+        importDone: true,
+        importedCount: result.imported || 0,
+        replacedCount: result.updated || 0,
+        failCount: result.failed || 0
+      })
+      this._notifyHomeRefresh()
+      if (result.errors && result.errors.length > 0) {
+        this.setData({ errorRows: result.errors })
       }
-    })
+      let tip = '导入完成！'
+      if (result.updated > 0) tip = '导入完成，更新' + result.updated + '条已有记录'
+      wx.showToast({ title: tip, icon: 'success' })
+    } catch (e) {
+      wx.hideLoading()
+      this.setData({ importing: false })
+      wx.showToast({ title: '上传失败', icon: 'none' })
+    }
   },
 
   // 通知首页下次 onShow 时刷新数据
   _notifyHomeRefresh() {
-    const pages = getCurrentPages()
-    // 【修复】使用 find 查找首页，避免硬编码索引
-    const homePage = pages.find(p => p.route && p.route.indexOf('pages/index/index') !== -1)
-    if (homePage && homePage.loadAllPlayers) {
-      homePage._needsReload = true
+    try {
+      const pages = getCurrentPages()
+      const homePage = pages.find(p => p && p.route && p.route.indexOf('pages/index/index') !== -1)
+      if (homePage && typeof homePage.loadAllPlayers === 'function') {
+        homePage._needsReload = true
+      }
+    } catch (_) {
+      // 页面栈异常时静默降级
     }
   }
 })

@@ -33,7 +33,7 @@ Page({
       const isAdmin = await perm.isAdmin()
       if (!isAdmin) {
         this.setData({ accessChecked: true, accessDenied: true })
-        modal.confirm(this, {
+        await modal.confirm(this, {
           theme: 'warning',
           title: '仅管理员可添加选手',
           content: '请联系管理员添加选手',
@@ -67,7 +67,6 @@ Page({
       success: (res) => {
         const tempPath = res.tempFiles[0].tempFilePath
         wx.showLoading({ title: '上传中...' })
-        const app = getApp()
         const uploadUrl = api.API_BASE + '/upload'
         wx.uploadFile({
           url: uploadUrl,
@@ -198,7 +197,7 @@ Page({
         wx.showToast({ title: msg, icon: 'success' })
         setTimeout(() => { wx.navigateBack() }, 800)
       } else {
-        wx.showToast({ title: res.message || '添加失败', icon: 'none' })
+        wx.showToast({ title: res.error || res.message || '添加失败', icon: 'none' })
       }
     } catch (err) {
       console.error('添加失败', err)
@@ -210,11 +209,14 @@ Page({
 
   // 通知首页下次 onShow 时刷新数据
   _notifyHomeRefresh() {
-    const pages = getCurrentPages()
-    // 【修复】使用 find 查找首页，避免硬编码索引
-    const homePage = pages.find(p => p.route && p.route.indexOf('pages/index/index') !== -1)
-    if (homePage && homePage.loadAllPlayers) {
-      homePage._needsReload = true
+    try {
+      const pages = getCurrentPages()
+      const homePage = pages.find(p => p && p.route && p.route.indexOf('pages/index/index') !== -1)
+      if (homePage && typeof homePage.loadAllPlayers === 'function') {
+        homePage._needsReload = true
+      }
+    } catch (_) {
+      // 页面栈异常时静默降级
     }
   }
 })

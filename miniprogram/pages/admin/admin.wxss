@@ -1,8 +1,8 @@
 /* pages/admin/admin.wxss */
+
 .admin-page {
-  min-height: 100vh;
   background-color: #0d1117;
-  padding: 24rpx 32rpx 60rpx;
+  padding: 24rpx 32rpx 120rpx;
 }
 
 /* ===== 页面标题 ===== */
@@ -157,16 +157,23 @@
   margin-top: 8rpx;
 }
 
-/* User List */
+/* User List - 卡片式 */
+.user-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
 .user-item {
   display: flex;
   flex-direction: row;
   justify-content: space-between;
   align-items: center;
-  padding: 24rpx;
+  padding: 28rpx 24rpx;
   background-color: #161b22;
+  border: 1rpx solid rgba(255, 255, 255, 0.06);
   border-radius: 16rpx;
-  margin-bottom: 12rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.15);
 }
 
 .user-info {

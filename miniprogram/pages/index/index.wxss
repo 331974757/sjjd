@@ -65,174 +65,6 @@
 
 /* 首页 */
 
-/* 用户身份卡片 */
-.home-card {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  padding: 28rpx 36rpx;
-  background: linear-gradient(135deg, rgba(79, 140, 255, 0.12), rgba(124, 92, 252, 0.08));
-  border: 1rpx solid rgba(79, 140, 255, 0.15);
-  border-radius: 20rpx;
-  margin: 0 36rpx 20rpx;
-}
-
-.home-avatar {
-  width: 80rpx;
-  height: 80rpx;
-  border-radius: 50%;
-  border: 2rpx solid rgba(79, 140, 255, 0.3);
-  flex-shrink: 0;
-  margin-right: 20rpx;
-}
-
-.home-card-body {
-  flex: 1;
-  overflow: hidden;
-}
-
-.home-nick-row {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  margin-bottom: 6rpx;
-}
-
-.home-nick {
-  font-size: 34rpx;
-  font-weight: 700;
-  color: #f0f6fc;
-  margin-right: 12rpx;
-}
-
-.home-role-tag {
-  padding: 2rpx 14rpx;
-  border-radius: 8rpx;
-  font-size: 20rpx;
-  font-weight: 600;
-  flex-shrink: 0;
-}
-
-.tag-super {
-  background-color: rgba(155, 89, 182, 0.2);
-  color: #bb86fc;
-  border: 1rpx solid rgba(155, 89, 182, 0.3);
-}
-
-.tag-admin {
-  background-color: rgba(52, 152, 219, 0.2);
-  color: #3498db;
-  border: 1rpx solid rgba(52, 152, 219, 0.3);
-}
-
-.tag-user {
-  background-color: rgba(119, 141, 169, 0.15);
-  color: #778da9;
-  border: 1rpx solid rgba(119, 141, 169, 0.2);
-}
-
-.home-nick-info, .home-nick-count {
-  font-size: 22rpx;
-  color: #8b949e;
-}
-
-.home-openid-row {
-  margin-top: 8rpx;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-}
-
-.home-openid-label {
-  font-size: 20rpx;
-  color: #484f58;
-  margin-right: 4rpx;
-}
-
-.home-openid-value {
-  font-size: 20rpx;
-  color: #3498db;
-}
-
-/* 快捷操作 */
-.home-actions {
-  display: flex;
-  flex-direction: row;
-  padding: 0 36rpx 24rpx;
-  gap: 16rpx;
-}
-
-.ha-btn {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 20rpx 12rpx;
-  background-color: rgba(255, 255, 255, 0.04);
-  border: 1rpx solid rgba(255, 255, 255, 0.06);
-  border-radius: 16rpx;
-  transition: all 0.15s ease;
-}
-
-.ha-btn:active {
-  background-color: rgba(79, 140, 255, 0.12);
-  border-color: rgba(79, 140, 255, 0.25);
-}
-
-.ha-icon {
-  font-size: 36rpx;
-  margin-bottom: 6rpx;
-}
-
-.ha-label {
-  font-size: 24rpx;
-  color: #e6edf3;
-  font-weight: 500;
-}
-
-/* 管理团队列表 */
-.home-admin-list {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 12rpx;
-  padding: 0 36rpx;
-}
-
-.home-admin-item {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  padding: 10rpx 20rpx;
-  background-color: #161b22;
-  border-radius: 10rpx;
-  border: 1rpx solid #21262d;
-}
-
-.home-admin-role {
-  font-size: 20rpx;
-  font-weight: 600;
-  padding: 2rpx 10rpx;
-  border-radius: 6rpx;
-  margin-right: 8rpx;
-}
-
-.super-label {
-  background-color: rgba(155, 89, 182, 0.15);
-  color: #bb86fc;
-}
-
-.admin-label {
-  background-color: rgba(52, 152, 219, 0.15);
-  color: #3498db;
-}
-
-.home-admin-name {
-  font-size: 26rpx;
-  color: #e6edf3;
-}
-
 /* 全局工具栏 */
 .global-toolbar {
   display: flex;
@@ -406,8 +238,6 @@
   flex-shrink: 0;
   margin-left: 6rpx;
 }
-
-/* ===== 旧样式占位（已废弃，保留以防外部引用） ===== */
 
 /* ===== 模块4：赛事动态 ===== */
 .ed-item {
@@ -1340,10 +1170,6 @@
   font-weight: 700;
   color: #ffffff;
 }
-.admin-modal-count {
-  font-size: 24rpx;
-  color: #8b949e;
-}
 
 /* 管理员列表 */
 .admin-list {
@@ -1472,19 +1298,11 @@
 .umg-stat-admin { color: #58a6ff; }
 .umg-stat-user  { color: #7ee787; }
 
-.umg-toolbar {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16rpx;
-}
 .umg-search {
   margin-bottom: 12rpx;
 }
 .umg-list {
   height: 520rpx;
-  overflow-y: auto;
 }
 .umg-hint {
   padding: 16rpx 0 0;
@@ -2206,31 +2024,13 @@
   color: #8b949e;
 }
 
-/* ===== 首页 - 用户管理（复用admin页面样式） ===== */
-.section { margin-bottom: 32rpx; }
-.section-title {
-  display: flex; flex-direction: row; justify-content: space-between; align-items: center;
-  font-size: 32rpx; font-weight: 700; color: #e6edf3;
-  padding: 0 36rpx; margin-bottom: 16rpx;
-}
-.section-title-right { display: flex; align-items: center; gap: 12rpx; }
-.admin-refresh {
-  width: 44rpx; height: 44rpx; border-radius: 22rpx;
-  display: flex; align-items: center; justify-content: center;
-  background-color: rgba(255,255,255,0.04); border: 1rpx solid rgba(255,255,255,0.08);
-}
-.admin-refresh:active { background-color: rgba(31,111,235,0.3); transform: scale(0.92); }
-.icon-img-sm { width: 28rpx; height: 28rpx; }
-.user-count { font-size: 24rpx; color: #484f58; font-weight: 400; }
-.subtitle { display: block; font-size: 22rpx; color: #484f58; padding: 0 36rpx; margin-bottom: 16rpx; }
+/* ===== 首页 - 用户管理（权限弹窗内列表样式） ===== */
 
 /* 搜索结果区（权限管理弹窗内搜索复用上方 .search-bar/.search-input） */
-.home-search-bar { position: relative; margin: 0 36rpx 20rpx; }
 .umg-search { margin: 0 0 12rpx; }
 .umg-search .search-input { height: 72rpx; background-color: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.08); }
 
-/* 用户列表 */
-.user-list { padding: 0 36rpx; }
+/* 用户列表项 */
 .user-item {
   display: flex; flex-direction: row; justify-content: space-between; align-items: center;
   padding: 24rpx; background-color: #161b22; border-radius: 16rpx; margin-bottom: 12rpx;
@@ -2251,7 +2051,6 @@
 .nick-count-info { margin-left: 8rpx; }
 .nick-count-text { font-size: 20rpx; color: #8b949e; }
 .user-nick.unregistered { color: #484f58; font-style: italic; }
-.user-created { font-size: 20rpx; color: #484f58; margin-left: 8rpx; flex-shrink: 0; }
 
 /* 操作按钮 */
 .user-actions { display: flex; flex-direction: row; flex-shrink: 0; margin-left: 12rpx; }
@@ -2275,16 +2074,6 @@
 .page-btn-disabled { background-color: rgba(119,141,169,0.06); border-color: rgba(119,141,169,0.12); color: #415a77; }
 .page-btn:active:not(.page-btn-disabled) { background-color: rgba(52,152,219,0.22); }
 .page-info { font-size: 24rpx; color: #8b949e; }
-
-/* 提示区块 */
-.section-hint {
-  padding: 24rpx 36rpx; margin: 0 36rpx; background-color: rgba(52,152,219,0.08);
-  border: 1rpx solid rgba(52,152,219,0.15); border-radius: 12rpx;
-}
-.hint-title { display: block; font-size: 26rpx; font-weight: 600; color: #3498db; margin-bottom: 8rpx; }
-.hint-desc { display: block; font-size: 22rpx; color: #8b949e; line-height: 1.6; }
-
-/* ===== 重复样式已合并到上方加载状态 ===== */
 
 /* ===== 首页加载失败提示 ===== */
 .home-load-error {
@@ -2325,7 +2114,7 @@
 /* ===== 公告编辑弹窗 ===== */
 .ann-modal-mask {
   position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-  background-color: rgba(0,0,0,0.65); z-index: 9999;
+  background-color: rgba(0,0,0,0.65); z-index: 10000;
   display: flex; align-items: center; justify-content: center;
 }
 .ann-modal {

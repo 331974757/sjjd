@@ -92,38 +92,33 @@ Page({
       count: 1,
       mediaType: ['image'],
       sourceType: ['album', 'camera'],
-      success: async (res) => {
+      success: (res) => {
         const tempPath = res.tempFiles[0].tempFilePath
         wx.showLoading({ title: '上传中...' })
-        try {
-          const uploadUrl = api.API_BASE + '/upload'
-          wx.uploadFile({
-            url: uploadUrl,
-            filePath: tempPath,
-            name: 'file',
-            header: api.getUploadHeaders(),
-            success: (uploadRes) => {
-              try {
-                const data = JSON.parse(uploadRes.data)
-                if (data.success && data.data && data.data.url) {
-                  const fullUrl = api.API_BASE.replace(/\/api$/, '') + data.data.url
-                  this.updateField('avatarUrl', fullUrl)
-                } else {
-                  wx.showToast({ title: data.error || '上传失败', icon: 'none' })
-                }
-              } catch (e) {
-                wx.showToast({ title: '上传失败', icon: 'none' })
+        const uploadUrl = api.API_BASE + '/upload'
+        wx.uploadFile({
+          url: uploadUrl,
+          filePath: tempPath,
+          name: 'file',
+          header: api.getUploadHeaders(),
+          success: (uploadRes) => {
+            try {
+              const data = JSON.parse(uploadRes.data)
+              if (data.success && data.data && data.data.url) {
+                const fullUrl = api.API_BASE.replace(/\/api$/, '') + data.data.url
+                this.updateField('avatarUrl', fullUrl)
+              } else {
+                wx.showToast({ title: data.error || '上传失败', icon: 'none' })
               }
-            },
-            fail: () => {
-              wx.showToast({ title: '上传失败，请检查网络', icon: 'none' })
-            },
-            complete: () => { wx.hideLoading() }
-          })
-        } catch (e) {
-          wx.hideLoading()
-          wx.showToast({ title: '获取身份信息失败', icon: 'none' })
-        }
+            } catch (e) {
+              wx.showToast({ title: '上传失败', icon: 'none' })
+            }
+          },
+          fail: () => {
+            wx.showToast({ title: '上传失败，请检查网络', icon: 'none' })
+          },
+          complete: () => { wx.hideLoading() }
+        })
       }
     })
   },
@@ -310,7 +305,7 @@ Page({
         // 不可变更新：展开旧对象 + 覆盖字段
         this.setData({ player: { ...this.data.player, [field]: value } })
       } else {
-        wx.showToast({ title: res.message || res.error || '更新失败', icon: 'none' })
+        wx.showToast({ title: res.error || res.message || '更新失败', icon: 'none' })
       }
     } catch (err) {
       wx.hideLoading()
@@ -333,7 +328,7 @@ Page({
         // 不可变更新
         this.setData({ player: { ...this.data.player, ...data } })
       } else {
-        wx.showToast({ title: res.message || res.error || '更新失败', icon: 'none' })
+        wx.showToast({ title: res.error || res.message || '更新失败', icon: 'none' })
       }
     } catch (err) {
       wx.hideLoading()
@@ -367,7 +362,7 @@ Page({
         wx.showToast({ title: '已删除', icon: 'success' })
         setTimeout(() => { wx.navigateBack() }, 800)
       } else {
-        wx.showToast({ title: res.message || res.error || '删除失败', icon: 'none' })
+        wx.showToast({ title: res.error || res.message || '删除失败', icon: 'none' })
       }
     } catch (err) {
       wx.hideLoading()

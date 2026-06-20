@@ -98,12 +98,14 @@ module.exports = {
     },
 
     async loadMoreEvents() {
-      if (this.data.eventLoadingMore || !this.data.eventHasMore) return
+      if (this._loadingMoreEvents || this.data.eventLoadingMore || !this.data.eventHasMore) return
+      this._loadingMoreEvents = true
       const nextPage = (this.data.eventPage || 1) + 1
       this.setData({ eventLoadingMore: true, eventPage: nextPage })
       try {
         await this.loadEvents(false)
       } finally {
+        this._loadingMoreEvents = false
         this.setData({ eventLoadingMore: false })
       }
     },
@@ -182,6 +184,7 @@ module.exports = {
         createEventLimit: 0,
         createEventLimitCustom: ''
       })
+      this._lockPage()
     },
 
     closeCreateEventModal() {
@@ -193,6 +196,7 @@ module.exports = {
         createEventLimitCustom: '',
         createDateTimeText: ''
       })
+      this._unlockPage()
     },
 
     onCreateEventNameInput(e) {
@@ -265,6 +269,7 @@ module.exports = {
 
         if (res.success) {
           this.setData({ showCreateModal: false })
+          this._unlockPage()
           modal.toast(this, { theme: 'success', content: '赛事创建成功', duration: 1500 })
           this.loadRuleEvents()
 

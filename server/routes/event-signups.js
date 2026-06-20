@@ -58,7 +58,7 @@ module.exports = function (app, h) {
       if (!openid) return res.json({ success: true, signed: false });
 
       const [userRows] = await h.pool.query('SELECT nick_name FROM users WHERE openid = ?', [openid]);
-      const userNick = (userRows.length && userRows[0].nick_name) ? userRows[0].nick_name : '';
+      const userNick = (userRows.length && userRows[0].nick_name) ? userRows[0].nick_name.trim() : '';
       if (!userNick) return res.json({ success: true, signed: false, reason: 'no_nickname' });
 
       const [playerRows] = await h.pool.query(
@@ -290,7 +290,7 @@ module.exports = function (app, h) {
       const isAdmin = role === 'admin' || role === 'super_admin';
       if (!isAdmin) {
         const [userRows] = await h.pool.query('SELECT nick_name FROM users WHERE openid = ?', [openid]);
-        const userNick = (userRows.length && userRows[0].nick_name) ? userRows[0].nick_name : '';
+        const userNick = (userRows.length && userRows[0].nick_name) ? userRows[0].nick_name.trim() : '';
         if (!userNick) return res.status(403).json({ success: false, error: '您没有权限取消此报名' });
         const [playerRows] = await h.pool.query(
           "SELECT id FROM dota2_players WHERE wx_nickname = ? AND status = 'active'", [userNick]

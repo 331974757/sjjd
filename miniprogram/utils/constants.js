@@ -8,7 +8,7 @@ const MORE_PAGE_SIZE = 10
 const NICK_CHANGE_LIMIT = 3
 
 // 数字补零
-const pad = n => String(n).padStart(2, '0')
+const pad = n => String(n ?? '').padStart(2, '0')
 
 module.exports = {
   PAGE_SIZE,

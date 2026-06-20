@@ -98,8 +98,6 @@ module.exports = {
       }
     },
 
-    homeRefreshUsers() { this.homeLoadUsers() },
-
     onHomeKeywordInput(e) {
       const value = e.detail.value.trim()
       if (this._homeSearchTimer) clearTimeout(this._homeSearchTimer)
@@ -122,9 +120,9 @@ module.exports = {
       list.sort((a, b) => {
         const roleDiff = (roleOrder[a.role] ?? 99) - (roleOrder[b.role] ?? 99)
         if (roleDiff !== 0) return roleDiff
-        const ta = String(a.createdAt || '')
-        const tb = String(b.createdAt || '')
-        return ta > tb ? -1 : ta < tb ? 1 : 0
+        const ta = new Date(a.createdAt).getTime() || 0
+        const tb = new Date(b.createdAt).getTime() || 0
+        return tb - ta
       })
       const kw = this.data.homeKeyword.toLowerCase()
       if (kw) {
@@ -197,7 +195,7 @@ module.exports = {
       try {
         const res = await api.put('/users/' + openid + '/role', { role })
         wx.hideLoading()
-        modal.toast(this, { theme: res.success ? 'success' : 'danger', content: res.success ? '已' + label : (res.message || '失败') })
+        modal.toast(this, { theme: res.success ? 'success' : 'danger', content: res.success ? '已' + label : (res.error || res.message || '失败') })
         if (res.success) this.homeLoadUsers()
       } catch (e) {
         wx.hideLoading()
@@ -218,7 +216,7 @@ module.exports = {
       try {
         const res = await api.put('/users/' + openid + '/reset-nickcount')
         wx.hideLoading()
-        modal.toast(this, { theme: res.success ? 'success' : 'danger', content: res.success ? '已重置' : (res.message || '失败') })
+        modal.toast(this, { theme: res.success ? 'success' : 'danger', content: res.success ? '已重置' : (res.error || res.message || '失败') })
         if (res.success) this.homeLoadUsers()
       } catch (e) {
         wx.hideLoading()
@@ -246,7 +244,13 @@ module.exports = {
           homeAnnounceText: (annRes && annRes.success && annRes.data)
             ? annRes.data.map(function(a, i) { return (a.is_pinned ? '📌' : '') + a.content; }).join('　　|　　')
             : '',
-          eventDynamicList: (dynRes && dynRes.success) ? (dynRes.data || []) : [],
+          eventDynamicList: (dynRes && dynRes.success) ? (dynRes.data || []).map(e => ({
+            id: e.id,
+            event_name: e.event_name,
+            status: e.status,
+            event_time: e.event_time,
+            signup_count: e.signup_count || 0
+          })) : [],
           homeStats: (statsRes && statsRes.success) ? Object.assign({
             registeredPlayers: 0, totalEvents: 0, activeEvents: 0, finishedEvents: 0
           }, statsRes.data) : { registeredPlayers: 0, totalEvents: 0, activeEvents: 0, finishedEvents: 0 },
@@ -261,39 +265,34 @@ module.exports = {
       }
     },
 
-    async refreshHomeData() {
-      this.setData({ homeDataLoaded: false })
-      await this.loadHomeData()
-      modal.toast(this, { theme: 'success', content: '已刷新', duration: 1000 })
-    },
-
     // ====== 首页跳转方法 ======
     goEditIntro() {
       wx.navigateTo({ url: '/pages/home-edit/home-edit' })
     },
 
-    preventInputClose() {
-      // 阻止输入框点击冒泡到遮罩层关闭弹窗
-    },
-
     goManageAnnounce() {
-      this.setData({ showAnnounceModal: true, pageLocked: true })
+      this.setData({ showAnnounceModal: true })
+      this._lockPage()
       this.loadAnnounceForEdit()
     },
 
     showUserMgmtModal() {
-      this.setData({ showUserMgmtModal: true, pageLocked: true })
+      this.setData({ showUserMgmtModal: true })
+      this._lockPage()
       this.homeLoadUsers()
     },
 
     closeUserMgmtModal() {
-      this.setData({ showUserMgmtModal: false, pageLocked: false })
+      this.setData({ showUserMgmtModal: false })
+      this._unlockPage()
     },
 
     // ====== 公告编辑弹窗方法 ======
     async loadAnnounceForEdit() {
+      wx.showLoading({ title: '加载中...' })
       try {
         const res = await api.get('/announcements')
+        wx.hideLoading()
         const list = (res && res.success) ? (res.data || []) : []
         // 只取最新一条
         const latest = list[0]
@@ -301,6 +300,7 @@ module.exports = {
           this.setData({ annEditId: latest.id, annEditContent: latest.content || '' })
         }
       } catch (e) {
+        wx.hideLoading()
         console.error('[home] 加载公告失败', e)
       }
     },
@@ -313,7 +313,8 @@ module.exports = {
     /** 关闭弹窗 */
     annCloseModal() {
       if (this.data.annOperating) return
-      this.setData({ showAnnounceModal: false, pageLocked: false })
+      this.setData({ showAnnounceModal: false })
+      this._unlockPage()
     },
 
     /** 保存 */
@@ -333,10 +334,11 @@ module.exports = {
         wx.hideLoading()
         if (res && res.success) {
           modal.toast(this, { theme: 'success', content: '已保存' })
-          this.setData({ showAnnounceModal: false, pageLocked: false })
+          this.setData({ showAnnounceModal: false })
+          this._unlockPage()
           await this.loadHomeData(true)
         } else {
-          modal.toast(this, { theme: 'danger', content: res.message || '保存失败' })
+          modal.toast(this, { theme: 'danger', content: res.error || res.message || '保存失败' })
         }
       } catch (e) {
         wx.hideLoading()

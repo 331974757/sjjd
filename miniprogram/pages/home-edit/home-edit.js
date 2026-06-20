@@ -124,7 +124,7 @@ Page({
                 this.setData({ blocks })
                 wx.showToast({ title: '上传成功', icon: 'success' })
               } else {
-                wx.showToast({ title: data.message || '上传失败', icon: 'none' })
+                wx.showToast({ title: data.error || data.message || '上传失败', icon: 'none' })
               }
             } catch (e) {
               wx.showToast({ title: '上传异常', icon: 'none' })
@@ -158,7 +158,7 @@ Page({
         // 延迟返回，让首页刷新数据
         setTimeout(() => { wx.navigateBack() }, 800)
       } else {
-        wx.showToast({ title: res.message || '保存失败', icon: 'none' })
+        wx.showToast({ title: res.error || res.message || '保存失败', icon: 'none' })
       }
     } catch (e) {
       wx.hideLoading()

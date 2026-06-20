@@ -38,7 +38,13 @@ module.exports = {
     async loadAllPlayers() {
       if (this._loading) return
       this._loading = true
-      const lockTimer = setTimeout(() => { this._loading = false }, 8000)
+      this._loadingStartTime = Date.now()
+      const lockTimer = setTimeout(() => {
+        // 保底解锁：仅当超过 30 秒且无结果时强制释放
+        if (Date.now() - (this._loadingStartTime || 0) > 30000 && !this.data.loaded) {
+          this._loading = false
+        }
+      }, 30000)
       try {
         const res = await api.get('/players', { pageSize: 1000 })
         const all = (res.data || []).map(p => ({
@@ -59,7 +65,8 @@ module.exports = {
 
     // ====== 追加更多选手 ======
     loadMore() {
-      if (this.data.loadingMore || !this.data.hasMore) return
+      if (this._loadingMore || this.data.loadingMore || !this.data.hasMore) return
+      this._loadingMore = true
       this.setData({ loadingMore: true })
       const filtered = this.data.filteredPlayers
       const current = this.data.displayPlayers
@@ -77,6 +84,7 @@ module.exports = {
       } else {
         this.setData({ loadingMore: false, hasMore: false })
       }
+      this._loadingMore = false
     },
 
     // ====== 搜索 & 筛选 ======
@@ -132,7 +140,7 @@ module.exports = {
     // ====== 筛选+排序+显示 ======
     filterAndDisplay() {
       let list = this.data.allPlayers.slice()
-      const kw = (this._searchText || '').toLowerCase()
+      const kw = (this.data._searchText || '').toLowerCase()
       const pos = this.data.positionFilter
       const rank = this.data.rankFilter
       const sort = this.data.sortFilter
@@ -351,7 +359,7 @@ module.exports = {
           this.setData({ deleteMode: false, selectedIds: {}, selectedCount: 0 })
           this.loadAllPlayers()
         } else {
-          modal.toast(this, { theme: 'danger', content: res.message || '删除失败' })
+          modal.toast(this, { theme: 'danger', content: res.error || res.message || '删除失败' })
         }
       } catch (err) {
         wx.hideLoading()
@@ -414,7 +422,7 @@ module.exports = {
           return
         }
 
-        setTimeout(async () => {
+        wx.nextTick(async () => {
           const modalRes = await modal.confirm(this, {
             theme: 'success',
             title: '导出成功',
@@ -432,7 +440,7 @@ module.exports = {
               }
             })
           }
-        }, 300)
+        })
       } catch (err) {
         wx.hideLoading()
         console.error('[导出] 异常:', err)

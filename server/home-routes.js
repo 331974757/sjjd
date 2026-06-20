@@ -9,13 +9,8 @@
  * ============================================================
  */
 
-const crypto = require('crypto');
+const { genId } = require('./utils/helpers');
 
-function genId() {
-  return crypto.randomBytes(16).toString('hex');
-}
-
-/** 将时间戳或MySQL datetime字符串转为可读字符串 */
 function formatTimestamp(ts) {
   if (!ts) return null;
   // MySQL datetime 字符串 "2026-06-21 12:00:00" 或 毫秒时间戳
@@ -143,7 +138,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
     try {
       const { content, isPinned } = req.body;
       if (!content || !content.trim()) {
-        return res.status(400).json({ success: false, message: '公告内容不能为空' });
+        return res.status(400).json({ success: false, error: '公告内容不能为空' });
       }
       const id = genId();
       // 获取当前最大 sort_order
@@ -167,14 +162,14 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
     try {
       const { content } = req.body;
       if (!content || !content.trim()) {
-        return res.status(400).json({ success: false, message: '公告内容不能为空' });
+        return res.status(400).json({ success: false, error: '公告内容不能为空' });
       }
       const [result] = await pool.query(
         'UPDATE announcements SET content = ?, updated_at = NOW() WHERE id = ?',
         [content.trim(), req.params.id]
       );
       if (result.affectedRows === 0) {
-        return res.status(404).json({ success: false, message: '公告不存在' });
+        return res.status(404).json({ success: false, error: '公告不存在' });
       }
       res.json({ success: true, message: '编辑成功' });
     } catch (e) {
@@ -189,7 +184,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
     try {
       const [result] = await pool.query('DELETE FROM announcements WHERE id = ?', [req.params.id]);
       if (result.affectedRows === 0) {
-        return res.status(404).json({ success: false, message: '公告不存在' });
+        return res.status(404).json({ success: false, error: '公告不存在' });
       }
       res.json({ success: true, message: '已删除' });
     } catch (e) {
@@ -209,7 +204,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
         [isPinned ? 1 : 0, req.params.id]
       );
       if (result.affectedRows === 0) {
-        return res.status(404).json({ success: false, message: '公告不存在' });
+        return res.status(404).json({ success: false, error: '公告不存在' });
       }
       res.json({ success: true, message: isPinned ? '已置顶' : '已取消置顶' });
     } catch (e) {
@@ -225,7 +220,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
     try {
       const { ids } = req.body;
       if (!Array.isArray(ids) || ids.length === 0) {
-        return res.status(400).json({ success: false, message: '请提供排序列表' });
+        return res.status(400).json({ success: false, error: '请提供排序列表' });
       }
       // 批量更新 sort_order：越靠前越大
       for (let i = 0; i < ids.length; i++) {

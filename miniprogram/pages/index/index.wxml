@@ -50,8 +50,6 @@
       </view>
     </view>
 
-    <!-- 模块1：图文介绍 -->
-
     <!-- 首页加载中 -->
     <view class="loading-state" wx:if="{{!homeDataLoaded && !homeLoadError}}">
       <view class="loading-spinner"></view>
@@ -175,7 +173,6 @@
     </view>
 
     </block>
-    <!-- 首页模块区块结束 -->
 
     <!-- 加载失败提示 -->
     <view class="home-load-error" wx:if="{{homeLoadError}}">
@@ -515,7 +512,7 @@
   </block>
 
   <!-- 昵称弹窗 -->
-  <view class="nick-modal-mask" wx:if="{{showNickModal}}" catchtouchmove="preventMove">
+  <view class="nick-modal-mask" wx:if="{{showNickModal}}" catchtouchmove="preventMove" catchtap="">
     <view class="nick-modal">
       <view class="nick-modal-close" bindtap="closeNickModal">
         <text class="nick-close-icon">✕</text>
@@ -550,7 +547,7 @@
   </view>
 
   <!-- 新建赛事弹窗 -->
-  <view class="event-create-mask" wx:if="{{showCreateModal}}" catchtouchmove="preventMove">
+  <view class="event-create-mask" wx:if="{{showCreateModal}}" catchtouchmove="preventMove" catchtap="">
     <view class="event-create-modal" catchtap="">
       <!-- 关闭按钮 -->
       <view class="ecm-close" bindtap="closeCreateEventModal">
@@ -641,9 +638,9 @@
   </view>
 
   <!-- 管理员信息弹窗 -->
-  <view class="admin-modal-mask" wx:if="{{showAdminModal}}" catchtouchmove="preventMove" bindtap="closeAdminModal">
+  <view class="admin-modal-mask" wx:if="{{showAdminModal}}" catchtouchmove="preventMove" catchtap="">
     <view class="admin-modal" catchtap="">
-      <view class="admin-modal-close" bindtap="closeAdminModal">
+      <view class="admin-modal-close" catchtap="closeAdminModal">
         <text class="admin-close-icon">✕</text>
       </view>
       <text class="admin-modal-title">管理员列表</text>
@@ -680,7 +677,7 @@
 
   <!-- 权限管理弹窗（仅超管可见） -->
   <view class="admin-modal-mask" wx:if="{{showUserMgmtModal}}" catchtouchmove="preventMove" catchtap="">
-    <view class="umg-modal" catchtap="preventInputClose">
+    <view class="umg-modal" catchtap="">
       <view class="admin-modal-close" catchtap="closeUserMgmtModal">
         <text class="admin-close-icon">✕</text>
       </view>
@@ -709,7 +706,7 @@
       </view>
 
       <!-- 用户列表 -->
-      <view class="umg-list" wx:else>
+      <scroll-view class="umg-list" scroll-y enhanced show-scrollbar="{{false}}" wx:else>
         <view class="user-item" wx:for="{{homeUsers}}" wx:key="openid">
           <view class="user-info">
             <view class="user-badge {{item.role === 'super_admin' ? 'badge-super' : (item.role === 'admin' ? 'badge-admin' : 'badge-user')}}">
@@ -749,6 +746,8 @@
           <text class="empty-hint">{{homeKeyword ? '请尝试其他关键词' : '其他用户打开小程序后会自动注册并出现在这里'}}</text>
         </view>
 
+      </scroll-view>
+
         <!-- 翻页 -->
         <view class="pagination" wx:if="{{homeTotalPages > 1}}">
           <view class="page-btn {{homePage <= 1 ? 'page-btn-disabled' : ''}}" bindtap="homePrevPage">
@@ -759,7 +758,6 @@
             <text>下一页</text>
           </view>
         </view>
-      </view>
 
       <!-- 提示 -->
       <view class="umg-hint">
@@ -769,8 +767,8 @@
   </view>
 
   <!-- 公告编辑弹窗 -->
-  <view class="ann-modal-mask" wx:if="{{showAnnounceModal}}" catchtouchmove="preventMove" bindtap="annCloseModal"></view>
-  <view class="ann-modal" wx:if="{{showAnnounceModal}}" catchtap="">
+  <view class="ann-modal-mask" wx:if="{{showAnnounceModal}}" catchtouchmove="preventMove" catchtap=""></view>
+  <view class="ann-modal" wx:if="{{showAnnounceModal}}" catchtap="" catchtouchmove="preventMove">
     <view class="ann-topbar">
       <text class="ann-title">编辑公告</text>
       <view class="ann-close-btn" bindtap="annCloseModal">
