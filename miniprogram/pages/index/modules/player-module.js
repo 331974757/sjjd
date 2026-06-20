@@ -14,7 +14,6 @@ const RANK_COLORS = R.RANK_COLORS
 module.exports = {
   data: {
     allPlayers: [],
-    filteredPlayers: [],
     displayPlayers: [],
     positionFilter: 'all',
     rankFilter: 'all',
@@ -22,9 +21,8 @@ module.exports = {
     filteredCount: 0,
     loaded: false,
     pageSize: C.PAGE_SIZE,
-    morePageSize: C.MORE_PAGE_SIZE,
+    currentPage: 1,
     hasMore: false,
-    loadingMore: false,
     _searchText: '',
     showChart: false,
     rankDistribution: [],
@@ -34,156 +32,104 @@ module.exports = {
   },
 
   methods: {
-    // ====== 全量拉取选手数据 ======
-    async loadAllPlayers() {
+    // ====== 服务端分页加载选手数据 ======
+    async loadAllPlayers(reset = true) {
       if (this._loading) return
       this._loading = true
-      this._loadingStartTime = Date.now()
-      const lockTimer = setTimeout(() => {
-        // 保底解锁：仅当超过 30 秒且无结果时强制释放
-        if (Date.now() - (this._loadingStartTime || 0) > 30000 && !this.data.loaded) {
-          this._loading = false
-        }
-      }, 30000)
+      if (reset) {
+        this.setData({ displayPlayers: [], loaded: false, hasMore: false, currentPage: 1 })
+      }
       try {
-        const res = await api.get('/players', { pageSize: 1000 })
-        const all = (res.data || []).map(p => ({
+        const params = {
+          page: reset ? 1 : (this.data.currentPage || 1),
+          pageSize: this.data.pageSize,
+          sortBy: 'rank', sortOrder: 'desc'
+        }
+        const kw = this.data._searchText || ''
+        if (kw) params.keyword = kw
+        const pos = this.data.positionFilter
+        if (pos !== 'all') params.position = pos
+        const rank = this.data.rankFilter
+        if (rank !== 'all') params.rank = rank
+
+        const res = await api.get('/players', params)
+        const list = (res.data || []).map(p => ({
           ...p,
-          calibrateRankName: R.normalizeRankName(p.calibrateRankName)
+          calibrateRankName: R.normalizeRankName(p.calibrateRankName),
+          _rankIcon: R.getRankIcon(p.calibrateRankName),
+          _rankIconIsImg: R.isRankIconImage(R.getRankIcon(p.calibrateRankName)),
         }))
-        this.setData({ allPlayers: all, loaded: true })
-        this.filterAndDisplay()
+        this.setData({
+          displayPlayers: reset ? list : [...this.data.displayPlayers, ...list],
+          loaded: true,
+          hasMore: (res.page * res.pageSize) < (res.total || 0),
+          currentPage: res.page || 1,
+          filteredCount: res.total || list.length,
+        })
+        // 缓存全量数据用于饼图/导出（最多 500 人）
+        if (reset && (res.total || 0) <= 500) {
+          this.setData({ allPlayers: list })
+        }
       } catch (err) {
         console.error('[选手数据] 加载失败', err)
         this.setData({ loaded: true })
         modal.toast(this, { theme: 'danger', content: '加载失败' })
       } finally {
-        clearTimeout(lockTimer)
         this._loading = false
       }
     },
 
-    // ====== 追加更多选手 ======
+    // ====== 加载更多（滚底加载下一页） ======
     loadMore() {
-      if (this._loadingMore || this.data.loadingMore || !this.data.hasMore) return
-      this._loadingMore = true
-      this.setData({ loadingMore: true })
-      const filtered = this.data.filteredPlayers
-      const current = this.data.displayPlayers
-      const moreSize = this.data.morePageSize
-      const nextItems = filtered.slice(current.length, current.length + moreSize).map(p => {
-        const icon = R.getRankIcon(p.calibrateRankName)
-        return { ...p, _rankIcon: icon, _rankIconIsImg: R.isRankIconImage(icon) }
-      })
-      if (nextItems.length > 0) {
-        this.setData({
-          displayPlayers: current.concat(nextItems),
-          loadingMore: false,
-          hasMore: current.length + nextItems.length < filtered.length
-        })
-      } else {
-        this.setData({ loadingMore: false, hasMore: false })
-      }
-      this._loadingMore = false
+      if (this._loading || !this.data.hasMore) return
+      this.setData({ currentPage: (this.data.currentPage || 1) + 1 })
+      this.loadAllPlayers(false)
     },
 
-    // ====== 搜索 & 筛选 ======
+    // ====== 搜索/筛选/排序（触发服务端查询） ======
     onKeywordInput(e) {
       const val = e.detail.value || ''
-      this._searchText = val
       this.setData({ _searchText: val })
       if (this._searchTimer) clearTimeout(this._searchTimer)
-      this._searchTimer = setTimeout(() => { this.filterAndDisplay() }, 300)
+      this._searchTimer = setTimeout(() => { this.loadAllPlayers(true) }, 300)
     },
 
     onSearchConfirm(e) {
       if (this._searchTimer) clearTimeout(this._searchTimer)
-      const val = e.detail.value || ''
-      this._searchText = val
-      this.setData({ _searchText: val })
-      this.filterAndDisplay()
+      this.setData({ _searchText: e.detail.value || '' })
+      this.loadAllPlayers(true)
     },
 
     clearSearch() {
-      this._searchText = ''
       this.setData({ _searchText: '' })
-      this.filterAndDisplay()
+      this.loadAllPlayers(true)
     },
 
     onPosFilter(e) {
       this.setData({ positionFilter: e.currentTarget.dataset.pos })
-      this.filterAndDisplay()
+      this.loadAllPlayers(true)
     },
 
     onRankFilter(e) {
       this.setData({ rankFilter: e.currentTarget.dataset.rank })
-      this.filterAndDisplay()
+      this.loadAllPlayers(true)
     },
 
     onSortToggle() {
+      // 服务端默认按 rank desc 排序，切换为 asc
       const next = this.data.sortFilter === 'rank-desc' ? 'rank-asc' : 'rank-desc'
       this.setData({ sortFilter: next })
-      this.filterAndDisplay()
+      this.loadAllPlayers(true)
     },
 
     resetFilters() {
-      this._searchText = ''
-      this.setData({
-        _searchText: '',
-        positionFilter: 'all',
-        rankFilter: 'all',
-        sortFilter: 'rank-desc'
-      })
-      this.filterAndDisplay()
+      this.setData({ _searchText: '', positionFilter: 'all', rankFilter: 'all', sortFilter: 'rank-desc' })
+      this.loadAllPlayers(true)
     },
 
-    // ====== 筛选+排序+显示 ======
     filterAndDisplay() {
-      let list = this.data.allPlayers.slice()
-      const kw = (this.data._searchText || '').toLowerCase()
-      const pos = this.data.positionFilter
-      const rank = this.data.rankFilter
-      const sort = this.data.sortFilter
-
-      if (kw) {
-        list = list.filter(p => {
-          const name = (p.wxNickname || '').toLowerCase()
-          const gid = (p.gameId || '').toLowerCase()
-          return name.indexOf(kw) !== -1 || gid.indexOf(kw) !== -1
-        })
-      }
-
-      if (pos !== 'all') {
-        const posNum = parseInt(pos)
-        list = list.filter(p => {
-          return p.goodAtPositions && p.goodAtPositions.indexOf(posNum) !== -1
-        })
-      }
-
-      if (rank !== 'all') {
-        list = list.filter(p => {
-          return R.getRankTier(p.calibrateRankName) === rank
-        })
-      }
-
-      if (sort === 'rank-desc') {
-        list.sort((a, b) => { return (b.calibrateRankSort || 0) - (a.calibrateRankSort || 0) })
-      } else if (sort === 'rank-asc') {
-        list.sort((a, b) => { return (a.calibrateRankSort || 0) - (b.calibrateRankSort || 0) })
-      }
-
-      const pageSize = this.data.pageSize
-      const firstPage = list.slice(0, pageSize).map(p => {
-        const icon = R.getRankIcon(p.calibrateRankName)
-        return { ...p, _rankIcon: icon, _rankIconIsImg: R.isRankIconImage(icon) }
-      })
-
-      this.setData({
-        filteredPlayers: list,
-        displayPlayers: firstPage,
-        filteredCount: list.length,
-        hasMore: list.length > pageSize
-      })
+      // 服务端分页模式下此方法由 loadAllPlayers 直接完成
+      this.loadAllPlayers(true)
     },
 
     // ====== 导航 ======
