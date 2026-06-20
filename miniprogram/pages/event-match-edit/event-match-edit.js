@@ -51,14 +51,12 @@ Page({
   // =====================================================
 
   onLoad(options) {
-    const { eventId } = options
-    if (!eventId) {
-      modal.toast(this, { title: '缺少赛事ID', icon: 'none' })
-      wx.navigateBack()
-      return
-    }
-    this.setData({ eventId })
-    this.init()
+    // 对战管理已整合到赛事详情页 Tab4「对阵对战」
+    const eventId = options.eventId || ''
+    modal.toast(this, { title: '对战管理已整合到赛事详情页', icon: 'none' })
+    setTimeout(() => {
+      wx.redirectTo({ url: '/pages/event-detail/event-detail?eventId=' + eventId })
+    }, 1000)
   },
 
   /** 手动刷新按钮 */

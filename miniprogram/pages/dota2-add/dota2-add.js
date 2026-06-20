@@ -25,7 +25,35 @@ Page({
   },
 
   onLoad() {
+    // 恢复草稿
+    try {
+      const draft = wx.getStorageSync('dota2_add_draft')
+      if (draft) {
+        this.setData(draft)
+        wx.removeStorageSync('dota2_add_draft')
+      }
+    } catch (_) {}
     this.checkAccess()
+  },
+
+  onUnload() {
+    // 有内容时保存草稿
+    const { wxNickname, gameId, steamId, calibrateMmr } = this.data
+    if (wxNickname || gameId || steamId || calibrateMmr) {
+      try {
+        wx.setStorageSync('dota2_add_draft', {
+          wxNickname: this.data.wxNickname,
+          gameId: this.data.gameId,
+          steamId: this.data.steamId,
+          calibrateMmr: this.data.calibrateMmr,
+          calibrateRankName: this.data.calibrateRankName,
+          calibrateRankStar: this.data.calibrateRankStar,
+          goodAtPositions: this.data.goodAtPositions,
+          signupPosition: this.data.signupPosition,
+          avatarUrl: this.data.avatarUrl
+        })
+      } catch (_) {}
+    }
   },
 
   async checkAccess() {

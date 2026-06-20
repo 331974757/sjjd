@@ -106,6 +106,23 @@ module.exports = {
     async doChangeStatus() {
       const payload = { eventStatus: this.data.targetStatus }
       this.setData({ showStatusConfirm: false, loading: true })
+
+      // 截止报名前校验最低人数
+      if (this.data.targetStatus === 2) {
+        const sigRes = await api.get('/events/' + this.data.eventId + '/signups', { status: 1, pageSize: 1 })
+        const currentCount = sigRes.total || 0
+        const minNeeded = 10  // 2队 × 5人
+        if (currentCount < minNeeded) {
+          this.setData({ loading: false })
+          const r = await modal.confirm(this, {
+            theme: 'warning', title: '报名人数不足',
+            content: `当前仅 ${currentCount} 人报名，至少需要 ${minNeeded} 人才够比赛。\n\n确定要截止报名吗？`,
+            confirmText: '仍要截止'
+          })
+          if (!r.confirm) return
+          this.setData({ loading: true })
+        }
+      }
       try {
         const res = await api.put('/events/' + this.data.eventId + '/status', payload)
         this.setData({ loading: false })

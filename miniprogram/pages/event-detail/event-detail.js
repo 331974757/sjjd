@@ -110,7 +110,10 @@ const coreMethods = {
       return
     }
 
-    // 回页刷新赛事状态+权限
+    // 回页刷新：但 15 秒内不重复请求
+    if (this._lastRefresh && (now - this._lastRefresh) < 15000) return
+    this._lastRefresh = now
+
     this.loadEvent().then(() => {
       if (this.data.event) this._refreshTabData()
     })

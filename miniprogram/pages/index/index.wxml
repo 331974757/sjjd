@@ -291,7 +291,7 @@
         bindtap="{{deleteMode ? 'onSelectCard' : 'goDetail'}}"
         data-id="{{item._id}}" data-gameid="{{item.gameId}}">
         <view class="card-avatar-wrap">
-          <image class="card-avatar" src="{{item.avatarUrl || '/assets/default-avatar.png'}}" mode="aspectFill" />
+          <image class="card-avatar" src="{{item.avatarUrl || '/assets/default-avatar.png'}}" mode="aspectFill" lazy-load />
           <view class="card-check" wx:if="{{deleteMode}}">
             <text class="check-icon">{{selectedIds[item._id] ? '✓' : ''}}</text>
           </view>

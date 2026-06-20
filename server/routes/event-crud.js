@@ -271,6 +271,19 @@ module.exports = function (app, h) {
         return res.status(400).json({ success: false, error: transition.error });
       }
 
+      // 截止报名时校验最低人数
+      if (eventStatus === 2) {
+        const [[{ cnt }]] = await h.pool.query(
+          'SELECT COUNT(*) AS cnt FROM dota2_event_signup WHERE event_id = ? AND signup_status = 1', [eventId]
+        );
+        if (cnt < 10) {
+          return res.status(400).json({
+            success: false, error: `报名人数不足（当前 ${cnt} 人），至少需要 10 人才能截止报名`,
+            code: 'SIGNUP_TOO_FEW'
+          });
+        }
+      }
+
       const limitVal = (eventStatus === 1 && signupLimit !== undefined) ? signupLimit : null;
       if (limitVal !== null) {
         if (typeof limitVal !== 'number' || limitVal < 0 || (limitVal !== 0 && !Number.isInteger(limitVal))) {

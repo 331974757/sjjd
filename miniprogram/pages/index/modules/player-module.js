@@ -316,6 +316,7 @@ module.exports = {
 
     // ====== 批量导出 ======
     async doExport() {
+      if (this._exporting) return; this._exporting = true
       wx.showLoading({ title: '导出中...' })
       try {
         const res = await api.get('/players/export/all')
