@@ -1,6 +1,6 @@
 {
   "pages": [
-    "pages/dota2/dota2",
+    "pages/index/index",
     "pages/dota2-detail/dota2-detail",
     "pages/dota2-add/dota2-add",
     "pages/dota2-import/dota2-import",
@@ -8,7 +8,10 @@
     "pages/event-detail/event-detail",
     "pages/event-signup-manage/event-signup-manage",
     "pages/event-team-edit/event-team-edit",
-    "pages/event-match-edit/event-match-edit"
+    "pages/event-match-edit/event-match-edit",
+    "pages/home-edit/home-edit",
+    "pages/announce-manage/announce-manage",
+    "pages/events-hub/events-hub"
   ],
   "window": {
     "backgroundTextStyle": "dark",

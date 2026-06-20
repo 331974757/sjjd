@@ -467,7 +467,7 @@
             class="sb-card {{item._selected ? 'sb-selected' : ''}} {{battleRoundStatus === 'fighting' || battleRoundStatus === 'done' || isArchived ? 'sb-readonly' : ''}}"
             wx:for="{{battleScoreboard}}"
             wx:key="teamId"
-            bindtap="{{item._matchId && item._matchStatus === 0 && actions.manage_matches.allowed && !isArchived ? '' : 'toggleBattleTeam'}}"
+            bindtap="{{battleRoundStatus === 'fighting' || battleRoundStatus === 'done' || !actions.manage_matches.allowed || isArchived || (item._matchId && item._matchStatus === 0) ? '' : 'toggleBattleTeam'}}"
             data-team-id="{{item.teamId}}"
           >
             <view class="sbc-info">
@@ -508,8 +508,11 @@
             <text>+ 手动添加对战组</text>
           </view>
         </block>
-        <!-- 已有对战：可调整 -->
-        <block wx:if="{{battleRoundHasMatches && (battleRoundStatus === 'pairing' || battleRoundStatus === 'fighting')}}">
+        <!-- 已有对战：可开战/清除 -->
+        <block wx:if="{{battleRoundHasMatches && battleRoundStatus === 'pairing'}}">
+          <view class="bqb-btn bqb-start" bindtap="doStartRound" loading="{{battleStarting}}">
+            <text>🔥 开始对战</text>
+          </view>
           <view class="bqb-btn bqb-del" bindtap="doDeleteRoundMatches" loading="{{battleDeleting}}">
             <text>🗑 清除本轮</text>
           </view>
@@ -1150,14 +1153,14 @@
   <!-- 对战确认弹窗 -->
   <view class="modal-mask" wx:if="{{showBattleConfirmModal}}" catchtouchmove="preventMove" bindtap="onBattleConfirmCancel">
     <view class="modal-box" catchtap="preventMove">
-      <text class="modal-title">{{battleConfirmTitle}}</text>
+      <text class="modal-title">{{_battleConfirmTitle}}</text>
       <view class="bcm-list">
-        <view class="bcm-row" wx:for="{{battleConfirmList}}" wx:key="index">
+        <view class="bcm-row" wx:for="{{_battleConfirmLines}}" wx:key="index">
           <text class="bcm-num">{{index + 1}}</text>
           <text class="bcm-text">{{item}}</text>
         </view>
       </view>
-      <text class="bcm-hint" wx:if="{{battleConfirmHint}}">{{battleConfirmHint}}</text>
+      <text class="bcm-hint" wx:if="{{_battleConfirmNote}}">{{_battleConfirmNote}}</text>
       <view class="modal-btns">
         <view class="modal-btn btn-secondary" bindtap="onBattleConfirmCancel"><text>取消</text></view>
         <view class="modal-btn btn-primary" bindtap="onBattleConfirmOk"><text>确定</text></view>

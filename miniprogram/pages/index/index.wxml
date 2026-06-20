@@ -1,4 +1,4 @@
-<!--pages/dota2/dota2.wxml-->
+<!--pages/index/index.wxml-->
 <view class="page">
   <!-- 自定义导航栏：金色大标题居中 -->
   <view class="nav-custom" style="padding-top:{{statusBarHeight}}px;">
@@ -12,39 +12,162 @@
     <view class="nav-title-line"></view>
   </view>
 
-  <!-- 🌐 全局工具栏：刷新 | 修改昵称 | 管理员展示 | 权限管理(仅超管) -->
-  <view class="global-toolbar">
-    <view class="gtb-btn" bindtap="onRefreshTap">
-      <image class="gtb-icon" src="/images/icons/refresh.svg" mode="aspectFit"/>
-    </view>
-    <view class="gtb-divider"></view>
-    <view class="gtb-btn" bindtap="editNickname">
-      <image class="gtb-icon" src="/images/icons/edit.svg" mode="aspectFit"/>
-    </view>
-    <view class="gtb-divider"></view>
-    <view class="gtb-btn" bindtap="showSuperAdminInfo">
-      <image class="gtb-icon" src="/images/icons/person.svg" mode="aspectFit"/>
-    </view>
-    <view class="gtb-divider" wx:if="{{userRole === 'super_admin'}}"></view>
-    <view class="gtb-btn gtb-btn-admin" wx:if="{{userRole === 'super_admin'}}" bindtap="goAdmin">
-      <image class="gtb-icon" src="/images/icons/shield.svg" mode="aspectFit"/>
-    </view>
-  </view>
-
-  <!-- 游戏切换标签（主导航） -->
+  <!-- 主导航标签 -->
   <view class="game-tabs">
+    <view class="game-tab {{currentGame === 'home' ? 'tab-active' : ''}}" bindtap="switchGame" data-game="home">
+      <text class="tab-text">首页</text>
+    </view>
     <view class="game-tab {{currentGame === 'dota2' ? 'tab-active' : ''}}" bindtap="switchGame" data-game="dota2">
       <text class="tab-text">Dota2</text>
     </view>
     <view class="game-tab {{currentGame === 'csgo' ? 'tab-active' : ''}}" bindtap="switchGame" data-game="csgo">
-      <text class="tab-text">CS:GO</text>
+      <text class="tab-text">其他游戏</text>
     </view>
     <view class="game-plus" bindtap="onGamePlusTap">
       <text class="plus-icon">+</text>
     </view>
   </view>
 
-  <!-- ====== Dota2 区域 ====== -->
+  <!-- 首页 -->
+  <block wx:if="{{currentGame === 'home'}}">
+
+    <!-- 全局图标工具栏 -->
+    <view class="global-toolbar">
+      <view class="gtb-btn" bindtap="onRefreshTap">
+        <image class="gtb-icon" src="/images/icons/refresh.svg" mode="aspectFit"/>
+      </view>
+      <view class="gtb-divider"></view>
+      <view class="gtb-btn" bindtap="editNickname">
+        <image class="gtb-icon" src="/images/icons/edit.svg" mode="aspectFit"/>
+      </view>
+      <view class="gtb-divider"></view>
+      <view class="gtb-btn" bindtap="showSuperAdminInfo">
+        <image class="gtb-icon" src="/images/icons/person.svg" mode="aspectFit"/>
+      </view>
+      <view class="gtb-divider" wx:if="{{userRole === 'super_admin'}}"></view>
+      <view class="gtb-btn gtb-btn-admin" wx:if="{{userRole === 'super_admin'}}" bindtap="showUserMgmtModal">
+        <image class="gtb-icon" src="/images/icons/shield.svg" mode="aspectFit"/>
+      </view>
+    </view>
+
+    <!-- 模块1：图文介绍 -->
+    <view class="home-module home-intro-area">
+      <view class="hm-bar" wx:if="{{userRole === 'super_admin'}}">
+        <view class="hm-bar-spacer"></view>
+        <view class="hm-edit-btn" bindtap="goEditIntro">
+          <text>编辑介绍</text>
+        </view>
+      </view>
+      <view class="intro-content" wx:if="{{homeIntro && homeIntro.length > 0}}">
+        <block wx:for="{{homeIntro}}" wx:key="index">
+          <text class="intro-text" wx:if="{{item.type === 'text'}}">{{item.content}}</text>
+          <image class="intro-image" wx:if="{{item.type === 'image'}}" src="{{item.url}}" mode="widthFix" lazy-load/>
+        </block>
+      </view>
+      <view class="intro-empty" wx:else>
+        <text class="intro-empty-text">欢迎来到蜀国争霸系统</text>
+        <text class="intro-empty-sub">Dota2小圈子自娱自乐对战平台</text>
+      </view>
+    </view>
+
+    <!-- 模块2：公告栏 -->
+    <view class="home-module">
+      <view class="hm-bar">
+        <view class="hm-tag">公告</view>
+        <view class="hm-bar-spacer"></view>
+        <view class="hm-edit-btn" wx:if="{{userRole === 'super_admin'}}" bindtap="goManageAnnounce">
+          <text>编辑公告</text>
+        </view>
+      </view>
+      <view class="marquee-box" wx:if="{{homeAnnounceText.length > 0}}">
+        <view class="marquee-track" style="transform: translateX({{-marqueeOffset}}rpx); transition: none;">
+          <text class="marquee-text">{{homeAnnounceText}}</text>
+          <text class="marquee-text" style="margin-left: 80rpx;">{{homeAnnounceText}}</text>
+        </view>
+      </view>
+      <view class="marquee-empty" wx:else>
+        <text class="marquee-empty-text">暂无公告</text>
+      </view>
+    </view>
+
+    <!-- 模块3：快捷链接 -->
+    <view class="home-module">
+      <view class="home-section-title">快捷链接</view>
+      <!-- 横向滚动卡片 -->
+      <scroll-view class="sc-shelf" scroll-x enable-flex>
+        <view class="sc-card" wx:for="{{homeGameList}}" wx:key="id">
+          <view class="scc-header">
+            <text class="scc-icon">{{item.icon}}</text>
+            <text class="scc-name">{{item.name}}</text>
+          </view>
+          <view
+            class="scc-row"
+            wx:for="{{item.actions}}"
+            wx:key="key"
+            wx:for-item="act"
+            bindtap="homeJumpToGame"
+            data-subtab="{{act.subTab}}"
+          >
+            <text class="scc-row-icon">{{act.icon}}</text>
+            <text class="scc-row-label">{{act.label}}</text>
+            <text class="scc-row-arrow">›</text>
+          </view>
+        </view>
+      </scroll-view>
+    </view>
+
+    <!-- 模块4：赛事动态 -->
+    <view class="home-module">
+      <view class="home-section-title">
+        <text>赛事动态</text>
+        <text class="hsr-more" bindtap="homeJumpToGame" data-subtab="rules">查看全部 ›</text>
+      </view>
+      <!-- 赛事动态列表 -->
+      <view wx:if="{{eventDynamicList.length > 0}}">
+        <view class="ed-item" wx:for="{{eventDynamicList}}" wx:key="id" bindtap="goEventDetail" data-id="{{item.id}}">
+          <view class="ed-left">
+            <text class="ed-name">{{item.event_name}}</text>
+            <view class="ed-meta">
+              <text class="ed-status-tag ed-status-{{item.status}}">{{eventStatusMap[item.status] || '未知'}}</text>
+              <text class="ed-time" wx:if="{{item.event_time}}">{{item.event_time}}</text>
+              <text class="ed-count">{{item.signup_count}}人参赛</text>
+            </view>
+          </view>
+          <text class="ed-arrow">›</text>
+        </view>
+      </view>
+      <!-- 空状态 -->
+      <view class="ed-empty" wx:else>
+        <text class="ed-empty-text">暂无赛事，快去催促主播安排比赛吧~</text>
+      </view>
+    </view>
+
+    <!-- 模块5：数据统计 -->
+    <view class="home-module">
+      <view class="home-section-title">平台数据统计</view>
+      <view class="stats-row">
+        <view class="stat-card">
+          <text class="stat-num">{{homeStats.registeredPlayers}}</text>
+          <text class="stat-label">用户</text>
+        </view>
+        <view class="stat-card">
+          <text class="stat-num">{{homeStats.totalEvents}}</text>
+          <text class="stat-label">总赛事数量</text>
+        </view>
+        <view class="stat-card">
+          <text class="stat-num">{{homeStats.activeEvents}}</text>
+          <text class="stat-label">进行中赛事</text>
+        </view>
+        <view class="stat-card">
+          <text class="stat-num">{{homeStats.finishedEvents}}</text>
+          <text class="stat-label">已完结赛事</text>
+        </view>
+      </view>
+    </view>
+
+  </block>
+
+  <!-- Dota2 -->
   <block wx:if="{{currentGame === 'dota2'}}">
 
     <!-- 子分页栏 -->
@@ -235,7 +358,7 @@
       </view>
     </view>
 
-    <!-- Dota2 历史赛事（第8轮：完整增强版，支持搜索+前三名展示+分页加载） -->
+    <!-- Dota2 历史赛事 -->
     <view class="event-list-page" wx:if="{{subTab === 'history'}}">
       <!-- 搜索栏 -->
       <view class="history-search-bar">
@@ -360,16 +483,16 @@
 
   </block>
 
-  <!-- ====== CS:GO 区域（尚未开放） ====== -->
+  <!-- 其他游戏（暂未开放） -->
   <block wx:if="{{currentGame === 'csgo'}}">
     <view class="placeholder-page csgo-placeholder">
       <text class="ph-icon">🎯</text>
-      <text class="ph-main">CS:GO 选手档案</text>
+      <text class="ph-main">其他游戏选手档案</text>
       <text class="ph-sub">暂未开放，敬请期待</text>
     </view>
   </block>
 
-  <!-- 昵称编辑弹窗 -->
+  <!-- 昵称弹窗 -->
   <view class="nick-modal-mask" wx:if="{{showNickModal}}" catchtouchmove="preventMove">
     <view class="nick-modal">
       <view class="nick-modal-close" bindtap="closeNickModal">
@@ -404,7 +527,7 @@
     </view>
   </view>
 
-  <!-- 【赛事创建】新建赛事弹窗 -->
+  <!-- 新建赛事弹窗 -->
   <view class="event-create-mask" wx:if="{{showCreateModal}}" catchtouchmove="preventMove">
     <view class="event-create-modal" catchtap="">
       <!-- 关闭按钮 -->
@@ -496,7 +619,7 @@
   </view>
 
   <!-- 管理员信息弹窗 -->
-  <view class="admin-modal-mask" wx:if="{{showAdminModal}}" bindtap="closeAdminModal">
+  <view class="admin-modal-mask" wx:if="{{showAdminModal}}" catchtouchmove="preventMove" bindtap="closeAdminModal">
     <view class="admin-modal" catchtap="">
       <view class="admin-modal-close" bindtap="closeAdminModal">
         <text class="admin-close-icon">✕</text>
@@ -532,5 +655,95 @@
       </view>
     </view>
   </view>
+
+  <!-- 权限管理弹窗（仅超管可见） -->
+  <view class="admin-modal-mask" wx:if="{{showUserMgmtModal}}" catchtouchmove="preventMove" bindtap="closeUserMgmtModal">
+    <view class="umg-modal" catchtap="">
+      <view class="admin-modal-close" bindtap="closeUserMgmtModal">
+        <text class="admin-close-icon">✕</text>
+      </view>
+      <text class="admin-modal-title">权限管理</text>
+
+      <!-- 操作栏：刷新 + 人数 -->
+      <view class="umg-toolbar">
+        <view class="admin-refresh" bindtap="homeRefreshUsers">
+          <image class="icon-img-sm" src="/images/icons/refresh.svg" mode="aspectFit"/>
+        </view>
+        <text class="user-count">{{homeKeyword ? homeFilteredTotal : homeAllUsers.length}} 人</text>
+      </view>
+
+      <!-- 搜索栏 -->
+      <view class="search-bar umg-search">
+        <input class="search-input" placeholder="搜索昵称或OpenID" value="{{homeKeyword}}" bindinput="onHomeKeywordInput" />
+        <view class="search-clear" wx:if="{{homeKeyword}}" bindtap="onHomeClearKeyword">
+          <text>✕</text>
+        </view>
+      </view>
+
+      <!-- 加载态 -->
+      <view class="loading-state" wx:if="{{homeUsersLoading}}">
+        <text>加载中...</text>
+      </view>
+
+      <!-- 用户列表 -->
+      <view class="umg-list" wx:else>
+        <view class="user-item" wx:for="{{homeUsers}}" wx:key="openid">
+          <view class="user-info">
+            <view class="user-badge {{item.role === 'super_admin' ? 'badge-super' : (item.role === 'admin' ? 'badge-admin' : 'badge-user')}}">
+              <text>{{item.role === 'super_admin' ? '超' : (item.role === 'admin' ? '管' : '普')}}</text>
+            </view>
+            <text class="user-nick {{item.nickName ? '' : 'unregistered'}}">{{item.nickName || '未注册'}}</text>
+            <text class="user-me" wx:if="{{item.isMe}}">（我）</text>
+            <view class="nick-count-info" wx:if="{{item.nickName && item.role !== 'admin' && item.role !== 'super_admin'}}">
+              <text class="nick-count-text">已改{{item.nickChangeCount}}次</text>
+            </view>
+          </view>
+          <view class="user-actions">
+            <view
+              wx:if="{{item.nickName && item.role !== 'admin' && item.role !== 'super_admin'}}"
+              class="reset-btn"
+              bindtap="homeResetNickCount"
+              data-openid="{{item.openid}}"
+              data-nickname="{{item.nickName}}"
+            >
+              <text>重置次数</text>
+            </view>
+            <view
+              class="toggle-btn {{homeOperating ? 'toggle-loading' : ''}} {{item.isMe ? 'toggle-disabled' : (item.role === 'super_admin' ? 'toggle-super' : (item.role === 'admin' ? 'toggle-off' : 'toggle-on'))}}"
+              bindtap="{{homeOperating ? '' : 'homeToggleAdmin'}}"
+              data-openid="{{item.openid}}"
+              data-role="{{item.role}}"
+              data-isme="{{item.isMe}}"
+              data-nickname="{{item.nickName}}"
+            >
+              <text>{{homeOperating ? '操作中...' : (item.isMe ? '不可操作' : (item.role === 'super_admin' ? '超管权限' : (item.role === 'admin' ? '取消权限' : '设置权限')))}}</text>
+            </view>
+          </view>
+        </view>
+
+        <view class="empty-state" wx:if="{{homeUsers.length === 0 && !homeUsersLoading}}">
+          <text class="empty-text">{{homeKeyword ? '未找到匹配的用户' : '暂无用户数据'}}</text>
+          <text class="empty-hint">{{homeKeyword ? '请尝试其他关键词' : '其他用户打开小程序后会自动注册并出现在这里'}}</text>
+        </view>
+
+        <!-- 翻页 -->
+        <view class="pagination" wx:if="{{homeTotalPages > 1}}">
+          <view class="page-btn {{homePage <= 1 ? 'page-btn-disabled' : ''}}" bindtap="homePrevPage">
+            <text>上一页</text>
+          </view>
+          <text class="page-info">{{homePage}} / {{homeTotalPages}}</text>
+          <view class="page-btn {{homePage >= homeTotalPages ? 'page-btn-disabled' : ''}}" bindtap="homeNextPage">
+            <text>下一页</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 提示 -->
+      <view class="umg-hint">
+        <text>让对方打开小程序即可自动注册。注册后你就能在这里看到他，点击设为管理员。</text>
+      </view>
+    </view>
+  </view>
+
   <modal id="modal"></modal>
 </view>

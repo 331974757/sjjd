@@ -1,0 +1,47 @@
+<!--pages/events-hub/events-hub.wxml-->
+<view class="page">
+  <!-- 页面标题 -->
+  <view class="hub-header">
+    <text class="hub-title">赛事专区</text>
+    <text class="hub-sub">选择一个游戏赛事</text>
+  </view>
+
+  <!-- 游戏列表（竖排分页） -->
+  <view class="hub-list">
+    <block wx:for="{{gameList}}" wx:key="id">
+      <!-- 游戏区块头部 -->
+      <view class="hub-game-header">
+        <text class="hgh-icon">{{item.icon}}</text>
+        <text class="hgh-name">{{item.name}}</text>
+      </view>
+
+      <!-- 快速跳转栏（竖排列表） -->
+      <view class="hub-jump-list">
+        <view
+          class="hjl-row"
+          wx:for="{{item.actions}}"
+          wx:key="key"
+          wx:for-item="act"
+          bindtap="onActionTap"
+          data-game-id="{{item.id}}"
+          data-action="{{act.key}}"
+        >
+          <view class="hjl-left">
+            <text class="hjl-icon">{{act.icon}}</text>
+            <text class="hjl-label">{{act.label}}</text>
+          </view>
+          <text class="hjl-arrow">›</text>
+        </view>
+      </view>
+    </block>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="hub-empty" wx:if="{{gameList.length === 0 && !loading}}">
+    <text class="hub-empty-text">暂无可用的赛事专区</text>
+    <text class="hub-empty-hint">敬请期待更多游戏赛事上线</text>
+  </view>
+
+  <!-- 底部占位 -->
+  <view class="hub-footer-space"></view>
+</view>

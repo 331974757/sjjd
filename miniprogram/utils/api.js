@@ -39,7 +39,6 @@ function getToken() {
 }
 
 async function request(options) {
-  const openid = await getOpenId()
   const token = getToken()
   let url = API_BASE + options.url
   const method = (options.method || 'GET').toUpperCase()
@@ -51,21 +50,14 @@ async function request(options) {
   }
 
   // body 数据仅用于非 GET
-  // 必须显式 JSON.stringify，微信 wx.request 传对象时可能不按 Content-Type 序列化
   const data = method === 'GET' ? undefined : JSON.stringify(options.data || {})
-
-  // openid 通过 query 传递（向后兼容尚未迁移 JWT 的路由）
-  if (openid) {
-    const sep = url.indexOf('?') >= 0 ? '&' : '?'
-    url += sep + 'openid=' + openid
-  }
 
   // GET 请求添加防缓存时间戳，确保每次拉取最新数据
   if (method === 'GET') {
     url += (url.indexOf('?') >= 0 ? '&' : '?') + '_t=' + Date.now()
   }
 
-  // 构建请求头：JWT token 作为身份认证
+  // JWT token 作为唯一身份认证（Authorization 头部）
   const headers = { 'Content-Type': 'application/json' }
   if (token) {
     headers['Authorization'] = 'Bearer ' + token
@@ -116,5 +108,6 @@ module.exports = {
     _openidCache = null;
     _lastFetchTime = 0;
   },
-  API_BASE
+  API_BASE,
+  BASE_URL: API_BASE.replace('/api', '')
 }

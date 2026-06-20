@@ -198,7 +198,7 @@
   </view>
 
   <!-- 位置选择弹窗 -->
-  <view class="pos-modal-mask" wx:if="{{showPosModal}}" bindtap="closePosModal">
+  <view class="pos-modal-mask" wx:if="{{showPosModal}}" catchtouchmove="preventMove" bindtap="closePosModal">
     <view class="pos-modal" catchtap="preventMove">
       <view class="pos-modal-header">
         <text class="pos-modal-title">{{posModalTitle}}</text>

@@ -1,0 +1,80 @@
+<!--pages/announce-manage/announce-manage.wxml-->
+<!-- 公告管理页（仅 super_admin 可访问） -->
+<view class="page">
+  <!-- 权限拦截 -->
+  <view class="perm-deny" wx:if="{{!isSuperAdmin && !loading}}">
+    <text class="perm-deny-icon">🔒</text>
+    <text class="perm-deny-text">您暂无该操作权限</text>
+  </view>
+
+  <!-- 公告管理（仅超管可见） -->
+  <block wx:if="{{isSuperAdmin}}">
+    <!-- 顶部操作栏 -->
+    <view class="am-topbar">
+      <text class="am-title">公告管理</text>
+      <view class="am-add-btn" bindtap="onAdd">
+        <text>+ 新增公告</text>
+      </view>
+    </view>
+
+    <!-- 加载中 -->
+    <view class="loading-state" wx:if="{{loading}}">
+      <text>加载中...</text>
+    </view>
+
+    <!-- 公告列表 -->
+    <view class="am-list" wx:else>
+      <view class="am-item" wx:for="{{announcements}}" wx:key="id">
+        <view class="am-item-top">
+          <view class="am-item-badges">
+            <view class="am-badge am-badge-pin" wx:if="{{item.is_pinned}}">
+              <text>📌 置顶</text>
+            </view>
+            <text class="am-item-order">#{{index + 1}}</text>
+          </view>
+          <view class="am-item-actions">
+            <view class="am-act" bindtap="onTogglePin" data-id="{{item.id}}" data-pinned="{{item.is_pinned}}">
+              <text>{{item.is_pinned ? '取消置顶' : '置顶'}}</text>
+            </view>
+            <view class="am-act" bindtap="onEdit" data-id="{{item.id}}" data-content="{{item.content}}">
+              <text>编辑</text>
+            </view>
+            <view class="am-act am-act-del" bindtap="onDelete" data-id="{{item.id}}" data-content="{{item.content}}">
+              <text>删除</text>
+            </view>
+          </view>
+        </view>
+        <text class="am-item-content">{{item.content}}</text>
+        <text class="am-item-time">{{item.created_at}}</text>
+      </view>
+
+      <!-- 空状态 -->
+      <view class="empty-state" wx:if="{{announcements.length === 0}}">
+        <text class="empty-text">暂无公告</text>
+        <text class="empty-hint">点击右上角「新增公告」添加</text>
+      </view>
+    </view>
+
+    <!-- 排序提示 -->
+    <view class="am-sort-hint" wx:if="{{announcements.length > 1}}">
+      <text>💡 长按公告可拖拽排序</text>
+    </view>
+
+    <!-- 新增/编辑弹窗 -->
+    <view class="am-modal-mask" wx:if="{{showModal}}" catchtouchmove="preventMove" bindtap="closeModal"></view>
+    <view class="am-modal" wx:if="{{showModal}}">
+      <view class="amm-title">
+        <text>{{editingId ? '编辑公告' : '新增公告'}}</text>
+      </view>
+      <textarea class="amm-textarea" value="{{modalContent}}" bindinput="onModalInput" placeholder="输入公告内容..." placeholder-style="color:#484f58" maxlength="500" auto-focus />
+      <view class="amm-actions">
+        <view class="amm-btn amm-cancel" bindtap="closeModal">
+          <text>取消</text>
+        </view>
+        <view class="amm-btn amm-confirm" bindtap="onConfirmModal">
+          <text>{{operating ? '操作中...' : '确认'}}</text>
+        </view>
+      </view>
+    </view>
+  </block>
+</view>

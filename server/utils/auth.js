@@ -135,7 +135,7 @@ async function getCallerRole(req) {
   const openid = extractOpenid(req);
   if (!openid) return ROLES.USER;
   try {
-    const [rows] = await pool.query('SELECT role FROM dota2_users WHERE openid = ?', [openid]);
+    const [rows] = await pool.query('SELECT role FROM users WHERE openid = ?', [openid]);
     return rows.length ? rows[0].role : ROLES.USER;
   } catch (e) {
     return ROLES.USER;
@@ -330,7 +330,7 @@ async function requireAdminCanSetRank(req, res, next) {
  * 检查是否管理员（返回布尔，不发送响应）
  */
 async function isAdmin(openid) {
-  const [rows] = await pool.query('SELECT role FROM dota2_users WHERE openid = ?', [openid]);
+  const [rows] = await pool.query('SELECT role FROM users WHERE openid = ?', [openid]);
   if (!rows.length) return false;
   return rows[0].role === ROLES.ADMIN || rows[0].role === ROLES.SUPER_ADMIN;
 }
@@ -339,7 +339,7 @@ async function isAdmin(openid) {
  * 检查是否超级管理员（返回布尔，不发送响应）
  */
 async function isSuperAdmin(openid) {
-  const [rows] = await pool.query('SELECT role FROM dota2_users WHERE openid = ?', [openid]);
+  const [rows] = await pool.query('SELECT role FROM users WHERE openid = ?', [openid]);
   if (!rows.length) return false;
   return rows[0].role === ROLES.SUPER_ADMIN;
 }

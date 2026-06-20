@@ -68,8 +68,7 @@ Page({
         const tempPath = res.tempFiles[0].tempFilePath
         wx.showLoading({ title: '上传中...' })
         const app = getApp()
-        const openid = app.globalData.openid || ''
-        const uploadUrl = api.API_BASE + '/upload' + (openid ? '?openid=' + encodeURIComponent(openid) : '')
+        const uploadUrl = api.API_BASE + '/upload'
         wx.uploadFile({
           url: uploadUrl,
           filePath: tempPath,
@@ -213,7 +212,7 @@ Page({
   _notifyHomeRefresh() {
     const pages = getCurrentPages()
     // 【修复】使用 find 查找首页，避免硬编码索引
-    const homePage = pages.find(p => p.route && p.route.indexOf('pages/dota2/dota2') !== -1)
+    const homePage = pages.find(p => p.route && p.route.indexOf('pages/index/index') !== -1)
     if (homePage && homePage.loadAllPlayers) {
       homePage._needsReload = true
     }

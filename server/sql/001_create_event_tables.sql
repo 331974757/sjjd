@@ -2,7 +2,7 @@
 -- Dota2 赛事业务数据表 - 完整建表语句
 -- 数据库: dota2
 -- 字符集: utf8mb4 / 引擎: InnoDB
--- 与现有 dota2_players / dota2_users 字段风格完全对齐
+-- 与现有 dota2_players / users 字段风格完全对齐
 -- ============================================================
 
 USE dota2;
@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS `dota2_events` (
   `event_id`      varchar(64)   NOT NULL COMMENT '赛事ID（主键）',
   `event_name`    varchar(200)  DEFAULT NULL COMMENT '赛事名称',
   `event_desc`    text          DEFAULT NULL COMMENT '赛事简介',
-  `creator_id`    varchar(64)   DEFAULT NULL COMMENT '创建管理员ID（关联dota2_users.id）',
+  `creator_id`    varchar(64)   DEFAULT NULL COMMENT '创建管理员ID（关联users.id）',
   `event_status`  tinyint       DEFAULT NULL COMMENT '赛事状态：0创建中/1报名中/2报名截止/3分组锁定/4对战中/5已结束',
   `start_time`    bigint        DEFAULT NULL COMMENT '赛事开始时间戳',
   `signup_limit`  int           DEFAULT NULL COMMENT '报名人数上限（NULL=无限制）',
@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS `dota2_event_matches` (
   `team_b_id`     varchar(64)   DEFAULT NULL COMMENT 'B队ID（关联dota2_event_teams.team_id）',
   `winner_id`     varchar(64)   DEFAULT NULL COMMENT '胜方队伍ID（关联dota2_event_teams.team_id）',
   `match_status`  tinyint       DEFAULT 0 COMMENT '对战状态：0未开始/1进行中/2已结束',
-  `judge_id`      varchar(64)   DEFAULT NULL COMMENT '判定管理员ID（关联dota2_users.id）',
+  `judge_id`      varchar(64)   DEFAULT NULL COMMENT '判定管理员ID（关联users.id）',
   `judge_time`    bigint        DEFAULT NULL COMMENT '判定时间戳',
   `battle_image`  varchar(500)  DEFAULT NULL COMMENT '对战结果图片URL',
   `created_at`    bigint        DEFAULT NULL COMMENT '创建时间戳',
@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS `dota2_event_ranks` (
   `event_id`      varchar(64)   DEFAULT NULL COMMENT '赛事ID（关联dota2_events.event_id）',
   `rank_num`      int           DEFAULT NULL COMMENT '排名序号（1/2/3...）',
   `team_id`       varchar(64)   DEFAULT NULL COMMENT '对应队伍ID（关联dota2_event_teams.team_id）',
-  `operator_id`   varchar(64)   DEFAULT NULL COMMENT '操作人ID（关联dota2_users.id）',
+  `operator_id`   varchar(64)   DEFAULT NULL COMMENT '操作人ID（关联users.id）',
   `created_at`    bigint        DEFAULT NULL COMMENT '创建时间戳',
   PRIMARY KEY (`rank_id`),
   UNIQUE INDEX `uk_event_rank` (`event_id`, `rank_num`)
@@ -111,7 +111,7 @@ CREATE TABLE IF NOT EXISTS `dota2_event_rules` (
   `rule_content`  text          DEFAULT NULL COMMENT '章程内容（富文本）',
   `version`       int           DEFAULT NULL COMMENT '版本号',
   `rule_status`   tinyint       DEFAULT 0 COMMENT '状态：0草稿/1已发布',
-  `creator_id`    varchar(64)   DEFAULT NULL COMMENT '创建人ID（关联dota2_users.id）',
+  `creator_id`    varchar(64)   DEFAULT NULL COMMENT '创建人ID（关联users.id）',
   `created_at`    bigint        DEFAULT NULL COMMENT '创建时间戳',
   `updated_at`    bigint        DEFAULT NULL COMMENT '更新时间戳',
   PRIMARY KEY (`rule_id`),

@@ -96,8 +96,7 @@ Page({
         const tempPath = res.tempFiles[0].tempFilePath
         wx.showLoading({ title: '上传中...' })
         try {
-          const openid = await api.getOpenId()
-          const uploadUrl = api.API_BASE + '/upload' + (openid ? '?openid=' + encodeURIComponent(openid) : '')
+          const uploadUrl = api.API_BASE + '/upload'
           wx.uploadFile({
             url: uploadUrl,
             filePath: tempPath,
@@ -385,7 +384,7 @@ Page({
   _notifyHomeRefresh() {
     try {
       const pages = getCurrentPages()
-      const homePage = pages.find(p => p && p.route && p.route.indexOf('pages/dota2/dota2') !== -1)
+      const homePage = pages.find(p => p && p.route && p.route.indexOf('pages/index/index') !== -1)
       if (homePage && typeof homePage.loadAllPlayers === 'function') {
         homePage._needsReload = true
       }
@@ -408,7 +407,7 @@ Page({
     }
     return {
       title: '蜀国争霸系统 - 选手档案',
-      path: '/pages/dota2/dota2'
+      path: '/pages/index/index'
     }
   }
 })

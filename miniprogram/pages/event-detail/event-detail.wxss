@@ -1643,6 +1643,11 @@
   color: #58a6ff;
 }
 
+.bqb-start {
+  background: rgba(63,185,80,0.15);
+  color: #3fb950;
+}
+
 .bqb-del {
   background: rgba(248,81,73,0.12);
   color: #f85149;

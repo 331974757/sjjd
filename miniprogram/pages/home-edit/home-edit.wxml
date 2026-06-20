@@ -1,0 +1,82 @@
+<!--pages/home-edit/home-edit.wxml-->
+<!-- 首页介绍编辑页（仅 super_admin 可访问） -->
+<view class="page">
+  <!-- 权限拦截提示 -->
+  <view class="perm-deny" wx:if="{{!isSuperAdmin && !loading}}">
+    <text class="perm-deny-icon">🔒</text>
+    <text class="perm-deny-text">您暂无该操作权限</text>
+  </view>
+
+  <!-- 编辑区（仅超管可见） -->
+  <block wx:if="{{isSuperAdmin}}">
+    <!-- 操作按钮栏 -->
+    <view class="he-topbar">
+      <text class="he-title">编辑首页介绍</text>
+      <view class="he-actions">
+        <view class="he-btn he-btn-cancel" bindtap="onCancel">
+          <text>取消</text>
+        </view>
+        <view class="he-btn he-btn-save" bindtap="onSave">
+          <text>保存</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="he-hint">
+      <text>支持图文混排，可添加多段文字和多张图片。保存后首页即时更新。</text>
+    </view>
+
+    <!-- 内容区块列表 -->
+    <view class="he-blocks">
+      <view class="he-block" wx:for="{{blocks}}" wx:key="index">
+        <!-- 工具栏：上移/下移/删除 -->
+        <view class="hb-toolbar">
+          <text class="hb-type">{{item.type === 'text' ? '文字' : '图片'}}</text>
+          <view class="hb-actions">
+            <view class="hb-act" bindtap="moveBlockUp" data-index="{{index}}" wx:if="{{index > 0}}">
+              <text>↑ 上移</text>
+            </view>
+            <view class="hb-act" bindtap="moveBlockDown" data-index="{{index}}" wx:if="{{index < blocks.length - 1}}">
+              <text>↓ 下移</text>
+            </view>
+            <view class="hb-act hb-act-del" bindtap="deleteBlock" data-index="{{index}}">
+              <text>删除</text>
+            </view>
+          </view>
+        </view>
+        <!-- 文字编辑 -->
+        <textarea wx:if="{{item.type === 'text'}}" class="he-textarea" value="{{item.content}}" bindinput="onTextInput" data-index="{{index}}" placeholder="输入展示文字..." placeholder-style="color:#484f58" auto-height maxlength="1000" />
+        <!-- 图片展示 -->
+        <block wx:if="{{item.type === 'image'}}">
+          <image class="he-preview" wx:if="{{item.url}}" src="{{item.url}}" mode="widthFix" />
+          <view class="he-upload-area" bindtap="uploadImage" data-index="{{index}}">
+            <text wx:if="{{!item.url}}">点击上传图片</text>
+            <text wx:else>点击更换图片</text>
+          </view>
+        </block>
+      </view>
+
+      <!-- 空状态 -->
+      <view class="he-empty" wx:if="{{blocks.length === 0}}">
+        <text class="he-empty-text">暂无内容，点击下方按钮添加</text>
+      </view>
+    </view>
+
+    <!-- 添加区块按钮 -->
+    <view class="he-add-bar">
+      <view class="he-add-btn" bindtap="addTextBlock">
+        <text>+ 添加文字</text>
+      </view>
+      <view class="he-add-btn" bindtap="addImageBlock">
+        <text>+ 添加图片</text>
+      </view>
+    </view>
+
+    <!-- 底部保存按钮 -->
+    <view class="he-bottom-save">
+      <view class="he-btn he-btn-save he-btn-full" bindtap="onSave">
+        <text>{{saving ? '保存中...' : '保存'}}</text>
+      </view>
+    </view>
+  </block>
+</view>

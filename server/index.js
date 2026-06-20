@@ -110,10 +110,10 @@ app.get('/api/auth/login', async (req, res) => {
       const token = jwt.sign({ openid: wxRes.openid }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
       // 确保用户记录存在
       try {
-        const [rows] = await pool.query('SELECT openid FROM dota2_users WHERE openid = ?', [wxRes.openid]);
+        const [rows] = await pool.query('SELECT openid FROM users WHERE openid = ?', [wxRes.openid]);
         if (!rows.length) {
           await pool.query(
-            "INSERT INTO dota2_users (id, openid, role, nick_name, nick_change_count, created_at, updated_at) VALUES (?, ?, 'user', '', 0, NOW(), NOW())",
+            "INSERT INTO users (id, openid, role, nick_name, nick_change_count, created_at, updated_at) VALUES (?, ?, 'user', '', 0, NOW(), NOW())",
             [genId(), wxRes.openid]
           );
         }
@@ -314,7 +314,7 @@ app.put('/api/players/:id', async (req, res) => {
 
     // 非管理员需校验：昵称必须匹配选手 wxNickname，且不能修改段位/微信昵称
     if (!isAdmin) {
-      const [userRows] = await pool.query('SELECT nick_name FROM dota2_users WHERE openid = ?', [openid]);
+      const [userRows] = await pool.query('SELECT nick_name FROM users WHERE openid = ?', [openid]);
       const userNick = (userRows.length && userRows[0].nick_name) ? userRows[0].nick_name : '';
       const [playerRows] = await pool.query(
         "SELECT wx_nickname, calibrate_rank_name, calibrate_rank_star, calibrate_mmr FROM dota2_players WHERE id = ? AND status = 'active'",
@@ -647,7 +647,7 @@ async function getCallerRole(openidOrReq) {
   }
   if (!openid) return 'user';
   try {
-    const [rows] = await pool.query('SELECT role FROM dota2_users WHERE openid = ?', [openid]);
+    const [rows] = await pool.query('SELECT role FROM users WHERE openid = ?', [openid]);
     return rows.length ? rows[0].role : 'user';
   } catch (e) { return 'user'; }
 }
@@ -682,7 +682,7 @@ app.get('/api/users/me', async (req, res) => {
   try {
     const openid = req._openid || '';
     if (!openid) return res.status(401).json({ success: false, error: '请先登录' });
-    const [rows] = await pool.query('SELECT * FROM dota2_users WHERE openid = ?', [openid]);
+    const [rows] = await pool.query('SELECT * FROM users WHERE openid = ?', [openid]);
     if (!rows.length) return res.json({ success: true, nickName: '', nickChangeCount: 0, role: 'user' });
     const u = mapUser(rows[0]);
     res.json({ success: true, ...u });
@@ -698,7 +698,7 @@ app.get('/api/users/:openid', async (req, res) => {
     if (!isAdmin && openid !== req.params.openid) {
       return res.status(403).json({ success: false, error: '仅可查询自己的用户信息' });
     }
-    const [rows] = await pool.query('SELECT * FROM dota2_users WHERE openid = ?', [req.params.openid]);
+    const [rows] = await pool.query('SELECT * FROM users WHERE openid = ?', [req.params.openid]);
     res.json({ success: true, data: rows[0] ? mapUser(rows[0]) : null });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
@@ -712,7 +712,7 @@ app.get('/api/users', async (req, res) => {
     if (callerRole !== 'super_admin') {
       return res.status(403).json({ success: false, error: '仅超级管理员可查看用户列表' });
     }
-    const [rows] = await pool.query('SELECT * FROM dota2_users ORDER BY created_at DESC');
+    const [rows] = await pool.query('SELECT * FROM users ORDER BY created_at DESC');
     res.json({ success: true, data: rows.map(mapUser) });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
@@ -726,7 +726,7 @@ app.get('/api/users/admins/list', async (req, res) => {
     if (callerRole !== 'admin' && callerRole !== 'super_admin') {
       return res.status(403).json({ success: false, error: '仅管理员可查看管理员列表' });
     }
-    const [rows] = await pool.query("SELECT * FROM dota2_users WHERE role IN ('admin','super_admin') ORDER BY role DESC, created_at ASC");
+    const [rows] = await pool.query("SELECT * FROM users WHERE role IN ('admin','super_admin') ORDER BY role DESC, created_at ASC");
     res.json({ success: true, data: rows.map(mapUser) });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
@@ -753,12 +753,12 @@ app.put('/api/users/:openid/role', async (req, res) => {
     if (!validRoles.includes(role)) {
       return res.status(400).json({ success: false, error: '无效的目标角色' });
     }
-    const [r] = await pool.query('SELECT * FROM dota2_users WHERE openid = ?', [req.params.openid]);
+    const [r] = await pool.query('SELECT * FROM users WHERE openid = ?', [req.params.openid]);
     if (r.length) {
-      await pool.query('UPDATE dota2_users SET role = ?, updated_at = NOW() WHERE openid = ?', [role, req.params.openid]);
+      await pool.query('UPDATE users SET role = ?, updated_at = NOW() WHERE openid = ?', [role, req.params.openid]);
     } else {
       const id = genId();
-      await pool.query('INSERT INTO dota2_users (id, openid, role, nick_name, created_at, updated_at) VALUES (?,?,?,?,NOW(),NOW())', [id, req.params.openid, role, '']);
+      await pool.query('INSERT INTO users (id, openid, role, nick_name, created_at, updated_at) VALUES (?,?,?,?,NOW(),NOW())', [id, req.params.openid, role, '']);
     }
     res.json({ success: true });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
@@ -771,16 +771,16 @@ app.put('/api/users/me/nickname', async (req, res) => {
     const { nickName } = req.body;
     if (!openid || !nickName) return res.status(400).json({ success: false, error: '缺少参数' });
 
-    const [dups] = await pool.query('SELECT openid FROM dota2_users WHERE nick_name = ? AND openid != ?', [nickName, openid]);
+    const [dups] = await pool.query('SELECT openid FROM users WHERE nick_name = ? AND openid != ?', [nickName, openid]);
     if (dups.length) {
       return res.status(400).json({ success: false, message: '该昵称已被其他用户使用，请换一个' });
     }
 
-    const [rows] = await pool.query('SELECT * FROM dota2_users WHERE openid = ?', [openid]);
+    const [rows] = await pool.query('SELECT * FROM users WHERE openid = ?', [openid]);
     if (!rows.length) {
       const id = genId();
       try {
-        await pool.query("INSERT INTO dota2_users (id,openid,nick_name,role,nick_change_count,created_at,updated_at) VALUES (?,?,?,'user',0,NOW(),NOW())", [id, openid, nickName]);
+        await pool.query("INSERT INTO users (id,openid,nick_name,role,nick_change_count,created_at,updated_at) VALUES (?,?,?,'user',0,NOW(),NOW())", [id, openid, nickName]);
         res.json({ success: true, nickChangeCount: 0 });
       } catch (e) {
         if (e.code === 'ER_DUP_ENTRY') {
@@ -797,7 +797,7 @@ app.put('/api/users/me/nickname', async (req, res) => {
         return res.status(400).json({ success: false, message: '修改次数已用完，请联系超级管理员重置', nickChangeCount: count });
       }
       try {
-        await pool.query('UPDATE dota2_users SET nick_name=?,nick_change_count=nick_change_count+1,updated_at=NOW() WHERE openid=?', [nickName, openid]);
+        await pool.query('UPDATE users SET nick_name=?,nick_change_count=nick_change_count+1,updated_at=NOW() WHERE openid=?', [nickName, openid]);
         res.json({ success: true, nickChangeCount: count + 1 });
       } catch (e) {
         if (e.code === 'ER_DUP_ENTRY') {
@@ -818,10 +818,14 @@ app.put('/api/users/:openid/reset-nickcount', async (req, res) => {
     if (callerRole !== 'super_admin') {
       return res.status(403).json({ success: false, error: '仅超级管理员可重置修改次数' });
     }
-    await pool.query('UPDATE dota2_users SET nick_change_count=0,updated_at=NOW() WHERE openid=?', [req.params.openid]);
+    await pool.query('UPDATE users SET nick_change_count=0,updated_at=NOW() WHERE openid=?', [req.params.openid]);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
+
+// ============== 首页业务模块（首页介绍/公告/数据统计/赛事动态） ==============
+// 【注意】必须在赛事模块之前注册，避免 /api/events/dynamic 被 /api/events/:eventId 拦截
+require('./home-routes')(app, { pool, assertAdmin, getCallerRole, upload });
 
 // ============== 赛事业务模块（赛事/报名/队伍/对战/名次/章程） ==============
 // 注：该模块复用 pool / assertAdmin / getCallerRole，与现有代码共享连接和权限
