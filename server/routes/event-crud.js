@@ -1,6 +1,5 @@
 /**
  * 赛事 CRUD 路由 — 创建/列表/详情/编辑/状态/删除
- * 原 event-routes.js 第1部分（约第174-704行）
  */
 module.exports = function (app, h) {
 
@@ -170,8 +169,6 @@ module.exports = function (app, h) {
   /** POST /api/events — 创建赛事 */
   async function handleCreateEvent(req, res) {
     try {
-      if (!await h.assertAdmin(req, res)) return;
-
       const eventName = (req.body.event_name || req.body.eventName || '').trim();
       let startTime = req.body.start_time || req.body.startTime || null;
       // 毫秒时间戳 → MySQL datetime 格式
@@ -227,7 +224,6 @@ module.exports = function (app, h) {
   /** PUT /api/events/:eventId — 编辑赛事信息 */
   app.put('/api/events/:eventId', h.auth.requireAdminNotArchived, async (req, res) => {
     try {
-      if (!await h.assertAdmin(req, res)) return;
       const { eventId } = req.params;
       const event = await h.validateEvent(eventId);
       if (!event) return res.status(404).json({ success: false, error: '赛事不存在' });
@@ -257,7 +253,6 @@ module.exports = function (app, h) {
   /** PUT /api/events/:eventId/status — 更新赛事状态 */
   app.put('/api/events/:eventId/status', h.auth.requireAdmin, async (req, res) => {
     try {
-      if (!await h.assertAdmin(req, res)) return;
       const { eventId } = req.params;
       const event = await h.validateEvent(eventId);
       if (!event) return res.status(404).json({ success: false, error: '赛事不存在' });
@@ -319,7 +314,6 @@ module.exports = function (app, h) {
   /** PUT /api/events/:eventId/signup-limit — 修改报名人数上限 */
   app.put('/api/events/:eventId/signup-limit', h.auth.requireAdmin, async (req, res) => {
     try {
-      if (!await h.assertAdmin(req, res)) return;
       const { eventId } = req.params;
       const event = await h.validateEvent(eventId);
       if (!event) return res.status(404).json({ success: false, error: '赛事不存在' });

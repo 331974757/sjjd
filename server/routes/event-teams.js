@@ -1,6 +1,5 @@
 /**
  * 队伍管理路由 — 队伍列表/批量保存/自动分队/锁定/回退/重命名/删除/积分榜
- * 原 event-routes.js 第3部分（约第1316-1951行）
  */
 const { allocateTeams } = require('../utils/team-allocation');
 
@@ -23,17 +22,34 @@ module.exports = function (app, h) {
 
       const teams = [];
       const allAssignedPlayerIds = new Set();
+      const teamPlayerIds = []; // 按队伍索引存储 playerIds
       for (const team of rows) {
         let playerIds = [];
         try { playerIds = team.player_ids ? JSON.parse(team.player_ids) : []; } catch (_) { playerIds = []; }
         playerIds.forEach(pid => allAssignedPlayerIds.add(pid));
+        teamPlayerIds.push(playerIds);
+      }
 
-        const players = playerIds.length ? await h.getPlayersByIds(playerIds) : [];
-        const members = players.map(p => ({
-          id: p.id, nickName: p.wx_nickname || '', rankName: p.calibrate_rank_name || '', rankStar: p.calibrate_rank_star || 0,
-          mmr: p.calibrate_mmr || 0, rankSort: p.calibrate_rank_sort || 0, avatarUrl: p.avatar_url || '',
-          isCaptain: p.id === team.captain_id
-        }));
+      // 收集所有已分配选手ID，一次查询
+      const allPlayerIds = [...allAssignedPlayerIds];
+      const allPlayersMap = {};
+      if (allPlayerIds.length) {
+        const players = await h.getPlayersByIds(allPlayerIds);
+        players.forEach(p => { allPlayersMap[p.id] = p; });
+      }
+
+      // 用 Map 映射到各队伍
+      for (let i = 0; i < rows.length; i++) {
+        const team = rows[i];
+        const playerIds = teamPlayerIds[i];
+        const members = playerIds.map(pid => {
+          const p = allPlayersMap[pid];
+          return p ? {
+            id: p.id, nickName: p.wx_nickname || '', rankName: p.calibrate_rank_name || '', rankStar: p.calibrate_rank_star || 0,
+            mmr: p.calibrate_mmr || 0, rankSort: p.calibrate_rank_sort || 0, avatarUrl: p.avatar_url || '',
+            isCaptain: p.id === team.captain_id
+          } : null;
+        }).filter(Boolean);
         const captainPlayer = members.find(m => m.isCaptain);
         const avgMmr = members.length > 0 ? Math.round((team.total_mmr || 0) / members.length) : 0;
 
@@ -74,8 +90,28 @@ module.exports = function (app, h) {
       const { teams } = req.body;
       if (!teams || !Array.isArray(teams)) return res.status(400).json({ success: false, error: '参数 teams 必须是数组' });
 
+      // 【安全】校验传入的 playerId 是否属于本赛事已报名选手
+      const [signedIds] = await h.pool.query(
+        'SELECT player_id FROM dota2_event_signup WHERE event_id = ? AND signup_status = 1', [eventId]
+      );
+      const validPlayerIds = new Set(signedIds.map(r => r.player_id));
+      const allSubmittedIds = teams.flatMap(t => t.playerIds || []);
+      const invalidIds = allSubmittedIds.filter(pid => !validPlayerIds.has(pid));
+      if (invalidIds.length) {
+        return res.status(400).json({ success: false, error: `选手 ${invalidIds.join(', ')} 未报名本赛事` });
+      }
+
       const uniqCheck = h.validatePlayerUniqueness(teams);
       if (!uniqCheck.valid) return res.status(400).json({ success: false, error: uniqCheck.error });
+
+      // 【校验】每队人数至少 MIN_TEAM_PLAYERS
+      const invalidTeams = teams.filter(t => !t.teamName || !t.playerIds || t.playerIds.length < h.MIN_TEAM_PLAYERS);
+      if (invalidTeams.length) {
+        return res.status(400).json({
+          success: false,
+          error: `队伍「${invalidTeams.map(t => t.teamName || '未命名').join('、')}」人数不足 ${h.MIN_TEAM_PLAYERS} 人`
+        });
+      }
 
       const conn = await h.pool.getConnection();
       try {
@@ -122,7 +158,7 @@ module.exports = function (app, h) {
       if (!teamCount || teamCount < 2) return res.status(400).json({ success: false, error: '队伍数量至少为2' });
 
       const [signupRows] = await h.pool.query(
-        'SELECT s.player_id, p.calibrate_mmr, p.wx_nickname, p.calibrate_rank_sort FROM dota2_event_signup s LEFT JOIN dota2_players p ON s.player_id = p.id WHERE s.event_id = ? AND s.signup_status = 1 ORDER BY p.calibrate_rank_sort DESC, p.calibrate_mmr DESC',
+        'SELECT s.player_id, p.calibrate_mmr, p.wx_nickname, p.calibrate_rank_sort, p.calibrate_rank_star, p.good_at_positions, p.calibrate_rank_name FROM dota2_event_signup s LEFT JOIN dota2_players p ON s.player_id = p.id WHERE s.event_id = ? AND s.signup_status = 1 ORDER BY p.calibrate_rank_sort DESC, p.calibrate_mmr DESC',
         [eventId]
       );
       if (!signupRows.length) return res.status(400).json({ success: false, error: '暂无已报名选手' });

@@ -1,6 +1,5 @@
 /**
  * 名次管理路由 — 名次排行榜/批量保存/设置/更新/删除
- * 原 event-routes.js 第5部分（约第2856-3202行）
  */
 module.exports = function (app, h) {
 

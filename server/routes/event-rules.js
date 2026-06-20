@@ -1,6 +1,5 @@
 /**
  * 赛事章程路由 — 章程列表/详情/赛事章程/创建/编辑/删除
- * 原 event-routes.js 第6部分（约第3204-3375行）
  */
 module.exports = function (app, h) {
 

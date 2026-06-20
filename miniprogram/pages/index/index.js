@@ -345,6 +345,10 @@ const pageConfig = {
       title: '蜀国争霸系统 - 看看大家的Dota2段位！',
       path: '/pages/index/index'
     }
+  },
+
+  onUnload() {
+    if (this._reloadTimer) clearTimeout(this._reloadTimer);
   }
 }
 

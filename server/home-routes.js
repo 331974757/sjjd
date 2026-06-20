@@ -10,6 +10,7 @@
  */
 
 const { genId } = require('./utils/helpers');
+const auth = require('./utils/auth');
 
 function formatTimestamp(ts) {
   if (!ts) return null;
@@ -57,26 +58,6 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
 
   // ==================== 权限辅助 ====================
 
-  /** 从请求中提取 operatorOpenid */
-  function getOperatorOpenid(req) {
-    return req._openid || '';
-  }
-
-  /** 断言当前用户是 super_admin，否则 403 */
-  async function assertSuperAdmin(req, res, next) {
-    try {
-      const openid = getOperatorOpenid(req);
-      if (!openid) return res.status(401).json({ success: false, error: '请先登录' });
-      const role = await getCallerRole(openid);
-      if (role !== 'super_admin') {
-        return res.status(403).json({ success: false, error: '仅超级管理员可操作' });
-      }
-      next();
-    } catch (e) {
-      res.status(500).json({ success: false, error: e.message });
-    }
-  }
-
   // ==================== 1. 首页介绍接口 ====================
 
   /**
@@ -99,7 +80,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
    * PUT /api/home/intro - 保存首页图文介绍（仅 super_admin）
    * Body: { content: [...] } JSON数组
    */
-  app.put('/api/home/intro', assertSuperAdmin, async (req, res) => {
+  app.put('/api/home/intro', auth.requireSuperAdmin, async (req, res) => {
     try {
       const { content } = req.body;
       const jsonStr = JSON.stringify(content || []);
@@ -134,7 +115,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
    * POST /api/announcements - 新增公告（仅 super_admin）
    * Body: { content, isPinned? }
    */
-  app.post('/api/announcements', assertSuperAdmin, async (req, res) => {
+  app.post('/api/announcements', auth.requireSuperAdmin, async (req, res) => {
     try {
       const { content, isPinned } = req.body;
       if (!content || !content.trim()) {
@@ -158,7 +139,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
    * PUT /api/announcements/:id - 编辑公告（仅 super_admin）
    * Body: { content }
    */
-  app.put('/api/announcements/:id', assertSuperAdmin, async (req, res) => {
+  app.put('/api/announcements/:id', auth.requireSuperAdmin, async (req, res) => {
     try {
       const { content } = req.body;
       if (!content || !content.trim()) {
@@ -180,7 +161,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
   /**
    * DELETE /api/announcements/:id - 删除公告（仅 super_admin）
    */
-  app.delete('/api/announcements/:id', assertSuperAdmin, async (req, res) => {
+  app.delete('/api/announcements/:id', auth.requireSuperAdmin, async (req, res) => {
     try {
       const [result] = await pool.query('DELETE FROM announcements WHERE id = ?', [req.params.id]);
       if (result.affectedRows === 0) {
@@ -196,7 +177,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
    * PUT /api/announcements/:id/pin - 置顶/取消置顶（仅 super_admin）
    * Body: { isPinned: true/false }
    */
-  app.put('/api/announcements/:id/pin', assertSuperAdmin, async (req, res) => {
+  app.put('/api/announcements/:id/pin', auth.requireSuperAdmin, async (req, res) => {
     try {
       const { isPinned } = req.body;
       const [result] = await pool.query(
@@ -216,7 +197,7 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
    * PUT /api/announcements/sort - 排序公告（仅 super_admin）
    * Body: { ids: [...] } 按新的顺序排列的 ID 列表
    */
-  app.put('/api/announcements/sort', assertSuperAdmin, async (req, res) => {
+  app.put('/api/announcements/sort', auth.requireSuperAdmin, async (req, res) => {
     try {
       const { ids } = req.body;
       if (!Array.isArray(ids) || ids.length === 0) {

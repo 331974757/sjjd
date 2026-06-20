@@ -38,7 +38,7 @@ function getToken() {
   return ''
 }
 
-async function request(options) {
+async function request(options, _retried) {
   const token = getToken()
   let url = API_BASE + options.url
   const method = (options.method || 'GET').toUpperCase()
@@ -70,7 +70,20 @@ async function request(options) {
       data: data,
       timeout: 8000,  // 8 秒超时，避免 App Service 层累计超时触发 SystemError
       header: headers,
-      success: (res) => {
+      success: async (res) => {
+        // 【401 自动续期】Token 过期 → 重新登录后重试一次
+        if (res.statusCode === 401 && !_retried) {
+          try {
+            const app = getApp();
+            app.clearLoginCache();
+            await app.getOpenId();  // 重新登录获取新 token
+            const retryResult = await request(options, true);
+            resolve(retryResult);
+            return;
+          } catch (_) {
+            // 续期失败，返回原始错误
+          }
+        }
         // 200~499 都 resolve，让调用方通过 res.success 判断业务成败
         // 否则 400 校验错误（如昵称重复）会走 reject 导致看不到具体错误消息
         if (res.statusCode < 500) {

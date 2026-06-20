@@ -1,6 +1,5 @@
 /**
  * 报名管理路由 — 报名列表/自主报名/管理员添加/批量/取消/搜索
- * 原 event-routes.js 第2部分（约第705-1314行）
  */
 module.exports = function (app, h) {
 
