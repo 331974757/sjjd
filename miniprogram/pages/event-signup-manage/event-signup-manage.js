@@ -200,6 +200,8 @@ Page({
 
   // ====== 管理员批量添加报名 ======
   async doBatchAdd() {
+    if (this.data._operating) return
+    if (this._batchAdding) return; this._batchAdding = true
     // 过滤掉已报名的选手（防御性检查）
     const players = this.data.searchResults
     const selectedIds = Object.keys(this.data.selectedPlayers).filter(id => {
@@ -208,6 +210,7 @@ Page({
     })
     if (selectedIds.length === 0) {
       modal.toast(this, { title: '请先选择未报名选手', icon: 'none' })
+      this._batchAdding = false
       return
     }
 
@@ -222,7 +225,7 @@ Page({
       content: `确定添加以下 ${selectedIds.length} 名选手？\n\n${names}`
     })
 
-    if (!confirmRes) return
+    if (!confirmRes) { this._batchAdding = false; return }
 
     this.setData({ loading: true })
     try {
@@ -249,6 +252,8 @@ Page({
     } catch (e) {
       this.setData({ loading: false })
       modal.toast(this, { title: '添加失败，请重试', icon: 'none' })
+    } finally {
+      this._batchAdding = false
     }
   },
 
@@ -294,7 +299,8 @@ Page({
 
   // 【核心】管理员剔除报名（软删除 + 留痕）
   async doRemoveSignup() {
-    if (!this.data.removeTarget) return
+    if (this._removing) return; this._removing = true
+    if (!this.data.removeTarget) { this._removing = false; return }
     const { signupId, playerName } = this.data.removeTarget
     this.setData({ showRemoveConfirm: false, loading: true })
 
@@ -315,6 +321,8 @@ Page({
     } catch (e) {
       this.setData({ loading: false })
       modal.toast(this, { title: '操作失败，请重试', icon: 'none' })
+    } finally {
+      this._removing = false
     }
   },
 

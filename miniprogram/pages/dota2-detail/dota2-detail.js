@@ -294,6 +294,7 @@ Page({
    * - 通知首页标记 needsReload
    */
   async updateField(field, value) {
+    if (this._saving) return; this._saving = true
     wx.showLoading({ title: '保存中...' })
     try {
       const res = await api.put('/players/' + this.data.playerId, { [field]: value })
@@ -311,6 +312,8 @@ Page({
       wx.hideLoading()
       console.error('[选手详情] 更新失败', err)
       modal.toast(this, { title: '更新失败', icon: 'none' })
+    } finally {
+      this._saving = false
     }
   },
 
@@ -334,6 +337,8 @@ Page({
       wx.hideLoading()
       console.error('[选手详情] 批量更新失败', err)
       modal.toast(this, { title: '更新失败', icon: 'none' })
+    } finally {
+      this._saving = false
     }
   },
 
@@ -353,6 +358,7 @@ Page({
    * 执行软删除：PUT /api/players/:id → 标记 status='deleted'
    */
   async doDelete() {
+    if (this._deleting) return; this._deleting = true
     wx.showLoading({ title: '删除中...' })
     try {
       const res = await api.del('/players/' + this.data.playerId)
