@@ -20,13 +20,13 @@
  * ============================================================
  */
 
+const { ERROR_CODES } = require('./errors');
+
 let pool = null;
 let getCallerRoleFn = null;
 
 /**
  * 初始化模块（必须在 app.listen 之前调用）
- * @param {Object} mysqlPool  - mysql2/promise 连接池
- * @param {Function} roleFn  - 获取调用者角色的函数 getCallerRole(openid)
  */
 function init(mysqlPool, roleFn) {
   pool = mysqlPool;
@@ -159,19 +159,18 @@ async function getEvent(eventId) {
 async function requireAdmin(req, res, next) {
   const role = await getCallerRole(req);
   if (role !== ROLES.ADMIN && role !== ROLES.SUPER_ADMIN) {
-    return res.status(403).json({ success: false, error: '仅管理员可操作' });
+    return res.status(403).json({ success: false, error: '仅管理员可操作', code: ERROR_CODES.PERMISSION_DENIED });
   }
   next();
 }
 
 /**
  * 断言超级管理员（仅 super_admin）
- * 适用：管理员账号管理、删除未归档赛事、全局配置修改
  */
 async function requireSuperAdmin(req, res, next) {
   const role = await getCallerRole(req);
   if (role !== ROLES.SUPER_ADMIN) {
-    return res.status(403).json({ success: false, error: '仅超级管理员可操作' });
+    return res.status(403).json({ success: false, error: '仅超级管理员可操作', code: ERROR_CODES.PERMISSION_DENIED });
   }
   next();
 }
@@ -256,7 +255,7 @@ async function requireNotArchived(req, res, next) {
     [eventId]
   );
   if (archived === 1 || event_status >= STATUS.ARCHIVED) {
-    return res.status(403).json({ success: false, error: '赛事已归档，所有数据为只读状态，不可修改' });
+    return res.status(403).json({ success: false, error: '赛事已归档，所有数据为只读状态，不可修改', code: ERROR_CODES.ARCHIVED });
   }
   next();
 }

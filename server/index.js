@@ -51,6 +51,8 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
 
+const { errorHandler } = require('./utils/errors');
+
 const pool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'dota2',
@@ -893,17 +895,12 @@ app.get('/api/_debug/permissions', async (req, res) => {
 
 // === 全局错误处理（防止无效 JSON 等导致进程崩溃） ===
 // body-parser 遇到非法 JSON 时会抛 SyntaxError，Express 4 默认不捕获会导致 crash
-app.use((err, req, res, next) => {
-  if (err instanceof SyntaxError && err.type === 'entity.parse.failed') {
-    return res.status(400).json({ success: false, error: '请求 JSON 格式错误' });
-  }
-  console.error('[UNHANDLED]', err.message || err);
-  res.status(500).json({ success: false, error: '服务器内部错误' });
-});
+// === 全局错误处理中间件（统一错误码 + 防止 JSON 解析崩溃） ===
+app.use(errorHandler);
 
 // 未匹配路由 404
 app.use((req, res) => {
-  res.status(404).json({ success: false, error: '接口不存在' });
+  res.status(404).json({ success: false, error: '接口不存在', code: 'NOT_FOUND' });
 });
 
 // === 启动安全提示：检查是否使用了硬编码默认值（生产环境应用 env 变量覆盖） ===
