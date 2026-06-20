@@ -884,10 +884,12 @@ app.put('/api/users/:openid/reset-nickcount', async (req, res) => {
 });
 
 // ============== 首页业务模块（首页介绍/公告/数据统计/赛事动态） ==============
-// 【注意】必须在赛事模块之前注册，避免 /api/events/dynamic 被 /api/events/:eventId 拦截require('./home-routes')(app, { pool, assertAdmin, getCallerRole, upload });
+// 【注意】必须在赛事模块之前注册，避免 /api/events/dynamic 被 /api/events/:eventId 拦截
+require('./home-routes')(app, { pool, assertAdmin, getCallerRole, upload });
 
 // ============== 赛事业务模块（赛事/报名/队伍/对战/名次/章程） ==============
-// 复用 pool / assertAdmin / getCallerRole，与现有代码共享连接和权限require('./event-routes')(app, { pool, assertAdmin, getCallerRole, upload });
+// 复用 pool / assertAdmin / getCallerRole，与现有代码共享连接和权限
+require('./event-routes')(app, { pool, assertAdmin, getCallerRole, upload });
 
 // ============== 统一权限中间件初始化 ==============
 const auth = require('./utils/auth');
