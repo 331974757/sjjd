@@ -61,7 +61,6 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   connectTimeout: 10000,           // 10秒连接超时
-  acquireTimeout: 10000,           // 10秒获取连接超时
   enableKeepAlive: true,           // 启用TCP Keep-Alive
   keepAliveInitialDelay: 0,        // Keep-Alive初始延迟
 });
