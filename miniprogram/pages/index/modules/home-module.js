@@ -186,7 +186,7 @@ module.exports = {
         case 'removeAdmin': title = '取消管理员'; content = '确定取消「' + name + '」的管理员权限吗？'; theme = 'danger'; callback = () => this.homeDoSetRole(openid, 'user', '取消管理员'); break
       }
       const r = await modal.confirm(this, { theme, title, content, confirmText: '确认' })
-      if (r.confirm) callback()
+      if (r.confirm) await callback()
     },
 
     async homeDoSetRole(openid, role, label) {
