@@ -2,6 +2,7 @@
  * 对战管理路由 — 对战列表/轮次/生成/开启/编辑/判定/图片上传/删除/下一轮/结束比赛/归档
  */
 module.exports = function (app, h) {
+  function shortName(name) { if (!name) return ''; return name.length > 8 ? name.substring(0, 8) + '…' : name; }
 
   /** GET /api/events/:eventId/matches — 对战列表 */
   app.get('/api/events/:eventId/matches', async (req, res) => {
@@ -45,7 +46,7 @@ module.exports = function (app, h) {
       const captainMap = {};
       if (captainIds.size > 0) {
         const [captains] = await h.pool.query('SELECT id, wx_nickname FROM dota2_players WHERE id IN (?)', [[...captainIds]]);
-        (captains || []).forEach(p => { captainMap[p.id] = p.wx_nickname || ''; });
+        (captains || []).forEach(p => { captainMap[p.id] = shortName(p.wx_nickname || ''); });
       }
 
       const matches = rows.map(m => ({
