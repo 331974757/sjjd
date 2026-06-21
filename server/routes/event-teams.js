@@ -128,8 +128,12 @@ module.exports = function (app, h) {
             return res.status(400).json({ success: false, error: `队伍「${team.teamName}」的队长不在队员列表中` });
           }
           const playerIdsJson = JSON.stringify(team.playerIds);
-          const players = await h.getPlayersByIds(team.playerIds);
-          const totalMmr = players.reduce((sum, p) => sum + (p.calibrate_mmr || 0), 0);
+          // 优先用前端传来的总分，否则从数据库计算
+          let totalMmr = team.totalMmr || 0;
+          if (!totalMmr) {
+            const players = await h.getPlayersByIds(team.playerIds);
+            totalMmr = players.reduce((sum, p) => sum + (p.calibrate_mmr || 0), 0);
+          }
           await conn.query(
             'INSERT INTO dota2_event_teams (team_id, event_id, team_name, captain_id, player_ids, total_mmr, avg_mmr, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())',
             [teamId, eventId, team.teamName, captainId, playerIdsJson, totalMmr, Math.round(totalMmr / team.playerIds.length)]

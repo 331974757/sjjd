@@ -579,6 +579,7 @@ Page({
       teamName: t.teamName,
       captainId: t.captain_id,
       playerIds: t.players.map(p => p.id),
+      totalMmr: t.totalMmr || 0,
     }))
 
     this.setData({ saving: true })
