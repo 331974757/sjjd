@@ -190,7 +190,13 @@ module.exports = function (app, h) {
         await conn.commit();
         res.json({
           success: true,
-          data: { teamCount: allocation.teams.length, teams: allocation.teams, message: `已自动分为 ${allocation.teams.length} 支队伍` }
+          data: {
+            teamCount: allocation.teams.length,
+            teams: allocation.teams,
+            stats: allocation.balanceInfo,
+            warnings: allocation.warnings || [],
+            message: `已自动分为 ${allocation.teams.length} 支队伍`
+          }
         });
       } catch (e) {
         await h.safeRollback(conn, 'allocateTeams');
