@@ -210,10 +210,15 @@ function checkAction(action, options) {
 
     // ─── 自主报名 ───
     case 'signup':
-    case 'cancel_signup':
-      // 管理员报名状态与普通用户一致（后端 requireSignupOpen 要求 status=1）
       if (status !== EVENT_STATUS.SIGNUP_OPEN) {
         return { allowed: false, disabled: true, reason: STATUS_NAMES[status] ? `「${STATUS_NAMES[status]}」阶段不可报名` : '非报名阶段' };
+      }
+      return { allowed: true, disabled: false, reason: '' };
+
+    case 'cancel_signup':
+      // 取消报名：只要赛事未归档、未进入对战阶段即可
+      if (status >= EVENT_STATUS.BATTLE_READY || archived === 1) {
+        return { allowed: false, disabled: true, reason: '当前阶段不可取消报名' };
       }
       return { allowed: true, disabled: false, reason: '' };
 

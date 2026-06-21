@@ -291,6 +291,12 @@ module.exports = function (app, h) {
         if (failCount > 0) {
           // 任何失败都回滚全部操作，保证数据一致性
           await conn.rollback();
+          conn.release();
+          return res.status(400).json({
+            success: false,
+            error: `批量添加失败：${failCount} 个选手添加出错，全部已回滚`,
+            data: { successCount: 0, skipCount, failCount, total: playerIds.length, results }
+          });
         } else {
           await conn.commit();
         }
