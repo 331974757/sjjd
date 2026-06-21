@@ -59,7 +59,7 @@ function getRoleSync() {
 }
 
 // 获取当前用户角色（异步），返回 'admin' | 'user' | 'super_admin'
-// 缓存策略：内存缓存 → Storage缓存(30分钟TTL) → API查询
+// 缓存策略：内存缓存 → Storage缓存(5分钟TTL) → API查询
 // 多次并发调用只会请求一次API（Promise 去重）
 function getRole() {
   // 1. 优先使用内存缓存

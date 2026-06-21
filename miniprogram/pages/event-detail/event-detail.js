@@ -170,7 +170,8 @@ const coreMethods = {
         this.setData({ event, isArchived })
         this._updateProgressSteps()
         this._computeOverviewJump()
-        this.startEditTime(); this.setData({ editingTime: false })
+        this.startEditTime()
+        // startEditTime 已内部设置 editingTime: true，概览不需要编辑态
         // 预加载报名人数供概览显示
         this.loadSignups()
       } else {
