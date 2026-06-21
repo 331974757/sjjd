@@ -305,6 +305,13 @@ const pageConfig = {
       this.loadHomeData()
       if (this.data.userRole === 'super_admin') { this.homeLoadUsers() }
     }
+    if (game === 'dota2') {
+      // 根据当前 subTab 加载对应数据
+      const tab = this.data.subTab
+      if (tab === 'profile' && !this.data.loaded) { this.loadAllPlayers() }
+      else if (tab === 'rules') { this.loadRuleEvents() }
+      else if (tab === 'history') { this.loadEvents() }
+    }
   },
 
   onGamePlusTap() {
