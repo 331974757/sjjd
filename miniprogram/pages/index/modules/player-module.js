@@ -39,6 +39,13 @@ module.exports = {
       if (reset) {
         this.setData({ displayPlayers: [], loaded: false, hasMore: false, currentPage: 1 })
       }
+      // 兜底超时：10 秒后强制结束加载状态
+      const timeout = setTimeout(() => {
+        if (!this.data.loaded) {
+          this.setData({ loaded: true })
+          modal.toast(this, { theme: 'warning', content: '加载超时，请下拉刷新' })
+        }
+      }, 10000)
       try {
         const params = {
           page: reset ? 1 : (this.data.currentPage || 1),
@@ -81,6 +88,7 @@ module.exports = {
         this.setData({ loaded: true })
         modal.toast(this, { theme: 'danger', content: '加载失败' })
       } finally {
+        clearTimeout(timeout)
         this._loading = false
       }
     },
