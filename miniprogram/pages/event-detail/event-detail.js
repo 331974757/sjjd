@@ -353,6 +353,8 @@ const coreMethods = {
     const idx = e.detail.value
     const text = dt.toDisplayText(this.data.editDateTimeRange, idx)
     this.setData({ editDateTimeIndex: idx, editDateTimeText: text })
+    // picker 确认后自动保存
+    this.confirmEditTime()
   },
   async confirmEditTime() {
     const ts = dt.toTimestamp(this.data.editDateTimeRange, this.data.editDateTimeIndex)
