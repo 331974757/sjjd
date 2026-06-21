@@ -72,9 +72,9 @@ module.exports = {
         const res = await api.get('/events/' + this.data.eventId + '/my-signup')
         if (res.success) {
           this.setData({
-            mySignup: res.data,
+            mySignup: res.data || null,
             mySignupLoaded: true,
-            _myPlayerId: res.data.playerId || ''
+            _myPlayerId: (res.data && res.data.playerId) || ''
           })
         } else {
           this.setData({ mySignupLoaded: true })
