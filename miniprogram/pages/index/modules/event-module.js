@@ -161,7 +161,9 @@ module.exports = {
       const dataset = e.currentTarget.dataset
       const eventId = dataset.eventId || dataset.id
       if (!eventId) return
-      const isHistory = this.data.subTab === 'history'
+      // 从 WXML data-force-readonly 判断是否为历史赛事入口
+      const isHistory = dataset.forceReadonly === true || dataset.forceReadonly === 'true' ||
+        (!dataset.forceActive && this.data.currentGame === 'dota2' && this.data.subTab === 'history')
       const extra = isHistory ? '&readonly=1&fromHistory=1' : ''
       wx.navigateTo({ url: '/pages/event-detail/event-detail?eventId=' + eventId + extra })
     },
