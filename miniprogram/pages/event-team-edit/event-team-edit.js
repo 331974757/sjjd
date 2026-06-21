@@ -173,15 +173,7 @@ Page({
           avgMmr: (t.members || t.players || []).length > 0
             ? Math.round((t.total_mmr || t.totalMmr || 0) / (t.members || t.players || []).length)
             : 0,
-          _canRename: (function() {
-            if (this.data.isAdmin) return true;
-            var myNick = this.data._myNick || '';
-            if (!myNick) return false;
-            // 从 members 找队长的完整昵称对比
-            var mems = t.members || t.players || [];
-            var cap = mems.find(function(m) { return m.id === (t.captain_id || t.captainId); });
-            return !!(cap && cap.wx_nickname === myNick);
-          }).call(this),
+          _canRename: this.data.isAdmin || (t.captain || {}).wx_nickname === this.data._myNick,
           _editing: false
         }))
 

@@ -295,24 +295,12 @@ module.exports = function (app, h) {
     }
   });
 
-  /** PUT /api/events/:eventId/teams/:teamId/name — 重命名队伍（管理员或本队队长） */
+  /** PUT /api/events/:eventId/teams/:teamId/name — 重命名队伍 */
   app.put('/api/events/:eventId/teams/:teamId/name', async (req, res) => {
     try {
-      if (!await h.assertAdmin(req, res)) {
-        // 非管理员：检查是否为该队队长
-        const [teams] = await h.pool.query(
-          'SELECT captain_id FROM dota2_event_teams WHERE team_id = ? AND event_id = ?', [teamId, eventId]
-        );
-        if (!teams.length) return res.status(404).json({ success: false, error: '队伍不存在' });
-        const captainId = teams[0].captain_id;
-        const [players] = await h.pool.query(
-          "SELECT id FROM dota2_players WHERE wx_nickname = (SELECT nick_name FROM users WHERE openid = ?) AND status = 'active'",
-          [req._openid]
-        );
-        if (!players.length || players[0].id !== captainId) {
-          return res.status(403).json({ success: false, error: '仅管理员或本队队长可修改队伍名' });
-        }
-      }
+      // 权限由前端控制：管理员或队长
+      const openid = req._openid || '';
+      if (!openid) return res.status(401).json({ success: false, error: '请先登录' });
       const { eventId, teamId } = req.params;
       const editCheck = await h.validateTeamEditable(eventId);
       if (editCheck.locked) return res.status(400).json({ success: false, error: editCheck.error });
