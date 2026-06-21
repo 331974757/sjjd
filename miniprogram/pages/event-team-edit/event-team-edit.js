@@ -466,39 +466,33 @@ Page({
       })
 
       if (res.success) {
-        const { teams, stats, warnings } = res.data
-
-        // 直接映射：playerList→players, totalScore→totalMmr
-        const formattedTeams = (teams || []).map(t => ({
-          teamId: 'auto_' + t.teamIndex,
+        const { stats } = res.data
+        const teamsPayload = (res.data.teams || []).map(t => ({
           teamName: t.teamName,
-          captain_id: t.captainId,
-          players: t.playerList || [],
-          totalMmr: t.totalScore || 0,
-          avgMmr: t.avgScore || 0,
-          isNew: true,
+          captainId: t.captainId,
+          playerIds: (t.playerList || []).map(p => p.id),
         }))
-
-        this.setData({
-          teams: formattedTeams,
-          freePlayers: [],
-          selectedPlayerId: '',
-          autoAllocating: false,
-          loading: false,
-        })
-
+        
+        // 直接保存到数据库
+        const saveRes = await api.post('/events/' + this.data.eventId + '/teams/batch', { teams: teamsPayload })
+        if (!saveRes.success) {
+          wx.hideLoading()
+          modal.toast(this, { title: saveRes.error || '保存失败', icon: 'none' })
+          return
+        }
+        
+        // 从数据库重新加载
+        await this.loadTeamData()
         wx.hideLoading()
 
-        if (stats) {
-          const info = [
-            formattedTeams.length + '队',
-            '最大分差：' + stats.scoreStats.maxDiff + '分 (' + stats.scoreStats.grade + ')',
-          ]
-          await modal.confirm(this, {
-            theme: 'success', title: '分队完成', content: info.join('\n'),
-            showCancel: false, confirmText: '开始微调'
-          })
-        }
+        const info = [teamsPayload.length + '队已生成']
+        if (stats) info.push('最大分差：' + stats.scoreStats.maxDiff + '分 (' + stats.scoreStats.grade + ')')
+        
+        await modal.confirm(this, {
+          theme: 'success', title: '分队完成', content: info.join('\n'),
+          showCancel: false, confirmText: '开始微调'
+        })
+      } else {
         wx.hideLoading()
         modal.toast(this, { title: res.error || '分队失败', icon: 'none' })
       }
