@@ -173,8 +173,7 @@ Page({
           avgMmr: (t.members || t.players || []).length > 0
             ? Math.round((t.total_mmr || t.totalMmr || 0) / (t.members || t.players || []).length)
             : 0,
-          // 队长可改自己的队伍名，管理员可改所有队伍名
-          _canRename: this.data.isAdmin || (t.captainName || this.data._myNick) === (this.data._myNick || perm.getNickName()),
+          // 管理员可改所有队伍名（队长改名请用赛事详情页的编队Tab）
         }))
 
         // 按总分降序排列
