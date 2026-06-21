@@ -2,6 +2,7 @@
  * 队伍管理路由 — 队伍列表/批量保存/自动分队/锁定/回退/重命名/删除/积分榜
  */
 const { allocateTeams } = require('../utils/team-allocation');
+const { getScore } = require('../utils/rank-score');
 
 module.exports = function (app, h) {
 
@@ -128,11 +129,11 @@ module.exports = function (app, h) {
             return res.status(400).json({ success: false, error: `队伍「${team.teamName}」的队长不在队员列表中` });
           }
           const playerIdsJson = JSON.stringify(team.playerIds);
-          // 优先用前端传来的总分，否则从数据库计算
+          // 优先用前端传来的总分，否则用等效分计算（MMR > 段位推算）
           let totalMmr = team.totalMmr || 0;
           if (!totalMmr) {
             const players = await h.getPlayersByIds(team.playerIds);
-            totalMmr = players.reduce((sum, p) => sum + (p.calibrate_mmr || 0), 0);
+            totalMmr = players.reduce((sum, p) => sum + getScore(p).score, 0);
           }
           await conn.query(
             'INSERT INTO dota2_event_teams (team_id, event_id, team_name, captain_id, player_ids, total_mmr, avg_mmr, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())',
