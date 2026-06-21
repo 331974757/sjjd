@@ -17,7 +17,7 @@ module.exports = function (app, h) {
       const signupTable = h.tableFor('dota2_event_signup', isArchived);
 
       const [rows] = await h.pool.query(
-        `SELECT * FROM ${teamsTable} WHERE event_id = ? ORDER BY total_mmr DESC`, [eventId]
+        `SELECT * FROM ${teamsTable} WHERE event_id = ?`, [eventId]
       );
 
       const teams = [];
