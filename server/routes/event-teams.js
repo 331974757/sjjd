@@ -205,18 +205,45 @@ module.exports = function (app, h) {
       if (!await h.assertAdmin(req, res)) return;
       const { eventId } = req.params;
 
-      const event = await h.validateEvent(eventId);
-      if (!event) return res.status(404).json({ success: false, error: '赛事不存在' });
-      if (event.event_status !== 2) return res.status(400).json({ success: false, error: '当前不在分组编队阶段' });
+      const conn = await h.pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        const [events] = await conn.query(
+          'SELECT * FROM dota2_events WHERE event_id = ? FOR UPDATE', [eventId]
+        );
+        if (!events.length) {
+          await conn.rollback(); conn.release();
+          return res.status(404).json({ success: false, error: '赛事不存在' });
+        }
+        const event = events[0];
+        if (event.event_status !== 2) {
+          await conn.rollback(); conn.release();
+          return res.status(400).json({ success: false, error: '当前不在分组编队阶段' });
+        }
 
-      const [teams] = await h.pool.query('SELECT COUNT(*) as cnt FROM dota2_event_teams WHERE event_id = ?', [eventId]);
-      if (teams[0].cnt < 2) return res.status(400).json({ success: false, error: '至少需要2支队伍才能锁定编组' });
+        const [[{ cnt }]] = await conn.query(
+          'SELECT COUNT(*) as cnt FROM dota2_event_teams WHERE event_id = ?', [eventId]
+        );
+        if (cnt < 2) {
+          await conn.rollback(); conn.release();
+          return res.status(400).json({ success: false, error: '至少需要2支队伍才能锁定编组' });
+        }
 
-      const transition = h.validateStatusTransition(2, 3);
-      if (!transition.valid) return res.status(400).json({ success: false, error: transition.error });
+        const transition = h.validateStatusTransition(2, 3);
+        if (!transition.valid) {
+          await conn.rollback(); conn.release();
+          return res.status(400).json({ success: false, error: transition.error });
+        }
 
-      await h.pool.query('UPDATE dota2_events SET event_status = 3, updated_at = NOW() WHERE event_id = ?', [eventId]);
-      res.json({ success: true, data: { eventStatus: 3, message: '编组已锁定，进入对战预备阶段' } });
+        await conn.query('UPDATE dota2_events SET event_status = 3, updated_at = NOW() WHERE event_id = ?', [eventId]);
+        await conn.commit();
+        conn.release();
+        res.json({ success: true, data: { eventStatus: 3, message: '编组已锁定，进入对战预备阶段' } });
+      } catch (e) {
+        await h.safeRollback(conn, 'lockTeams');
+        conn.release();
+        throw e;
+      }
     } catch (e) {
       res.status(500).json({ success: false, error: e.message });
     }
