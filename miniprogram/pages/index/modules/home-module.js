@@ -199,7 +199,8 @@ module.exports = {
         if (res.success) { perm.clearCache(); this.homeLoadUsers() }
       } catch (e) {
         wx.hideLoading()
-        modal.toast(this, { theme: 'danger', content: '操作失败' })
+        console.error('[权限] 操作失败', e)
+        modal.toast(this, { theme: 'danger', content: (e && e.data && e.data.error) || '操作失败' })
       } finally {
         this.setData({ homeOperating: false })
       }
