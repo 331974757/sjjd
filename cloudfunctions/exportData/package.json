@@ -1,9 +1,0 @@
-{
-  "name": "exportData",
-  "version": "1.0.0",
-  "description": "导出云数据库数据",
-  "main": "index.js",
-  "dependencies": {
-    "wx-server-sdk": "latest"
-  }
-}
