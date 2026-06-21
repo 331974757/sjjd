@@ -466,33 +466,39 @@ Page({
       })
 
       if (res.success) {
-        // 自动分队建议已生成，直接保存到数据库后再加载显示
-        const teamsPayload = (res.data.teams || []).map(t => ({
+        const { teams, stats, warnings } = res.data
+
+        // 直接映射：playerList→players, totalScore→totalMmr
+        const formattedTeams = (teams || []).map(t => ({
+          teamId: 'auto_' + t.teamIndex,
           teamName: t.teamName,
-          captainId: t.captainId,
-          playerIds: (t.playerList || []).map(p => p.id),
+          captain_id: t.captainId,
+          players: t.playerList || [],
+          totalMmr: t.totalScore || 0,
+          avgMmr: t.avgScore || 0,
+          isNew: true,
         }))
-        await api.post('/events/' + this.data.eventId + '/teams/batch', { teams: teamsPayload })
-        await this.loadTeamData()
-        
-        const { stats, warnings } = res.data
-        const info = [
-          '已自动分为 ' + teamsPayload.length + ' 队',
-        ]
-        if (stats) {
-          info.push('最大分差：' + stats.scoreStats.maxDiff + '分 (' + stats.scoreStats.grade + ')')
-        }
-        if (warnings && warnings.length) info.push('⚠ ' + warnings[0])
-        
-        wx.hideLoading()
-        await modal.confirm(this, {
-          theme: 'success',
-          title: '分队完成',
-          content: info.join('\n'),
-          showCancel: false,
-          confirmText: '好的，开始微调'
+
+        this.setData({
+          teams: formattedTeams,
+          freePlayers: [],
+          selectedPlayerId: '',
+          autoAllocating: false,
+          loading: false,
         })
-      } else {
+
+        wx.hideLoading()
+
+        if (stats) {
+          const info = [
+            formattedTeams.length + '队',
+            '最大分差：' + stats.scoreStats.maxDiff + '分 (' + stats.scoreStats.grade + ')',
+          ]
+          await modal.confirm(this, {
+            theme: 'success', title: '分队完成', content: info.join('\n'),
+            showCancel: false, confirmText: '开始微调'
+          })
+        }
         wx.hideLoading()
         modal.toast(this, { title: res.error || '分队失败', icon: 'none' })
       }

@@ -712,10 +712,11 @@ function buildTeamOutput(teams) {
       calibrate_rank_sort: p.calibrate_rank_sort ?? null,
       calibrate_rank_star: p.calibrate_rank_star ?? null,
       calibrate_rank_name: p.calibrate_rank_name || '',
+      avatar_url: p.avatar_url || '',
       good_at_positions: p.good_at_positions || '',
       positionDetail: p._pos,
-      computedScore: p._score,          // 参与计算的最终分值
-      scoreSource: p._scoreSource,       // 分值来源：actual_mmr | rank_formula | ...
+      computedScore: p._score,
+      scoreSource: p._scoreSource,
     }));
 
     return {

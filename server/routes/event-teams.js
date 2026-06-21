@@ -162,7 +162,7 @@ module.exports = function (app, h) {
       if (!teamCount || teamCount < 2) return res.status(400).json({ success: false, error: '队伍数量至少为2' });
 
       const [signupRows] = await h.pool.query(
-        'SELECT s.player_id AS id, p.calibrate_mmr, p.wx_nickname, p.calibrate_rank_sort, p.calibrate_rank_star, p.good_at_positions, p.calibrate_rank_name FROM dota2_event_signup s LEFT JOIN dota2_players p ON s.player_id = p.id WHERE s.event_id = ? AND s.signup_status = 1 ORDER BY p.calibrate_rank_sort DESC, p.calibrate_mmr DESC',
+        'SELECT s.player_id AS id, p.calibrate_mmr, p.wx_nickname, p.calibrate_rank_sort, p.calibrate_rank_star, p.good_at_positions, p.calibrate_rank_name, p.avatar_url FROM dota2_event_signup s LEFT JOIN dota2_players p ON s.player_id = p.id WHERE s.event_id = ? AND s.signup_status = 1 ORDER BY p.calibrate_rank_sort DESC, p.calibrate_mmr DESC',
         [eventId]
       );
       if (!signupRows.length) return res.status(400).json({ success: false, error: '暂无已报名选手' });
