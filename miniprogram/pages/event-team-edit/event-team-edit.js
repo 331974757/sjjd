@@ -470,7 +470,7 @@ Page({
 
         const formattedTeams = teams.map(t => ({
           teamId: 'temp_' + t.index + '_' + Date.now(),
-          teamName: t.teamName,
+          teamName: '队伍' + t.index,
           captain_id: t.captainId,
           captain: (t.players || []).length > 0
             ? ((t.players || []).find(p => p.id === t.captainId) || t.players[0])
@@ -479,7 +479,7 @@ Page({
           players: t.players || [],
           totalMmr: t.totalMmr || 0,
           isNew: true,
-        })).sort((a, b) => (a.teamName || '').localeCompare(b.teamName || '', 'zh'))
+        })).sort((a, b) => a.index - b.index)
 
         this.setData({
           teams: formattedTeams,
