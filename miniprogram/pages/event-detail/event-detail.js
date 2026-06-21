@@ -328,12 +328,20 @@ const coreMethods = {
     const ts = event.start_time
     const now = new Date()
     const refYear = now.getFullYear()
-    const d = ts ? new Date(ts > 10000000000 ? ts : ts * 1000) : new Date(Date.now() + 3600000)
+    // 兼容 DATETIME 字符串和毫秒时间戳
+    let d
+    if (!ts) {
+      d = new Date(Date.now() + 3600000)
+    } else if (typeof ts === 'number' || !isNaN(Number(ts))) {
+      d = new Date(Number(ts) > 10000000000 ? Number(ts) : Number(ts) * 1000)
+    } else {
+      d = new Date(ts)
+    }
     if (isNaN(d.getTime())) return
     const range = dt.buildRange({ refYear, yearSpan: 3, selYear: d.getFullYear(), selMonth: d.getMonth() + 1 })
     const idx = dt.buildIndex(d.getTime(), refYear)
     const text = dt.toDisplayText(range, idx)
-    this.setData({ editingTime: true, editDateTimeRange: range, editDateTimeIndex: idx, editDateTimeText: text })
+    this.setData({ editDateTimeRange: range, editDateTimeIndex: idx, editDateTimeText: text })
   },
   cancelEditTime() { this.setData({ editingTime: false }) },
   onEditDateTimeColumnChange(e) {
