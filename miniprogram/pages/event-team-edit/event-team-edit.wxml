@@ -100,8 +100,8 @@
             <text class="team-name">{{item.teamName}}</text>
             <text class="team-count">{{item.players.length}}人</text>
           </view>
-          <!-- 总分 -->
-          <text class="team-mmr" wx:if="{{item.totalMmr > 0}}">总{{item.totalMmr}}分</text>
+          <!-- 总分/均分 -->
+          <text class="team-mmr">总{{item.totalMmr}}分 / 均{{item.avgMmr || 0}}分</text>
           <!-- 删除按钮（非只读） -->
           <view class="team-del-btn" wx:if="{{canEdit}}" catchtap="deleteTeam" data-team-id="{{item.teamId}}">
             <text>×</text>
@@ -129,7 +129,7 @@
             <image class="tpc-avatar" src="{{player.avatar_url || ''}}" mode="aspectFill" />
             <view class="tpc-info">
               <text class="tpc-name">{{player.wx_nickname || '未知'}}</text>
-              <text class="tpc-rank">{{player.calibrate_rank_name || ''}}</text>
+              <text class="tpc-rank">{{player.calibrate_rank_name || ''}}{{player.calibrate_rank_star > 0 ? player.calibrate_rank_star : ''}} {{player.calibrate_mmr > 0 ? player.calibrate_mmr + '分' : ''}}</text>
             </view>
             <!-- 队长已设置时显示皇冠，否则可点击 -->
             <view class="tpc-actions" wx:if="{{canEdit}}">
