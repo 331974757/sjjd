@@ -183,12 +183,6 @@ module.exports = function (app, h) {
           message: `已自动分为 ${allocation.teams.length} 支队伍，调整后请点击「保存编组」`
         }
       });
-      } catch (e) {
-        await h.safeRollback(conn, 'allocateTeams');
-        throw e;
-      } finally {
-        conn.release();
-      }
     } catch (e) {
       res.status(500).json({ success: false, error: e.message });
     }
