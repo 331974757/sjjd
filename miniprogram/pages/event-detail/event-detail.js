@@ -189,7 +189,7 @@ const coreMethods = {
     const { event, readonly } = this.data
     const status = event ? event.event_status : 0
     const tabs = this.data.tabs.map(t => {
-      const unlocked = readonly ? t.key === 'overview' : status >= t.unlockStatus
+      const unlocked = readonly ? true : status >= t.unlockStatus
       const unlockedFlag = status >= t.unlockStatus
       return { ...t, _locked: !unlocked, _unlocked: unlockedFlag }
     })
