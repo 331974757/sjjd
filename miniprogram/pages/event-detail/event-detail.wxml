@@ -78,7 +78,7 @@
         wx:for="{{tabs}}"
         wx:key="key"
         bindtap="switchTab"
-        data-index="{{index}}"
+        data-tab="{{item.key}}"
       >
         <text class="tab-label">{{item.label}}</text>
         <text class="tab-lock-icon" wx:if="{{item._locked && !readonly}}">🔒</text>
@@ -130,12 +130,12 @@
         <text class="progress-title">🏁 赛事进度</text>
         <view class="progress-track">
           <view
-            class="progress-step {{item._active ? 'ps-active' : ''}} {{item._done ? 'ps-done' : ''}} {{item.key === 'archived' && item._active ? 'ps-archived' : ''}}"
+            class="progress-step {{item.state === 'active' ? 'ps-active' : ''}} {{item.state === 'done' ? 'ps-done' : ''}} {{item.label === '已归档' && item.state === 'active' ? 'ps-archived' : ''}}"
             wx:for="{{progressSteps}}"
-            wx:key="key"
+            wx:key="label"
           >
             <view class="ps-dot">
-              <text wx:if="{{item._done}}">✓︎</text>
+              <text wx:if="{{item.state === 'done'}}">✓︎</text>
               <text wx:else>{{index + 1}}</text>
             </view>
             <view class="ps-line-right" wx:if="{{index < 6}}"></view>
@@ -147,7 +147,7 @@
 
       <!-- 快捷跳转按钮（根据赛事阶段动态显示单个按钮） -->
       <view class="overview-jump" wx:if="{{_overviewJump && !isArchived}}">
-        <button class="oj-single-btn" bindtap="switchTab" data-index="{{_overviewJump.index}}">
+        <button class="oj-single-btn" bindtap="switchTab" data-tab="{{_overviewJump.tab}}">
           {{_overviewJump.label}}
         </button>
         <text class="oj-single-hint">{{_overviewJump.desc}}</text>

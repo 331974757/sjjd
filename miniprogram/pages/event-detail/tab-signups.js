@@ -88,6 +88,7 @@ module.exports = {
 
     // --- 用户自主报名 ---
     async doSignup() {
+      if (this._signupLock) return; this._signupLock = true
       const { event, mySignup, signupCount } = this.data
       if (event.event_status !== 1) {
         modal.toast(this, { title: '当前赛事不在报名阶段', icon: 'none' })
@@ -115,6 +116,8 @@ module.exports = {
       } catch (e) {
         this.setData({ loading: false })
         modal.toast(this, { title: '报名失败，请重试', icon: 'none' })
+      } finally {
+        this._signupLock = false
       }
     },
 
@@ -145,6 +148,7 @@ module.exports = {
     showCancelSignup() { this.setData({ showCancelConfirm: true }) },
     hideCancelSignup() { this.setData({ showCancelConfirm: false }) },
     async doCancelSignup() {
+      if (this._cancelLock) return; this._cancelLock = true
       this.setData({ showCancelConfirm: false, loading: true })
       try {
         const res = await api.del('/events/' + this.data.eventId + '/signups/' + this.data.mySignup.signupId)
@@ -157,6 +161,8 @@ module.exports = {
       } catch (e) {
         this.setData({ loading: false })
         modal.toast(this, { title: '取消失败，请重试', icon: 'none' })
+      } finally {
+        this._cancelLock = false
       }
     },
 
