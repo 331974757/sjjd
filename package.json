@@ -2,7 +2,9 @@
   "scripts": {
     "dev": "cd server && npm run dev",
     "deploy": "node deploy-server.js",
-    "deploy:check": "node deploy-server.js"
+    "deploy:check": "node deploy-server.js",
+    "test": "bash switch-env.sh test",
+    "prod": "bash switch-env.sh prod"
   },
   "dependencies": {
     "ssh2": "^1.17.0"
