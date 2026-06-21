@@ -173,7 +173,17 @@ Page({
           avgMmr: (t.members || t.players || []).length > 0
             ? Math.round((t.total_mmr || t.totalMmr || 0) / (t.members || t.players || []).length)
             : 0,
-          // 管理员可改所有队伍名（队长改名请用赛事详情页的编队Tab）
+          _canRename: (function() {
+            if (this.data.isAdmin) return true;
+            var fullName = (t.captain && t.captain.wx_nickname) || t.captainName || '';
+            var myNick = this.data._myNick || '';
+            if (!myNick) return false;
+            if (fullName === myNick) return true;
+            var mems = t.members || t.players || [];
+            var cap = mems.find(function(m) { return m.id === (t.captain_id || t.captainId); });
+            return !!(cap && cap.wx_nickname === myNick);
+          }).call(this),
+          _editing: false
         }))
 
         // 按总分降序排列
