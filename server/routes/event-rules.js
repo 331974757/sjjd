@@ -163,7 +163,10 @@ module.exports = function (app, h) {
     try {
       if (!await h.assertAdmin(req, res)) return;
       const { ruleId } = req.params;
-      await h.pool.query('DELETE FROM dota2_event_rules WHERE rule_id = ?', [ruleId]);
+      const [result] = await h.pool.query('DELETE FROM dota2_event_rules WHERE rule_id = ?', [ruleId]);
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ success: false, error: '章程不存在' });
+      }
       res.json({ success: true });
     } catch (e) {
       res.status(500).json({ success: false, error: e.message });

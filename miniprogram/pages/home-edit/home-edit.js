@@ -155,7 +155,15 @@ Page({
       wx.hideLoading()
       if (res.success) {
         modal.toast(this, { title: '保存成功', icon: 'success' })
-        // 延迟返回，让首页刷新数据
+        // 通知首页强制刷新
+        const pages = getCurrentPages()
+        const homePage = pages.find(p => p.route === 'pages/index/index')
+        if (homePage) {
+          homePage._lastHomeLoad = 0
+          if (typeof homePage.loadHomeData === 'function') {
+            homePage.loadHomeData(true)
+          }
+        }
         setTimeout(() => { wx.navigateBack() }, 800)
       } else {
         modal.toast(this, { title: res.error || res.message || '保存失败', icon: 'none' })

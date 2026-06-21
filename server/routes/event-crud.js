@@ -177,7 +177,7 @@ module.exports = function (app, h) {
       }
       const eventDesc = (req.body.event_desc || req.body.eventDesc || '').trim();
       const signupLimitRaw = req.body.signup_limit || req.body.signupLimit || 0;
-      const signupLimitVal = parseInt(signupLimitRaw) || 0;
+      const signupLimitVal = Math.max(0, parseInt(signupLimitRaw) || 0);
 
       if (!eventName) return res.status(400).json({ success: false, error: '请输入赛事名称' });
       if (eventName.length < 2) return res.status(400).json({ success: false, error: '赛事名称至少需要2个字符' });
@@ -262,7 +262,7 @@ module.exports = function (app, h) {
       }
 
       const { eventStatus, signupLimit } = req.body;
-      if (eventStatus === undefined || eventStatus < 0 || eventStatus > 6) {
+      if (!Number.isInteger(eventStatus) || eventStatus < 0 || eventStatus > 6) {
         return res.status(400).json({ success: false, error: '无效的赛事状态，有效值0-6' });
       }
 

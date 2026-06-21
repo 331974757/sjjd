@@ -43,7 +43,13 @@ module.exports = {
         const params = {
           page: reset ? 1 : (this.data.currentPage || 1),
           pageSize: this.data.pageSize,
-          sortBy: 'rank', sortOrder: 'desc'
+          sortBy: 'rank'
+        }
+        // 读取排序方向
+        if (this.data.sortFilter === 'rank-asc') {
+          params.sortOrder = 'asc'
+        } else {
+          params.sortOrder = 'desc'
         }
         const kw = this.data._searchText || ''
         if (kw) params.keyword = kw

@@ -49,15 +49,16 @@ const pageConfig = {
     if (options && options.subTab) {
       this.setData({ subTab: options.subTab })
     }
-    this.loadNickname()
-    this.loadUserInfo()
-    this.loadHomeData()
-    // 如果有 subTab 参数，直接加载对应 Tab 数据
-    if (options && options.subTab === 'history') {
-      this.loadEvents()
-    } else if (options && options.subTab === 'rules') {
-      this.loadRuleEvents()
-    }
+    // 先加载角色信息，再加载首页数据（依赖 userRole）
+    this.loadNickname().then(() => {
+      this.loadHomeData()
+      // 如果有 subTab 参数，直接加载对应 Tab 数据
+      if (options && options.subTab === 'history') {
+        this.loadEvents()
+      } else if (options && options.subTab === 'rules') {
+        this.loadRuleEvents()
+      }
+    })
     // 选手列表和用户管理延迟到用户切换到对应 Tab 时加载
   },
 

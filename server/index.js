@@ -435,6 +435,25 @@ app.delete('/api/players/:id', async (req, res) => {
       }
       // 级联标记该选手未归档赛事的报名为无效
       await conn.query("UPDATE dota2_event_signup SET signup_status = 0 WHERE player_id = ? AND signup_status = 1 AND event_id IN (SELECT event_id FROM dota2_events WHERE is_archived = 0)", [req.params.id]);
+      // 清理未归档赛事队伍中的选手
+      const [teams] = await conn.query(
+        "SELECT team_id, player_ids, captain_id FROM dota2_event_teams WHERE event_id IN (SELECT event_id FROM dota2_events WHERE is_archived = 0 OR is_archived IS NULL)"
+      );
+      for (const team of teams) {
+        try {
+          let ids = team.player_ids ? JSON.parse(team.player_ids) : [];
+          if (!Array.isArray(ids)) continue;
+          const newIds = ids.filter(pid => pid !== req.params.id);
+          if (newIds.length === ids.length) continue;
+          // 如果队长被删，选第一个队员为新队长
+          let captain = team.captain_id === req.params.id ? (newIds[0] || null) : team.captain_id;
+          if (captain) captain = String(captain);
+          await conn.query(
+            'UPDATE dota2_event_teams SET player_ids = ?, captain_id = ? WHERE team_id = ?',
+            [JSON.stringify(newIds), captain, team.team_id]
+          );
+        } catch (_) { /* JSON 解析失败跳过 */ }
+      }
       await conn.commit();
       conn.release();
       res.json({ success: true });
@@ -455,7 +474,7 @@ app.post('/api/players/batch-delete', async (req, res) => {
     try {
       await conn.beginTransaction();
       const [result] = await conn.query("UPDATE dota2_players SET status='deleted', updated_at=NOW() WHERE id IN (?) AND status = 'active'", [ids]);
-      await conn.query("UPDATE dota2_event_signup SET signup_status = 0 WHERE player_id IN (?) AND signup_status = 1 AND event_id IN (SELECT event_id FROM dota2_events WHERE is_archived = 0)", [ids]);
+      await conn.query("UPDATE dota2_event_signup SET signup_status = 0 WHERE player_id IN (?) AND signup_status = 1 AND event_id IN (SELECT event_id FROM dota2_events WHERE is_archived = 0 OR is_archived IS NULL)", [ids]);
       await conn.commit();
       conn.release();
       res.json({ success: true, deleted: result.affectedRows });
