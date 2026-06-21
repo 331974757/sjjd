@@ -690,6 +690,7 @@
         <text class="umg-stat umg-stat-super">超管 {{homeAllSuperCount}} 人</text>
         <text class="umg-stat umg-stat-admin">管理 {{homeAllAdminCount}} 人</text>
         <text class="umg-stat umg-stat-user">用户 {{homeAllUserCount}} 人</text>
+        <text class="umg-stat">| 共 {{homeFilteredTotal}} 人</text>
       </view>
 
       <!-- 搜索栏 -->
