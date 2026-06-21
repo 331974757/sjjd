@@ -53,9 +53,14 @@ module.exports = function (app, h) {
       }
 
       const sql = `
-        SELECT e.*,
-          (SELECT COUNT(*) FROM dota2_event_signup_his s WHERE s.event_id COLLATE utf8mb4_unicode_ci = e.event_id COLLATE utf8mb4_unicode_ci AND s.signup_status = 1) as signup_count
+        SELECT e.*, COALESCE(sc.cnt, 0) as signup_count
         FROM dota2_events e
+        LEFT JOIN (
+          SELECT event_id, COUNT(*) AS cnt
+          FROM dota2_event_signup_his
+          WHERE signup_status = 1
+          GROUP BY event_id
+        ) sc ON sc.event_id COLLATE utf8mb4_unicode_ci = e.event_id COLLATE utf8mb4_unicode_ci
         ${where}
         ORDER BY e.archived_at DESC, e.created_at DESC
         LIMIT ? OFFSET ?

@@ -182,19 +182,28 @@ module.exports = function (app, h) {
         });
       }
 
-      if (insertValues.length > 0) {
-        await h.pool.query(
-          `INSERT INTO dota2_event_matches (match_id, event_id, round_num, team_a_id, team_b_id, match_status, created_at) VALUES ${insertValues.join(', ')}`,
-          insertParams
-        );
-      }
-
       let advanced = false;
-      if (nextRound === 1 && battleCheck.event.event_status === 3) {
-        await h.pool.query(
-          'UPDATE dota2_events SET event_status = 4, updated_at = NOW() WHERE event_id = ? AND event_status = 3', [eventId]
-        );
-        advanced = true;
+      if (insertValues.length > 0) {
+        const conn = await h.pool.getConnection();
+        try {
+          await conn.beginTransaction();
+          await conn.query(
+            `INSERT INTO dota2_event_matches (match_id, event_id, round_num, team_a_id, team_b_id, match_status, created_at) VALUES ${insertValues.join(', ')}`,
+            insertParams
+          );
+          if (nextRound === 1 && battleCheck.event.event_status === 3) {
+            await conn.query(
+              'UPDATE dota2_events SET event_status = 4, updated_at = NOW() WHERE event_id = ? AND event_status = 3', [eventId]
+            );
+            advanced = true;
+          }
+          await conn.commit();
+        } catch (e) {
+          await h.safeRollback(conn, 'generateMatches');
+          throw e;
+        } finally {
+          conn.release();
+        }
       }
 
       res.json({
@@ -411,8 +420,8 @@ module.exports = function (app, h) {
 
       const [matches] = await h.pool.query('SELECT * FROM dota2_event_matches WHERE match_id = ? AND event_id = ?', [matchId, eventId]);
       if (!matches.length) return res.status(404).json({ success: false, error: '对战记录不存在' });
-      if (matches[0].match_status === 2) {
-        return res.status(400).json({ success: false, error: '已判定胜负的对战不可删除' });
+      if (matches[0].match_status !== 0) {
+        return res.status(400).json({ success: false, error: '仅未开始的对战可删除' });
       }
 
       await h.pool.query('DELETE FROM dota2_event_matches WHERE match_id = ? AND event_id = ?', [matchId, eventId]);
