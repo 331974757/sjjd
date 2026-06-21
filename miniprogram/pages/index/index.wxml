@@ -317,7 +317,7 @@
     <!-- 空状态（区分无数据 vs 筛选无结果） -->
     <view class="empty-state" wx:if="{{displayPlayers.length === 0 && loaded}}">
       <text class="empty-icon">{{allPlayers.length === 0 ? '📭' : '🔍'}}</text>
-      <text class="empty-text">{{allPlayers.length === 0 ? '暂无选手数据' : '暂无符合条件的选手'}}</text>
+      <text class="empty-text">{{filteredCount === 0 ? '暂无选手数据' : '暂无符合条件的选手'}}</text>
       <text class="empty-sub" wx:if="{{allPlayers.length === 0 && isAdmin}}">点击右下角 + 号添加第一位选手</text>
       <text class="empty-sub" wx:elif="{{allPlayers.length > 0}}">试试调整筛选条件</text>
     </view>

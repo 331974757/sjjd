@@ -271,8 +271,8 @@
 
       <!-- 普通用户报名按钮（底部固定） -->
       <view class="tab2-bottom-signup" wx:if="{{!readonly && !isArchived}}">
-        <button class="signup-btn btn-primary" wx:if="{{signupBtn.allowed && mySignupLoaded && (!mySignup || !mySignup.signedUp)}}" bindtap="doSignup" loading="{{loading}}">我要报名</button>
-        <view class="signup-done" wx:if="{{mySignup && mySignup.signedUp}}">
+        <button class="signup-btn btn-primary" wx:if="{{signupBtn.allowed && mySignupLoaded && (!mySignup || !mySignup.isActive)}}" bindtap="doSignup" loading="{{loading}}">我要报名</button>
+        <view class="signup-done" wx:if="{{mySignup && mySignup.isActive}}">
           <text class="done-icon">✓︎</text>
           <text class="done-text">已报名</text>
           <button class="signup-btn btn-cancel" wx:if="{{cancelSignupBtn.allowed}}" bindtap="showCancelSignup">取消报名</button>
