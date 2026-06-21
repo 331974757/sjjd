@@ -174,7 +174,7 @@ module.exports = function (app, h) {
     }
   });
 
-  /** POST /api/events/:eventId/signups/admin — 管理员添加报名 */
+  /** POST /api/events/:eventId/signups/admin — 管理员添加报名（事务保护） */
   app.post('/api/events/:eventId/signups/admin', async (req, res) => {
     try {
       if (!await h.assertAdmin(req, res)) return;
@@ -183,6 +183,9 @@ module.exports = function (app, h) {
       if (!event) return res.status(404).json({ success: false, error: '赛事不存在' });
       if (event.is_archived === 1) {
         return res.status(403).json({ success: false, error: '赛事已归档，不可添加报名', code: 'ARCHIVED' });
+      }
+      if (event.event_status !== 1 && event.event_status !== 2) {
+        return res.status(400).json({ success: false, error: '当前赛事不在可报名阶段' });
       }
 
       const openid = req._openid || '';

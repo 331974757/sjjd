@@ -158,12 +158,15 @@ module.exports = function (app, h) {
       if (!teamCount || teamCount < 2) return res.status(400).json({ success: false, error: '队伍数量至少为2' });
 
       const [signupRows] = await h.pool.query(
-        'SELECT s.player_id, p.calibrate_mmr, p.wx_nickname, p.calibrate_rank_sort, p.calibrate_rank_star, p.good_at_positions, p.calibrate_rank_name FROM dota2_event_signup s LEFT JOIN dota2_players p ON s.player_id = p.id WHERE s.event_id = ? AND s.signup_status = 1 ORDER BY p.calibrate_rank_sort DESC, p.calibrate_mmr DESC',
+        'SELECT s.player_id AS id, p.calibrate_mmr, p.wx_nickname, p.calibrate_rank_sort, p.calibrate_rank_star, p.good_at_positions, p.calibrate_rank_name FROM dota2_event_signup s LEFT JOIN dota2_players p ON s.player_id = p.id WHERE s.event_id = ? AND s.signup_status = 1 ORDER BY p.calibrate_rank_sort DESC, p.calibrate_mmr DESC',
         [eventId]
       );
       if (!signupRows.length) return res.status(400).json({ success: false, error: '暂无已报名选手' });
 
       const allocation = allocateTeams(signupRows, teamCount);
+      if (allocation.error) {
+        return res.status(400).json({ success: false, error: allocation.error });
+      }
 
       const conn = await h.pool.getConnection();
       try {
@@ -172,11 +175,11 @@ module.exports = function (app, h) {
 
         for (const team of allocation.teams) {
           const teamId = h.genId();
-          const playerIdsJson = JSON.stringify(team.playerIds);
-          const totalMmr = team.totalMmr || 0;
+          const playerIdsJson = JSON.stringify((team.playerList || []).map(p => p.id));
+          const totalMmr = team.totalScore || 0;
           await conn.query(
             'INSERT INTO dota2_event_teams (team_id, event_id, team_name, captain_id, player_ids, total_mmr, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())',
-            [teamId, eventId, team.name, team.captainId || team.playerIds[0], playerIdsJson, totalMmr]
+            [teamId, eventId, team.teamName, team.captainId || ((team.playerList || [])[0]?.id || null), playerIdsJson, totalMmr]
           );
         }
 
