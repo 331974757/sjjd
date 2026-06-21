@@ -105,7 +105,7 @@ Page({
             try {
               const data = JSON.parse(uploadRes.data)
               if (data.success && data.data && data.data.url) {
-                const fullUrl = api.API_BASE.replace(/\/api$/, '') + data.data.url
+                const fullUrl = api.BASE_URL + data.data.url
                 this.updateField('avatarUrl', fullUrl)
               } else {
                 modal.toast(this, { title: data.error || '上传失败', icon: 'none' })
