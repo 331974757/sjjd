@@ -479,7 +479,7 @@ Page({
           players: t.players || [],
           totalMmr: t.totalMmr || 0,
           isNew: true,
-        }))
+        })).sort((a, b) => (a.teamName || '').localeCompare(b.teamName || '', 'zh'))
 
         this.setData({
           teams: formattedTeams,
