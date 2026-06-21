@@ -506,13 +506,15 @@ Page({
           if (warnings && warnings.length) {
             info.push(`⚠ ${warnings[0]}`)
           }
-          modal.confirm(this, {
+          await modal.confirm(this, {
             theme: 'success',
             title: '分队完成',
             content: info.join('\n'),
             showCancel: false,
             confirmText: '好的'
           })
+          // 弹窗关闭后从服务器重新加载队伍数据
+          await this.loadTeamData()
         }
       } else {
         wx.hideLoading()
