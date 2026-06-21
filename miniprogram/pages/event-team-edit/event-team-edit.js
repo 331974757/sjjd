@@ -494,6 +494,7 @@ Page({
           freePlayers: allFreePlayers,
           selectedPlayerId: '',
         })
+        console.log('[分队] 队伍数=' + formattedTeams.length + ' 首队players=' + JSON.stringify((formattedTeams[0] || {}).players ? (formattedTeams[0].players.length + '人') : '无'))
 
         wx.hideLoading()
 
