@@ -218,9 +218,9 @@ module.exports = {
         console.log('[add] response:', JSON.stringify(res))
         // 服务器始终返回 success:true，实际添加结果在 res.data 中
         const result = res.data || {}
-        const added = result.success || 0
-        const skipped = result.skipped || 0
-        const failed = result.failed || 0
+        const added = result.successCount || 0
+        const skipped = result.skipCount || 0
+        const failed = result.failCount || 0
         if (res.success && added > 0) {
           // 仅当服务器确认添加成功后，才在搜索结果中标记已报名
           const results = this.data.searchResults.map(p =>
