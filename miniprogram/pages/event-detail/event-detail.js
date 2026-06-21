@@ -431,6 +431,7 @@ const coreMethods = {
     this.setData({ showBattleConfirmModal: false })
     if (cb) cb(true)
   },
+  onBattleConfirmOk() { this.onBattleConfirmYes() },
   onBattleConfirmNo() {
     const cb = this.data._battleConfirmCallback
     this.setData({ showBattleConfirmModal: false })
