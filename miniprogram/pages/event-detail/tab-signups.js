@@ -80,8 +80,11 @@ module.exports = {
           this.setData({ mySignupLoaded: true })
         }
       } catch (e) {
-        console.error('[报名] 加载状态失败', e)
+        console.error('[报名] 加载状态失败', e.errno || e.message || e)
         this.setData({ mySignupLoaded: true })
+        // 网络超时或 401 时不弹 Toast（静默降级）
+        if (e.message && e.message.indexOf('timeout') >= 0) return
+        if (e.data && e.data.code === 'AUTH_ERROR') return
         modal.toast(this, { title: '加载报名状态失败', icon: 'none' })
       }
     },
