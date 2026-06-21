@@ -218,13 +218,19 @@ module.exports = {
         const skipped = result.skipCount || 0
         const failed = result.failCount || 0
         if (res.success && added > 0) {
-          // 仅当服务器确认添加成功后，才在搜索结果中标记已报名
-          const results = this.data.searchResults.map(p =>
-            String(p.id) === String(pid) ? { ...p, _alreadySigned: true } : p
-          )
-          this.setData({ searchResults: results, addLoading: false })
+          this.setData({ addLoading: false })
           modal.toast(this, { title: '已添加报名', icon: 'success' })
           await Promise.all([this.loadSignups(), this.loadMySignup()])
+          // 刷新搜索结果中的已报名标记
+          if (this.data.searchResults.length > 0) {
+            const idsRes = await api.get('/events/' + this.data.eventId + '/signups/ids')
+            const signedIds = new Set((idsRes.success && idsRes.data) ? idsRes.data.map(id => String(id)) : [])
+            const results = this.data.searchResults.map(p => ({
+              ...p,
+              _alreadySigned: signedIds.has(String(p._id || p.id))
+            }))
+            this.setData({ searchResults: results })
+          }
         } else if (res.success && skipped > 0) {
           this.setData({ addLoading: false })
           // 已报名，更新搜索结果的 _alreadySigned 标记
@@ -262,8 +268,17 @@ module.exports = {
         const res = await api.del('/events/' + this.data.eventId + '/signups/' + s.signup_id)
         this.setData({ loading: false })
         if (res.success) {
-          // 已剔除，更新列表和自己
           await Promise.all([this.loadSignups(), this.loadMySignup()])
+          // 刷新搜索结果中的已报名标记
+          if (this.data.searchResults.length > 0) {
+            const idsRes = await api.get('/events/' + this.data.eventId + '/signups/ids')
+            const signedIds = new Set((idsRes.success && idsRes.data) ? idsRes.data.map(id => String(id)) : [])
+            const results = this.data.searchResults.map(p => ({
+              ...p,
+              _alreadySigned: signedIds.has(String(p._id || p.id))
+            }))
+            this.setData({ searchResults: results })
+          }
         } else {
           modal.toast(this, { title: res.error || '操作失败', icon: 'none' })
         }
