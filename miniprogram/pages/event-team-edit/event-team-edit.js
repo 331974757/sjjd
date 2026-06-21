@@ -122,7 +122,7 @@ Page({
       if (res.success && res.data) {
         const event = res.data
         // 判断是否可编辑：管理员 + 状态为报名截止(2)或分组锁定(3) + 未归档
-        const canEdit = this.data.isAdmin && (event.event_status === 2 || event.event_status === 3) && event.is_archived !== 1
+        const canEdit = this.data.isAdmin && event.event_status === 2 && event.is_archived !== 1
         this.setData({
           eventStatus: event.event_status,
           eventName: event.event_name || '',
