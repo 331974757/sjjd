@@ -436,6 +436,7 @@ const coreMethods = {
     this.setData({ showBattleConfirmModal: false })
     if (cb) cb(false)
   },
+  onBattleConfirmCancel() { this.onBattleConfirmNo() },
 
   // ============ 工具函数 ============
   getStatusName(status) {
