@@ -466,33 +466,41 @@ Page({
       })
 
       if (res.success) {
-        const { stats } = res.data
-        const teamsPayload = (res.data.teams || []).map(t => ({
+        const { teams, stats, warnings } = res.data
+
+        const formattedTeams = teams.map(t => ({
+          teamId: 'temp_' + t.teamIndex + '_' + Date.now(),
           teamName: t.teamName,
-          captainId: t.captainId,
+          captain_id: t.captainId,
+          captain: (t.playerList || []).length > 0
+            ? ((t.playerList || []).find(p => p.id === t.captainId) || t.playerList[0])
+            : null,
           playerIds: (t.playerList || []).map(p => p.id),
+          players: t.playerList || [],
+          totalMmr: t.totalScore || 0,
+          isNew: true,
         }))
-        
-        // 直接保存到数据库
-        const saveRes = await api.post('/events/' + this.data.eventId + '/teams/batch', { teams: teamsPayload })
-        if (!saveRes.success) {
-          wx.hideLoading()
-          modal.toast(this, { title: saveRes.error || '保存失败', icon: 'none' })
-          return
-        }
-        
-        // 从数据库重新加载
-        await this.loadTeamData()
+
+        this.setData({
+          teams: formattedTeams,
+          freePlayers: [],
+          selectedPlayerId: '',
+          autoAllocating: false
+        })
+
         wx.hideLoading()
 
-        const info = [teamsPayload.length + '队已生成']
-        if (stats) info.push('最大分差：' + stats.scoreStats.maxDiff + '分 (' + stats.scoreStats.grade + ')')
-        
-        await modal.confirm(this, {
-          theme: 'success', title: '分队完成', content: info.join('\n'),
-          showCancel: false, confirmText: '开始微调'
-        })
-      } else {
+        if (stats) {
+          const info = [
+            `共${teams.length}队 · ${(t.playerList||[]).length}名选手`,
+            `最大分差：${stats.scoreStats.maxDiff}分 (${stats.scoreStats.grade})`,
+          ]
+          if (warnings && warnings.length) info.push('⚠ ' + warnings[0])
+          modal.confirm(this, {
+            theme: 'success', title: '分队完成', content: info.join('\n'),
+            showCancel: false, confirmText: '好的'
+          })
+        }
         wx.hideLoading()
         modal.toast(this, { title: res.error || '分队失败', icon: 'none' })
       }
