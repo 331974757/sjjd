@@ -220,7 +220,7 @@ module.exports = {
         if (res.success && added > 0) {
           // 仅当服务器确认添加成功后，才在搜索结果中标记已报名
           const results = this.data.searchResults.map(p =>
-            String(p._id) == String(pid) ? { ...p, _alreadySigned: true } : p
+            String(p.id) === String(pid) ? { ...p, _alreadySigned: true } : p
           )
           this.setData({ searchResults: results, addLoading: false })
           modal.toast(this, { title: '已添加报名', icon: 'success' })
@@ -229,7 +229,7 @@ module.exports = {
           this.setData({ addLoading: false })
           // 已报名，更新搜索结果的 _alreadySigned 标记
           const results = this.data.searchResults.map(p =>
-            String(p._id) == String(pid) ? { ...p, _alreadySigned: true } : p
+            String(p.id) === String(pid) ? { ...p, _alreadySigned: true } : p
           )
           this.setData({ searchResults: results })
           modal.toast(this, { title: '该选手已报名', icon: 'none' })

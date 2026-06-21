@@ -218,7 +218,7 @@
             <text class="sari-name">{{item.wx_nickname || '未知'}}</text>
             <text class="sari-rank">{{item.calibrate_rank_name || '未定段'}}</text>
             <text class="sari-tag" wx:if="{{item._alreadySigned}}">已报名</text>
-            <button class="sari-add-btn" wx:if="{{!item._alreadySigned}}" catchtap="doSingleAdd" data-pid="{{item._id}}" size="mini">添加</button>
+            <button class="sari-add-btn" wx:if="{{!item._alreadySigned}}" catchtap="doSingleAdd" data-pid="{{item.id}}" size="mini">添加</button>
           </view>
         </view>
         <view class="sa-no-result" wx:if="{{searchKeyword && searchKeyword.length > 0 && !searchLoading && searchResults.length === 0}}">
