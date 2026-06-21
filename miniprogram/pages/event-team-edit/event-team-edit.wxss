@@ -308,6 +308,7 @@
 .captain-icon { font-size: 28rpx; margin-right: 10rpx; }
 .captain-name { max-width: 240rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: middle; }
 .captain-name { font-size: 24rpx; color: #d29922; font-weight: 600; }
+.team-edit-icon { font-size: 28rpx; color: #58a6ff; margin-left: 8rpx; padding: 4rpx 8rpx; }
 
 /* 未指定队长提示 */
 .no-captain-row {
