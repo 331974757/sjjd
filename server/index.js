@@ -806,13 +806,9 @@ app.get('/api/users', async (req, res) => {
 
 app.get('/api/users/admins/list', async (req, res) => {
   try {
-    // 【安全】仅管理员可查看管理员列表
+    // 所有登录用户可查看管理员列表（方便找人）
     const openid = req._openid || '';
     if (!openid) return res.status(401).json({ success: false, error: '请先登录' });
-    const callerRole = await getCallerRole(openid);
-    if (callerRole !== 'admin' && callerRole !== 'super_admin') {
-      return res.status(403).json({ success: false, error: '仅管理员可查看管理员列表' });
-    }
     const [rows] = await pool.query("SELECT * FROM users WHERE role IN ('admin','super_admin') ORDER BY role DESC, created_at ASC");
     res.json({ success: true, data: rows.map(mapUser) });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
