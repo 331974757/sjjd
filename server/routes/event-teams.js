@@ -4,8 +4,6 @@
 const { allocateTeams } = require('../utils/team-allocation');
 const { getScore } = require('../utils/rank-score');
 
-function shortName(name) { if (!name) return ''; return name.length > 8 ? name.substring(0, 8) + '…' : name; }
-
 module.exports = function (app, h) {
 
   /** GET /api/events/:eventId/teams — 获取队伍列表（含队员详情+未入队选手） */
@@ -379,7 +377,7 @@ module.exports = function (app, h) {
       const captainMap = {};
       if (captainIds.length > 0) {
         const players = await h.getPlayersByIds(captainIds);
-        players.forEach(p => { captainMap[p.id] = shortName(p.wx_nickname || ''); });
+        players.forEach(p => { captainMap[p.id] = p.wx_nickname || ''; });
       }
 
       const scoreboard = teams.map(t => {
