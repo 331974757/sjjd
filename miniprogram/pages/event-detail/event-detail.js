@@ -240,13 +240,13 @@ const coreMethods = {
         this.loadMySignup()
         break
       case 'teams':
-        if (!this._tabTeamsLoaded) { this._tabTeamsLoaded = true; this.loadTeams() }
+        this._tabTeamsLoaded = true; this.loadTeams()
         break
       case 'matches':
-        if (!this._tabMatchesLoaded) { this._tabMatchesLoaded = true; this.loadBattleData() }
+        this._tabMatchesLoaded = true; this.loadBattleData()
         break
       case 'ranks':
-        if (!this._tabRanksLoaded) { this._tabRanksLoaded = true; this.loadRanks(); if (!this.data.readonly) this.loadRankTeamCards() }
+        this._tabRanksLoaded = true; this.loadRanks(); if (!this.data.readonly) this.loadRankTeamCards()
         break
     }
   },
