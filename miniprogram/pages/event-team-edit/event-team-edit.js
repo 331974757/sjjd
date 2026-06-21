@@ -466,15 +466,22 @@ Page({
         const { teams, stats, warnings } = res.data
 
         const formattedTeams = teams.map(t => ({
-          teamId: 'temp_' + t.index + '_' + Date.now(),
+          teamId: 'temp_' + t.teamIndex + '_' + Date.now(),
           teamName: t.teamName,
           captain_id: t.captainId,
-          captain: t.players.length > 0
-            ? (t.players.find(p => p.id === t.captainId) || t.players[0])
+          captain: (t.playerList || []).length > 0
+            ? ((t.playerList || []).find(p => p.id === t.captainId) || t.playerList[0])
             : null,
-          playerIds: t.playerIds,
-          players: t.players,
-          totalMmr: t.totalMmr,
+          playerIds: (t.playerList || []).map(p => p.id),
+          players: (t.playerList || []).map(p => ({
+            id: p.id,
+            wx_nickname: p.wx_nickname || '',
+            calibrate_mmr: p.calibrate_mmr || 0,
+            calibrate_rank_name: p.calibrate_rank_name || '',
+            calibrate_rank_star: p.calibrate_rank_star || 0,
+          })),
+          totalMmr: t.totalScore || 0,
+          avgMmr: (t.playerList || []).length > 0 ? Math.round((t.totalScore || 0) / t.playerList.length) : 0,
           isNew: true,
         }))
 
@@ -489,7 +496,7 @@ Page({
 
         if (stats) {
           const info = [
-            `共${teams.length}队 · ${res.data.totalPlayers}名选手`,
+            `共${teams.length}队 · ${teams.reduce((s,t) => s + (t.playerList||[]).length, 0)}名选手`,
             `最大分差：${stats.scoreStats.maxDiff}分 (${stats.scoreStats.grade})`,
             `位置满足率：${Math.round(stats.positionRate.rate * 100)}%`,
           ]
