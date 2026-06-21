@@ -71,17 +71,21 @@ module.exports = {
     _getTeamMembers(teamId) {
       if (!teamId) return []
       const teams = this.data.teamsForRank || []
-      const team = teams.find(t => t.team_id === teamId)
+      const team = teams.find(t => t.teamId === teamId)
       if (!team) return []
       const members = []
       // 队长排第一个
-      if (team.captain) {
-        members.push({ id: team.captain.id, nickName: team.captain.wx_nickname || '', isCaptain: true })
+      if (team.captainName) {
+        const capId = team.captainId || ''
+        const capMember = (team.members || []).find(m => m.id === capId)
+        if (capMember) {
+          members.push({ id: capMember.id, nickName: capMember.wx_nickname || '', isCaptain: true })
+        }
       }
-      if (team.players) {
-        team.players.forEach(p => {
+      if (team.members) {
+        team.members.forEach(p => {
           if (!members.find(m => m.id === p.id)) {
-            members.push({ id: p.id, nickName: p.wx_nickname || '', isCaptain: p.id === team.captain_id })
+            members.push({ id: p.id, nickName: p.wx_nickname || '', isCaptain: p.id === team.captainId })
           }
         })
       }
