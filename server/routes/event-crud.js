@@ -234,7 +234,14 @@ module.exports = function (app, h) {
       const values = [];
       if (eventName !== undefined) { sets.push('event_name = ?'); values.push(eventName); }
       if (eventDesc !== undefined) { sets.push('event_desc = ?'); values.push(eventDesc); }
-      if (startTime !== undefined) { sets.push('start_time = ?'); values.push(startTime); }
+      if (startTime !== undefined) {
+        // 毫秒时间戳 → MySQL datetime 格式
+        let st = startTime
+        if (st && !isNaN(Number(st))) {
+          st = new Date(Number(st)).toISOString().slice(0, 19).replace('T', ' ')
+        }
+        sets.push('start_time = ?'); values.push(st);
+      }
 
       if (sets.length > 0) {
         sets.push('updated_at = NOW()');
