@@ -64,6 +64,10 @@ module.exports = {
           item.avgMmr = 0;
         }
       }
+      // 队长名截断
+      if (item.captainName && item.captainName.length > 8) {
+        item.captainName = item.captainName.substring(0, 8) + '…';
+      }
       return item;
     },
 
