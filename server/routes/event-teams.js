@@ -131,8 +131,8 @@ module.exports = function (app, h) {
           const players = await h.getPlayersByIds(team.playerIds);
           const totalMmr = players.reduce((sum, p) => sum + (p.calibrate_mmr || 0), 0);
           await conn.query(
-            'INSERT INTO dota2_event_teams (team_id, event_id, team_name, captain_id, player_ids, total_mmr, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())',
-            [teamId, eventId, team.teamName, captainId, playerIdsJson, totalMmr]
+            'INSERT INTO dota2_event_teams (team_id, event_id, team_name, captain_id, player_ids, total_mmr, avg_mmr, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())',
+            [teamId, eventId, team.teamName, captainId, playerIdsJson, totalMmr, Math.round(totalMmr / team.playerIds.length)]
           );
         }
 
@@ -182,8 +182,8 @@ module.exports = function (app, h) {
           const playerIdsJson = JSON.stringify((team.playerList || []).map(p => p.id));
           const totalMmr = team.totalScore || 0;
           await conn.query(
-            'INSERT INTO dota2_event_teams (team_id, event_id, team_name, captain_id, player_ids, total_mmr, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())',
-            [teamId, eventId, team.teamName, team.captainId || ((team.playerList || [])[0]?.id || null), playerIdsJson, totalMmr]
+            'INSERT INTO dota2_event_teams (team_id, event_id, team_name, captain_id, player_ids, total_mmr, avg_mmr, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())',
+            [teamId, eventId, team.teamName, team.captainId || ((team.playerList || [])[0]?.id || null), playerIdsJson, totalMmr, Math.round(totalMmr / (team.playerList || []).length)]
           );
         }
 
