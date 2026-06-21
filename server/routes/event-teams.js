@@ -301,6 +301,13 @@ module.exports = function (app, h) {
       const { teamName } = req.body;
       if (!teamName) return res.status(400).json({ success: false, error: '队伍名称不能为空' });
 
+      // 检查重名
+      const [dup] = await h.pool.query(
+        'SELECT team_id FROM dota2_event_teams WHERE event_id = ? AND team_name = ? AND team_id != ?',
+        [eventId, teamName, teamId]
+      );
+      if (dup.length) return res.status(400).json({ success: false, error: '队伍名已存在，请换一个' });
+
       const [rows] = await h.pool.query('SELECT * FROM dota2_event_teams WHERE team_id = ? AND event_id = ?', [teamId, eventId]);
       if (!rows.length) return res.status(404).json({ success: false, error: '队伍不存在' });
 

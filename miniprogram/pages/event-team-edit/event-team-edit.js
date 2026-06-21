@@ -205,6 +205,17 @@ Page({
     const teamId = e.currentTarget.dataset.id
     const newName = (e.detail.value || '').trim()
     if (!newName) return
+    // 检查重名
+    const dup = this.data.teams.find(t => t.teamId !== teamId && t.teamName === newName)
+    if (dup) {
+      modal.toast(this, { title: '队伍名「' + newName + '」已存在，请换一个', icon: 'none' })
+      // 恢复编辑状态
+      const teams = this.data.teams.map(t =>
+        t.teamId === teamId ? { ...t, _editing: true } : t
+      )
+      this.setData({ teams })
+      return
+    }
     try {
       await api.put('/events/' + this.data.eventId + '/teams/' + teamId + '/name', { teamName: newName })
       const teams = this.data.teams.map(t =>
