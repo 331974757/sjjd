@@ -201,27 +201,10 @@ module.exports = function (app, h) {
       const openid = req._openid || '';
       const limitDb = signupLimitVal > 0 ? signupLimitVal : null;
 
-      // 尝试完整表结构插入，失败则逐步降级（兼容旧表缺少列的迁移场景）
-      const insertSteps = [
-        { sql: 'INSERT INTO dota2_events (event_id, event_name, event_desc, creator_id, event_status, start_time, signup_limit, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?, 0, NOW(), NOW())',
-          params: [eventId, eventName, eventDesc || null, openid, startTime, limitDb] },
-        { sql: 'INSERT INTO dota2_events (event_id, event_name, event_desc, creator_id, event_status, start_time, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, 0, NOW(), NOW())',
-          params: [eventId, eventName, eventDesc || null, openid, startTime] },
-        { sql: 'INSERT INTO dota2_events (event_id, event_name, creator_id, event_status, start_time, is_archived, created_at, updated_at) VALUES (?, ?, ?, 0, ?, 0, NOW(), NOW())',
-          params: [eventId, eventName, openid, startTime] },
-      ];
-
-      let inserted = false;
-      for (const step of insertSteps) {
-        try {
-          await h.pool.query(step.sql, step.params);
-          inserted = true;
-          break;
-        } catch (e) {
-          if (e.code !== 'ER_BAD_FIELD_ERROR') throw e;
-        }
-      }
-      if (!inserted) throw new Error('无法创建赛事：所有插入策略均失败');
+      await h.pool.query(
+        'INSERT INTO dota2_events (event_id, event_name, event_desc, creator_id, event_status, start_time, signup_limit, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?, 0, NOW(), NOW())',
+        [eventId, eventName, eventDesc || null, openid, startTime, limitDb]
+      );
 
       res.json({
         success: true,

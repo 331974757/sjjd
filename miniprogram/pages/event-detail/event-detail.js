@@ -121,6 +121,8 @@ const coreMethods = {
 
   /** 手动刷新按钮 */
   async onRefreshTap() {
+    // 清除 Tab 缓存强制重新加载
+    this._tabSignupsLoaded = this._tabTeamsLoaded = this._tabMatchesLoaded = this._tabRanksLoaded = false
     wx.showLoading({ title: '刷新中...', mask: true })
     try {
       await this.loadEvent()
@@ -230,18 +232,16 @@ const coreMethods = {
         this._computeOverviewJump()
         break
       case 'signups':
-        this.loadSignups()
-        this.loadMySignup()
+        if (!this._tabSignupsLoaded) { this._tabSignupsLoaded = true; this.loadSignups(); this.loadMySignup() }
         break
       case 'teams':
-        this.loadTeams()
+        if (!this._tabTeamsLoaded) { this._tabTeamsLoaded = true; this.loadTeams() }
         break
       case 'matches':
-        this.loadBattleData()
+        if (!this._tabMatchesLoaded) { this._tabMatchesLoaded = true; this.loadBattleData() }
         break
       case 'ranks':
-        this.loadRanks()
-        if (!this.data.readonly) this.loadRankTeamCards()
+        if (!this._tabRanksLoaded) { this._tabRanksLoaded = true; this.loadRanks(); if (!this.data.readonly) this.loadRankTeamCards() }
         break
     }
   },

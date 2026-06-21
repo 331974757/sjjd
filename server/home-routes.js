@@ -25,7 +25,7 @@ function formatTimestamp(ts) {
   return `${y}-${m}-${day} ${h}:${mi}`;
 }
 
-module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
+module.exports = function (app, { pool, getCallerRole, upload }) {
 
   // ==================== 确保表存在 ====================
   async function ensureTables() {

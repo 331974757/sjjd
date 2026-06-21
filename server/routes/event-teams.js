@@ -123,6 +123,10 @@ module.exports = function (app, h) {
           if (!team.teamName || !team.playerIds || !team.playerIds.length) continue;
           const teamId = h.genId();
           const captainId = team.captainId || team.playerIds[0];
+          if (team.captainId && !team.playerIds.includes(team.captainId)) {
+            await conn.rollback(); conn.release();
+            return res.status(400).json({ success: false, error: `队伍「${team.teamName}」的队长不在队员列表中` });
+          }
           const playerIdsJson = JSON.stringify(team.playerIds);
           const players = await h.getPlayersByIds(team.playerIds);
           const totalMmr = players.reduce((sum, p) => sum + (p.calibrate_mmr || 0), 0);

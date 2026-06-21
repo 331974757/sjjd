@@ -20,8 +20,14 @@ Page({
 
   async onLoad() {
     // 用户管理已整合到首页权限管理弹窗，无需独立页面
+    // 非超管直接踢出
+    if (!await perm.isSuperAdmin()) {
+      modal.toast(this, { title: '仅超级管理员可访问', icon: 'none' })
+      setTimeout(() => { wx.navigateBack() }, 1500)
+      return
+    }
     modal.toast(this, { title: '用户管理已整合到首页', icon: 'none' })
-    setTimeout(() => { wx.switchTab({ url: '/pages/index/index?subTab=home' }) }, 1000)
+    setTimeout(() => { wx.switchTab({ url: '/pages/index/index' }) }, 1000)
   },
 
   onShow() {
