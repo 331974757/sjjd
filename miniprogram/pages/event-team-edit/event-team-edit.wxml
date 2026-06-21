@@ -97,9 +97,7 @@
         <!-- 队伍标题栏 -->
         <view class="team-title-bar">
           <view class="team-name-row">
-            <text class="team-name" wx:if="{{!item._editing}}">{{item.teamName}}</text>
-            <input class="team-name-input" wx:if="{{item._editing}}" value="{{item.teamName}}" focus bindblur="saveTeamName" bindconfirm="saveTeamName" data-id="{{item.teamId}}" />
-            <text class="team-edit-icon" wx:if="{{canEdit && !item._editing}}" bindtap="startEditTeamName" data-id="{{item.teamId}}">✎</text>
+            <text class="team-name">{{item.teamName}}</text>
             <text class="team-count">{{item.players.length}}人</text>
           </view>
           <!-- 总分/均分 -->
