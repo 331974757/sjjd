@@ -172,32 +172,17 @@ module.exports = function (app, h) {
         return res.status(400).json({ success: false, error: allocation.error });
       }
 
-      const conn = await h.pool.getConnection();
-      try {
-        await conn.beginTransaction();
-        await conn.query('DELETE FROM dota2_event_teams WHERE event_id = ?', [eventId]);
-
-        for (const team of allocation.teams) {
-          const teamId = h.genId();
-          const playerIdsJson = JSON.stringify((team.playerList || []).map(p => p.id));
-          const totalMmr = team.totalScore || 0;
-          await conn.query(
-            'INSERT INTO dota2_event_teams (team_id, event_id, team_name, captain_id, player_ids, total_mmr, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())',
-            [teamId, eventId, team.teamName, team.captainId || ((team.playerList || [])[0]?.id || null), playerIdsJson, totalMmr]
-          );
+      // 仅返回建议分组，不写数据库。管理员微调后点"保存编组"才持久化
+      res.json({
+        success: true,
+        data: {
+          teamCount: allocation.teams.length,
+          teams: allocation.teams,
+          stats: allocation.balanceInfo,
+          warnings: allocation.warnings || [],
+          message: `已自动分为 ${allocation.teams.length} 支队伍，调整后请点击「保存编组」`
         }
-
-        await conn.commit();
-        res.json({
-          success: true,
-          data: {
-            teamCount: allocation.teams.length,
-            teams: allocation.teams,
-            stats: allocation.balanceInfo,
-            warnings: allocation.warnings || [],
-            message: `已自动分为 ${allocation.teams.length} 支队伍`
-          }
-        });
+      });
       } catch (e) {
         await h.safeRollback(conn, 'allocateTeams');
         throw e;

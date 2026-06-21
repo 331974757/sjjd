@@ -511,10 +511,8 @@ Page({
             title: '分队完成',
             content: info.join('\n'),
             showCancel: false,
-            confirmText: '好的'
+            confirmText: '好的，开始微调'
           })
-          // 弹窗关闭后从服务器重新加载队伍数据
-          await this.loadTeamData()
         }
       } else {
         wx.hideLoading()
