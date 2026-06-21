@@ -170,8 +170,9 @@ const coreMethods = {
         this.setData({ event, isArchived })
         this._updateProgressSteps()
         this._computeOverviewJump()
-        // 初始化时间选择器数据
         this.startEditTime(); this.setData({ editingTime: false })
+        // 预加载报名人数供概览显示
+        this.loadSignups()
       } else {
         modal.toast(this, { title: '赛事不存在或已删除', icon: 'none' })
         setTimeout(() => wx.navigateBack(), 1500)
