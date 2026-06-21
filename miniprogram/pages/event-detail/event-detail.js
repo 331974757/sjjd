@@ -172,8 +172,8 @@ const coreMethods = {
         this._computeOverviewJump()
         this.startEditTime()
         // startEditTime 已内部设置 editingTime: true，概览不需要编辑态
-        // 预加载报名人数供概览显示
-        this.loadSignups()
+        // 预加载报名人数和名次数供概览显示
+        await Promise.all([this.loadSignups(), this.loadRanks()])
       } else {
         modal.toast(this, { title: '赛事不存在或已删除', icon: 'none' })
         setTimeout(() => wx.navigateBack(), 1500)
