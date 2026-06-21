@@ -371,8 +371,8 @@ module.exports = function (app, h) {
       if (!keyword || !keyword.trim()) return res.json({ success: true, data: [] });
       const kw = '%' + keyword.trim() + '%';
       const [rows] = await h.pool.query(
-        "SELECT id, wx_nickname, calibrate_rank_name, calibrate_rank_star, avatar_url, game_id, calibrate_mmr FROM dota2_players WHERE status = 'active' AND (wx_nickname LIKE ? OR game_id LIKE ? OR steam_id LIKE ?) LIMIT 20",
-        [kw, kw, kw]
+        "SELECT id, wx_nickname, calibrate_rank_name, calibrate_rank_star, avatar_url, game_id, calibrate_mmr FROM dota2_players WHERE status = 'active' AND (wx_nickname LIKE ?) LIMIT 20",
+        [kw]
       );
       res.json({ success: true, data: rows });
     } catch (e) {
