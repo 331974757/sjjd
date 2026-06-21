@@ -399,6 +399,10 @@ const coreMethods = {
       this.setData({ _cloning: false })
       if (res.success) {
         modal.toast(this, { title: res.message || '克隆成功', icon: 'success' })
+        // 通知首页刷新赛事列表
+        var pages = getCurrentPages()
+        var homePage = pages.find(function(p) { return p && p.route === 'pages/index/index' })
+        if (homePage) { homePage._needsEventReload = true }
         // 跳转到新创建的赛事
         setTimeout(() => {
           wx.redirectTo({ url: '/pages/event-detail/event-detail?eventId=' + res.data.eventId })

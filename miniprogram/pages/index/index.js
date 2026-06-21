@@ -84,7 +84,11 @@ const pageConfig = {
       }
     }
     if (this.data.currentGame === 'dota2') {
-      if (this.data.subTab === 'rules') {
+      if (this._needsEventReload) {
+        this._needsEventReload = false
+        this.loadRuleEvents()
+        this.loadEvents()
+      } else if (this.data.subTab === 'rules') {
         this.loadRuleEvents()
       } else if (this.data.subTab === 'history') {
         this.loadEvents()
