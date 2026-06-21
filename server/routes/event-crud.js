@@ -178,7 +178,16 @@ module.exports = function (app, h) {
       let startTime = req.body.start_time || req.body.startTime || null;
       // 毫秒时间戳 → MySQL datetime 格式
       if (startTime && !isNaN(Number(startTime))) {
-        startTime = new Date(Number(startTime)).toISOString().slice(0, 19).replace('T', ' ');
+        const ts = Number(startTime);
+        // 过去超过1天的时间视为无效（允许少量时差）
+        if (ts < Date.now() - 86400000) {
+          return res.status(400).json({ success: false, error: '赛事时间不能是过去' });
+        }
+        // 拒绝超过2年后的时间
+        if (ts > Date.now() + 730 * 86400000) {
+          return res.status(400).json({ success: false, error: '赛事时间不能超过2年后' });
+        }
+        startTime = new Date(ts).toISOString().slice(0, 19).replace('T', ' ');
       }
       const eventDesc = (req.body.event_desc || req.body.eventDesc || '').trim();
       const signupLimitRaw = req.body.signup_limit || req.body.signupLimit || 0;
@@ -447,7 +456,7 @@ module.exports = function (app, h) {
         );
       }
 
-      res.json({ success: true, data: { eventId: newId, eventName: newName }, message: `已克隆为「${newName}」` });
+      res.json({ success: true, data: { eventId: newId, eventName: newName }, message: `已克隆为「${newName}」。（仅基本信息+章程已复制，报名、队伍、对战等数据需重新设置）` });
     } catch (e) {
       res.status(500).json({ success: false, error: e.message });
     }

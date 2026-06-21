@@ -288,7 +288,8 @@ module.exports = function (app, h) {
           }
         }
 
-        if (failCount > 0 && successCount === 0) {
+        if (failCount > 0) {
+          // 任何失败都回滚全部操作，保证数据一致性
           await conn.rollback();
         } else {
           await conn.commit();

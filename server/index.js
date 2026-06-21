@@ -473,6 +473,10 @@ app.post('/api/players/batch-delete', async (req, res) => {
     if (!await assertAdmin(req, res)) return;
     const { ids } = req.body;
     if (!ids || !ids.length) return res.status(400).json({ success: false, error: 'missing ids' });
+    // 校验所有 id 为有效字符串
+    if (!ids.every(id => typeof id === 'string' && id.length > 0)) {
+      return res.status(400).json({ success: false, error: '无效的选手ID格式' });
+    }
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();

@@ -294,7 +294,8 @@ const coreMethods = {
   onEditNameInput(e) { this.setData({ editNameValue: e.detail.value }) },
   async confirmEditName() {
     const val = (this.data.editNameValue || '').trim()
-    if (!val || val.length < 2 || val.length > 50) return
+    if (!val || val.length < 2) { modal.toast(this, { title: '赛事名称至少2个字符', icon: 'none' }); return }
+    if (val.length > 50) { modal.toast(this, { title: '赛事名称不能超过50个字符', icon: 'none' }); return }
     this.setData({ editingName: false })
     try {
       const res = await api.put('/events/' + this.data.eventId, { eventName: val })
