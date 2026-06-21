@@ -211,15 +211,9 @@ function checkAction(action, options) {
     // ─── 自主报名 ───
     case 'signup':
     case 'cancel_signup':
-      // 管理员在报名截止（状态≤2）前均可操作；普通用户仅在报名中（状态=1）可操作
-      if (isAdmin) {
-        if (status > EVENT_STATUS.SIGNUP_CLOSED) {
-          return { allowed: false, disabled: true, reason: STATUS_NAMES[status] ? `「${STATUS_NAMES[status]}」阶段不可操作报名` : '非报名阶段' };
-        }
-      } else {
-        if (status !== EVENT_STATUS.SIGNUP_OPEN) {
-          return { allowed: false, disabled: true, reason: STATUS_NAMES[status] ? `「${STATUS_NAMES[status]}」阶段不可报名` : '非报名阶段' };
-        }
+      // 管理员报名状态与普通用户一致（后端 requireSignupOpen 要求 status=1）
+      if (status !== EVENT_STATUS.SIGNUP_OPEN) {
+        return { allowed: false, disabled: true, reason: STATUS_NAMES[status] ? `「${STATUS_NAMES[status]}」阶段不可报名` : '非报名阶段' };
       }
       return { allowed: true, disabled: false, reason: '' };
 

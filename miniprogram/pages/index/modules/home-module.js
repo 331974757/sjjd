@@ -196,7 +196,7 @@ module.exports = {
         const res = await api.put('/users/' + openid + '/role', { role })
         wx.hideLoading()
         modal.toast(this, { theme: res.success ? 'success' : 'danger', content: res.success ? '已' + label : (res.error || res.message || '失败') })
-        if (res.success) this.homeLoadUsers()
+        if (res.success) { perm.clearCache(); this.homeLoadUsers() }
       } catch (e) {
         wx.hideLoading()
         modal.toast(this, { theme: 'danger', content: '操作失败' })

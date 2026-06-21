@@ -112,9 +112,12 @@ app.get('/api/auth/login', async (req, res) => {
       try {
         const [rows] = await pool.query('SELECT openid FROM users WHERE openid = ?', [wxRes.openid]);
         if (!rows.length) {
+          // 首个用户自动升级为超级管理员
+          const [[{ total }]] = await pool.query('SELECT COUNT(*) AS total FROM users');
+          const role = (total === 0) ? 'super_admin' : 'user';
           await pool.query(
-            "INSERT INTO users (id, openid, role, nick_name, nick_change_count, created_at, updated_at) VALUES (?, ?, 'user', '', 0, NOW(), NOW())",
-            [genId(), wxRes.openid]
+            "INSERT INTO users (id, openid, role, nick_name, nick_change_count, created_at, updated_at) VALUES (?, ?, ?, '', 0, NOW(), NOW())",
+            [genId(), wxRes.openid, role]
           );
         }
       } catch (e) {

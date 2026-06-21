@@ -280,7 +280,11 @@ const coreMethods = {
       }
     }
 
-    this.setData({ actions })
+    this.setData({
+      actions,
+      signupBtn: actions.signup,
+      cancelSignupBtn: actions.cancel_signup
+    })
   },
 
   // ============ 赛事名&简介内联编辑 ============
