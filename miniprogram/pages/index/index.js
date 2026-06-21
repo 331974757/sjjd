@@ -334,7 +334,7 @@ const pageConfig = {
     const tab = e.currentTarget.dataset.tab
     if (tab === this.data.subTab) return
     this.setData({ subTab: tab })
-    if (tab === 'profile' && !this.data.loaded) {
+    if (tab === 'profile' && this.data.displayPlayers.length === 0) {
       this.loadAllPlayers()
     } else if (tab === 'rules') {
       this.loadRuleEvents()
