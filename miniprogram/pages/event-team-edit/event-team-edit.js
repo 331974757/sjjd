@@ -466,56 +466,32 @@ Page({
       })
 
       if (res.success) {
-        const { teams, stats, warnings } = res.data
-
-        const formattedTeams = teams.map(t => ({
-          teamId: 'temp_' + t.teamIndex + '_' + Date.now(),
+        // 自动分队建议已生成，直接保存到数据库后再加载显示
+        const teamsPayload = (res.data.teams || []).map(t => ({
           teamName: t.teamName,
-          captain_id: t.captainId,
-          captain: (t.playerList || []).length > 0
-            ? ((t.playerList || []).find(p => p.id === t.captainId) || t.playerList[0])
-            : null,
+          captainId: t.captainId,
           playerIds: (t.playerList || []).map(p => p.id),
-          players: (t.playerList || []).map(p => ({
-            id: p.id,
-            wx_nickname: p.wx_nickname || '',
-            calibrate_mmr: p.calibrate_mmr || 0,
-            calibrate_rank_name: p.calibrate_rank_name || '',
-            calibrate_rank_star: p.calibrate_rank_star || 0,
-          })),
-          totalMmr: t.totalScore || 0,
-          avgMmr: (t.playerList || []).length > 0 ? Math.round((t.totalScore || 0) / t.playerList.length) : 0,
-          isNew: true,
         }))
-
-        const allFreePlayers = []
-        this.setData({
-          teams: formattedTeams,
-          freePlayers: allFreePlayers,
-          selectedPlayerId: '',
-          autoAllocating: false,
-          loading: false
-        })
-
-        wx.hideLoading()
-
+        await api.post('/events/' + this.data.eventId + '/teams/batch', { teams: teamsPayload })
+        await this.loadTeamData()
+        
+        const { stats, warnings } = res.data
+        const info = [
+          '已自动分为 ' + teamsPayload.length + ' 队',
+        ]
         if (stats) {
-          const info = [
-            `共${teams.length}队 · ${teams.reduce((s,t) => s + (t.playerList||[]).length, 0)}名选手`,
-            `最大分差：${stats.scoreStats.maxDiff}分 (${stats.scoreStats.grade})`,
-            `位置满足率：${Math.round(stats.positionRate.rate * 100)}%`,
-          ]
-          if (warnings && warnings.length) {
-            info.push(`⚠ ${warnings[0]}`)
-          }
-          await modal.confirm(this, {
-            theme: 'success',
-            title: '分队完成',
-            content: info.join('\n'),
-            showCancel: false,
-            confirmText: '好的，开始微调'
-          })
+          info.push('最大分差：' + stats.scoreStats.maxDiff + '分 (' + stats.scoreStats.grade + ')')
         }
+        if (warnings && warnings.length) info.push('⚠ ' + warnings[0])
+        
+        wx.hideLoading()
+        await modal.confirm(this, {
+          theme: 'success',
+          title: '分队完成',
+          content: info.join('\n'),
+          showCancel: false,
+          confirmText: '好的，开始微调'
+        })
       } else {
         wx.hideLoading()
         modal.toast(this, { title: res.error || '分队失败', icon: 'none' })
