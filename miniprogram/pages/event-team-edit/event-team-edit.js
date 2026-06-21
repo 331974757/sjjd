@@ -469,15 +469,15 @@ Page({
         const { teams, stats, warnings } = res.data
 
         const formattedTeams = teams.map(t => ({
-          teamId: 'temp_' + t.teamIndex + '_' + Date.now(),
+          teamId: 'temp_' + t.index + '_' + Date.now(),
           teamName: t.teamName,
           captain_id: t.captainId,
-          captain: (t.playerList || []).length > 0
-            ? ((t.playerList || []).find(p => p.id === t.captainId) || t.playerList[0])
+          captain: (t.players || []).length > 0
+            ? ((t.players || []).find(p => p.id === t.captainId) || t.players[0])
             : null,
-          playerIds: (t.playerList || []).map(p => p.id),
-          players: t.playerList || [],
-          totalMmr: t.totalScore || 0,
+          playerIds: t.playerIds,
+          players: t.players || [],
+          totalMmr: t.totalMmr || 0,
           isNew: true,
         }))
 
@@ -492,7 +492,7 @@ Page({
 
         if (stats) {
           const info = [
-            `共${teams.length}队 · ${(t.playerList||[]).length}名选手`,
+            `共${teams.length}队 · ${teams.reduce((s,t)=>s+(t.players||[]).length,0)}名选手`,
             `最大分差：${stats.scoreStats.maxDiff}分 (${stats.scoreStats.grade})`,
           ]
           if (warnings && warnings.length) info.push('⚠ ' + warnings[0])

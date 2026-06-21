@@ -188,11 +188,20 @@ module.exports = function (app, h) {
         }
 
         await conn.commit();
+        // 转为前端友好格式
+        const teams = allocation.teams.map(t => ({
+          index: t.teamIndex,
+          teamName: t.teamName,
+          captainId: t.captainId || ((t.playerList || [])[0]?.id || ''),
+          playerIds: (t.playerList || []).map(p => p.id),
+          players: t.playerList || [],
+          totalMmr: t.totalScore || 0,
+        }));
+
         res.json({
           success: true,
           data: {
-            teamCount: allocation.teams.length,
-            teams: allocation.teams,
+            teams,
             stats: allocation.balanceInfo,
             warnings: allocation.warnings || [],
             message: `已自动分为 ${allocation.teams.length} 支队伍`
