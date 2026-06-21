@@ -222,33 +222,23 @@ module.exports = function (app, { pool, assertAdmin, getCallerRole, upload }) {
    */
   app.get('/api/stats/platform', async (req, res) => {
     try {
-      // 累计注册选手：有昵称或修改过昵称的用户
-      const [userRows] = await pool.query(
-        "SELECT COUNT(*) AS cnt FROM users WHERE nick_name != '' OR nick_change_count > 0"
-      );
-      // 总赛事（不含已归档）
-      const [totalRows] = await pool.query(
-        "SELECT COUNT(*) AS cnt FROM dota2_events WHERE is_archived = 0"
-      );
-      // 进行中赛事：状态 0-4（创建中/报名中/报名截止/对战预备/对战中）且未归档
-      const [activeRows] = await pool.query(
-        "SELECT COUNT(*) AS cnt FROM dota2_events WHERE event_status IN (0,1,2,3,4) AND is_archived = 0"
-      );
-      // 已完结赛事：状态 5 未归档 + 已归档
-      const [finishedMain] = await pool.query(
-        "SELECT COUNT(*) AS cnt FROM dota2_events WHERE event_status = 5 AND is_archived = 0"
-      );
-      const [archived] = await pool.query(
-        "SELECT COUNT(*) AS cnt FROM dota2_events WHERE is_archived = 1"
-      );
+      // 合并为一次查询，减少数据库往返
+      const [[row]] = await pool.query(`
+        SELECT
+          (SELECT COUNT(*) FROM users WHERE nick_name != '' OR nick_change_count > 0) AS registeredPlayers,
+          (SELECT COUNT(*) FROM dota2_events WHERE is_archived = 0) AS totalEvents,
+          (SELECT COUNT(*) FROM dota2_events WHERE event_status IN (0,1,2,3,4) AND is_archived = 0) AS activeEvents,
+          (SELECT COUNT(*) FROM dota2_events WHERE event_status = 5 AND is_archived = 0) AS finishedMain,
+          (SELECT COUNT(*) FROM dota2_events WHERE is_archived = 1) AS archived
+      `);
 
       res.json({
         success: true,
         data: {
-          registeredPlayers: userRows[0].cnt || 0,
-          totalEvents: totalRows[0].cnt || 0,
-          activeEvents: activeRows[0].cnt || 0,
-          finishedEvents: (finishedMain[0].cnt || 0) + (archived[0].cnt || 0)
+          registeredPlayers: row.registeredPlayers || 0,
+          totalEvents: row.totalEvents || 0,
+          activeEvents: row.activeEvents || 0,
+          finishedEvents: (row.finishedMain || 0) + (row.archived || 0)
         }
       });
     } catch (e) {

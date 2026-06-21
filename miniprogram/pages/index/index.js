@@ -71,8 +71,13 @@ const pageConfig = {
       this._nickMayBeChanged = false
       this.fetchNicknameInfo()
     }
+    // 节流：30 秒内不重复加载首页数据
     if (this.data.currentGame === 'home') {
-      this.loadHomeData(true)
+      const now = Date.now()
+      if (!this._lastHomeLoad || (now - this._lastHomeLoad) > 30000) {
+        this._lastHomeLoad = now
+        this.loadHomeData(true)
+      }
       if (this.data.userRole === 'super_admin') {
         this.homeLoadUsers()
       }
