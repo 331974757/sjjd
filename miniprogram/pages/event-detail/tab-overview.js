@@ -5,6 +5,7 @@
 // ============================================================
 
 const api = require('../../utils/api.js')
+const modal = require('../../utils/modal.js')
 
 module.exports = {
   // ===== Tab1 数据定义 =====
