@@ -175,10 +175,9 @@ Page({
             : 0,
           _canRename: (function() {
             if (this.data.isAdmin) return true;
-            var fullName = (t.captain && t.captain.wx_nickname) || t.captainName || '';
             var myNick = this.data._myNick || '';
             if (!myNick) return false;
-            if (fullName === myNick) return true;
+            // 从 members 找队长的完整昵称对比
             var mems = t.members || t.players || [];
             var cap = mems.find(function(m) { return m.id === (t.captain_id || t.captainId); });
             return !!(cap && cap.wx_nickname === myNick);

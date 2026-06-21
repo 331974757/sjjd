@@ -99,7 +99,7 @@
           <view class="team-name-row">
             <text class="team-name" wx:if="{{!item._editing}}">{{item.teamName}}</text>
             <input class="team-name-edit" wx:if="{{item._editing}}" value="{{item.teamName}}" focus bindblur="saveTeamName" bindconfirm="saveTeamName" data-id="{{item.teamId}}" />
-            <text class="team-edit-icon" wx:if="{{item._canRename && !item._editing}}" catchtap="startEditTeamName" data-id="{{item.teamId}}">✎</text>
+            <text class="team-edit-icon" wx:if="{{(canEdit || item._canRename) && !item._editing}}" catchtap="startEditTeamName" data-id="{{item.teamId}}">✎</text>
             <text class="team-count">{{item.players.length}}人</text>
           </view>
           <!-- 总分/均分 -->
