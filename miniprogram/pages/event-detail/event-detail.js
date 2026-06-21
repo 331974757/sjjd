@@ -232,7 +232,9 @@ const coreMethods = {
         this._computeOverviewJump()
         break
       case 'signups':
-        if (!this._tabSignupsLoaded) { this._tabSignupsLoaded = true; this.loadSignups(); this.loadMySignup() }
+        if (!this._tabSignupsLoaded) { this._tabSignupsLoaded = true; this.loadSignups() }
+        // mySignup 每次都要刷新（轻量接口 + 用户可能在别处报名了）
+        this.loadMySignup()
         break
       case 'teams':
         if (!this._tabTeamsLoaded) { this._tabTeamsLoaded = true; this.loadTeams() }

@@ -151,9 +151,18 @@ Page({
           teamName: t.team_name || t.teamName || '未命名',
           captain_id: t.captain_id || t.captainId || '',
           captain: t.captain || null,
-          players: t.players || [],
-          playerIds: (t.players || []).map(p => p.id),
+          players: (t.members || t.players || []).map(m => ({
+            id: m.id, wx_nickname: m.nickName || m.wx_nickname || '',
+            calibrate_mmr: m.mmr || m.calibrate_mmr || 0,
+            calibrate_rank_name: m.rankName || m.calibrate_rank_name || '',
+            calibrate_rank_star: m.rankStar || m.calibrate_rank_star || 0,
+            isCaptain: m.isCaptain || m.id === (t.captain_id || t.captainId)
+          })),
+          playerIds: (t.members || t.players || []).map(p => p.id),
           totalMmr: t.total_mmr || t.totalMmr || 0,
+          avgMmr: (t.members || t.players || []).length > 0
+            ? Math.round((t.total_mmr || t.totalMmr || 0) / (t.members || t.players || []).length)
+            : 0,
         }))
 
         this.setData({
