@@ -165,9 +165,20 @@ Page({
             : 0,
         }))
 
+        // 规范化自由选手数据，对齐 WXML 期望的字段名
+        const normalizedFree = (freePlayers || []).map(p => ({
+          id: p.id,
+          wx_nickname: p.nickName || p.wx_nickname || '',
+          calibrate_mmr: p.mmr || p.calibrate_mmr || 0,
+          calibrate_rank_name: p.rankName || p.calibrate_rank_name || '',
+          calibrate_rank_star: p.rankStar || p.calibrate_rank_star || 0,
+          avatar_url: p.avatarUrl || p.avatar_url || '',
+          game_id: p.gameId || p.game_id || '',
+        }))
+
         this.setData({
           teams: normalizedTeams,
-          freePlayers: freePlayers || [],
+          freePlayers: normalizedFree,
           eventStatus: eventStatus || this.data.eventStatus,
           selectedPlayerId: '', // 清空选中
           loading: false,
