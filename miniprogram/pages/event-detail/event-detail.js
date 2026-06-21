@@ -357,11 +357,19 @@ const coreMethods = {
     this.confirmEditTime()
   },
   async confirmEditTime() {
-    const ts = dt.toTimestamp(this.data.editDateTimeRange, this.data.editDateTimeIndex)
-    if (isNaN(ts)) return
+    const range = this.data.editDateTimeRange
+    const idx = this.data.editDateTimeIndex
+    if (!range || range.length < 5) return
+    // 从 range/idx 直接构建 "YYYY-MM-DD HH:mm:ss"
+    const y = parseInt(range[0][idx[0]]) || 0
+    const mo = parseInt(range[1][idx[1]]) || 1
+    const d = parseInt(range[2][idx[2]]) || 1
+    const h = parseInt(range[3][idx[3]]) || 0
+    const mi = parseInt(range[4][idx[4]]) || 0
+    const startTime = `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')} ${String(h).padStart(2,'0')}:${String(mi).padStart(2,'0')}:00`
     this.setData({ editingTime: false })
     try {
-      const res = await api.put('/events/' + this.data.eventId, { startTime: ts })
+      const res = await api.put('/events/' + this.data.eventId, { startTime })
       if (res.success) { await this.loadEvent() }
       else { modal.toast(this, { title: res.error || '更新失败', icon: 'none' }) }
     } catch (e) { modal.toast(this, { title: '更新失败，请重试', icon: 'none' }) }
