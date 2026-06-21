@@ -469,6 +469,7 @@ Page({
         const { teams, stats, warnings } = res.data
 
         const formattedTeams = teams.map(t => ({
+          index: t.index,
           teamId: 'temp_' + t.index + '_' + Date.now(),
           teamName: '队伍' + t.index,
           captain_id: t.captainId,
