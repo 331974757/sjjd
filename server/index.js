@@ -240,7 +240,7 @@ app.get('/api/players', async (req, res) => {
     // 将前端英文code转换为数据库中的中文段位名
     const rankName = RANK_CODE_MAP[rank] || rank;
     if (rank) { where += ' AND calibrate_rank_name = ?'; params.push(rankName); }
-    if (position) { where += ' AND FIND_IN_SET(?, signup_position)'; params.push(String(position)); }
+    if (position) { where += ' AND FIND_IN_SET(?, good_at_positions)'; params.push(String(position)); }
     if (keyword) {
       where += ' AND (wx_nickname LIKE ? OR steam_id LIKE ? OR game_id LIKE ?)';
       const kw = '%' + keyword + '%'; params.push(kw, kw, kw);
