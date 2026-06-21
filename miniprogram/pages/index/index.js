@@ -153,7 +153,7 @@ const pageConfig = {
   loadNickname() {
     const nick = perm.getNickName() || ''
     this.setData({ nickName: nick })
-    this.fetchNicknameInfo().then(() => {
+    return this.fetchNicknameInfo().then(() => {
       if (!this.data.nickName && !this._nickModalAutoShown) {
         this._nickModalAutoShown = true
         this.setData({ showNickModal: true, nickInputValue: '' })
