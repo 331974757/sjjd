@@ -242,6 +242,10 @@ module.exports = function (app, h) {
       if (event.is_archived === 1) {
         return res.status(403).json({ success: false, error: '赛事已归档，不可批量添加', code: 'ARCHIVED' });
       }
+      // 只允许在报名中(status=1)或报名截止(status=2)阶段批量添加
+      if (event.event_status !== 1 && event.event_status !== 2) {
+        return res.status(400).json({ success: false, error: '当前赛事不在可报名阶段', code: 'STATUS_ERROR' });
+      }
 
       const { playerIds } = req.body;
       if (!playerIds || !Array.isArray(playerIds) || playerIds.length === 0) {

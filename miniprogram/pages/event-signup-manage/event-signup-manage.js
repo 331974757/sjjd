@@ -247,7 +247,7 @@ Page({
         // 重新标记搜索结果中已报名的
         this.refreshSearchResults()
       } else {
-        modal.toast(this, { title: res.error || '添加失败', icon: 'none' })
+        modal.toast(this, { title: res.error || '添加失败，请刷新后重试', icon: 'none', duration: 3000 })
       }
     } catch (e) {
       this.setData({ loading: false })
