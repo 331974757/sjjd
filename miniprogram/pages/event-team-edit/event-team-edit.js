@@ -165,12 +165,8 @@ Page({
             : 0,
         }))
 
-        // 按队名数字排序（队伍1,2,3,4）
-        normalizedTeams.sort((a, b) => {
-          var na = parseInt((a.teamName || '').replace(/[^0-9]/g, '')) || 0
-          var nb = parseInt((b.teamName || '').replace(/[^0-9]/g, '')) || 0
-          return na - nb
-        })
+        // 按总分降序排列
+        normalizedTeams.sort((a, b) => (b.totalMmr || 0) - (a.totalMmr || 0))
         const normalizedFree = freePlayers || []
 
         this.setData({
@@ -476,7 +472,7 @@ Page({
         const formattedTeams = teams.map(t => ({
           index: t.index,
           teamId: 'temp_' + t.index + '_' + Date.now(),
-          teamName: '队伍' + t.index,
+          teamName: t.teamName,
           captain_id: t.captainId,
           captain: (t.players || []).length > 0
             ? ((t.players || []).find(p => p.id === t.captainId) || t.players[0])
@@ -485,7 +481,9 @@ Page({
           players: t.players || [],
           totalMmr: t.totalMmr || 0,
           isNew: true,
-        })).sort((a, b) => a.index - b.index)
+        })).sort((a, b) => b.totalMmr - a.totalMmr)
+        // 重新编号：分数最高的为队伍1
+        formattedTeams.forEach((t, i) => { t.teamName = '队伍' + (i + 1); t.index = i + 1 })
 
         this.setData({
           teams: formattedTeams,
