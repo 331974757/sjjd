@@ -67,7 +67,7 @@ module.exports = {
         let openid = ''
         try { const app = getApp(); openid = await app.getOpenId() } catch (e) { console.warn('[home] 获取openid失败', e) }
         wx.showLoading({ title: '加载中...' })
-        const res = await api.get('/users')
+        const res = await api.get('/users', { pageSize: 200 })
         wx.hideLoading()
         let raw = (res && res.data) ? res.data : []
         raw = raw.map(u => ({
