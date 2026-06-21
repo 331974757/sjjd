@@ -192,8 +192,29 @@ Page({
   },
 
   // =====================================================
-  // 选手选择交互（模拟拖拽：点击选择 → 点击队伍放入）
+  // 重命名队伍
   // =====================================================
+  startEditTeamName(e) {
+    const teamId = e.currentTarget.dataset.id
+    const teams = this.data.teams.map(t =>
+      t.teamId === teamId ? { ...t, _editing: true } : t
+    )
+    this.setData({ teams })
+  },
+  async saveTeamName(e) {
+    const teamId = e.currentTarget.dataset.id
+    const newName = (e.detail.value || '').trim()
+    if (!newName) return
+    try {
+      await api.put('/events/' + this.data.eventId + '/teams/' + teamId + '/name', { teamName: newName })
+      const teams = this.data.teams.map(t =>
+        t.teamId === teamId ? { ...t, teamName: newName, _editing: false } : t
+      )
+      this.setData({ teams })
+    } catch (err) {
+      modal.toast(this, { title: '改名失败', icon: 'none' })
+    }
+  },
 
   /**
    * 点击自由选手：选中/取消选中
