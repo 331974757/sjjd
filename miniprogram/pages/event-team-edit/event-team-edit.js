@@ -94,7 +94,7 @@ Page({
       // 1. 获取用户权限 【第9轮修复】perm.requireRole 不存在，改用 getRole
       const role = await perm.getRole()
       const isAdmin = role === 'admin' || role === 'super_admin'
-      this.setData({ userRole: role, isAdmin })
+      this.setData({ userRole: role, isAdmin, _myNick: perm.getNickName() || '' })
 
       // 2. 加载赛事状态
       await this.loadEventStatus()
@@ -173,6 +173,8 @@ Page({
           avgMmr: (t.members || t.players || []).length > 0
             ? Math.round((t.total_mmr || t.totalMmr || 0) / (t.members || t.players || []).length)
             : 0,
+          // 队长可改自己的队伍名，管理员可改所有队伍名
+          _canRename: this.data.isAdmin || (t.captainName || this.data._myNick) === (this.data._myNick || perm.getNickName()),
         }))
 
         // 按总分降序排列
