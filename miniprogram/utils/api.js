@@ -1,5 +1,6 @@
 // utils/api.js - ECS REST API 统一请求模块
-const API_BASE = 'https://congqin.online/api'
+const env = require('./env.js')
+const API_BASE = env.API_BASE
 
 // 缓存 openid 避免每次都调 getApp
 let _openidCache = null
