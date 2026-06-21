@@ -4,6 +4,7 @@
 const C = require('../../../utils/constants.js')
 const api = require('../../../utils/api.js')
 const modal = require('../../../utils/modal.js')
+const perm = require('../../../utils/permission.js')
 
 module.exports = {
   data: {
