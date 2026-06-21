@@ -72,9 +72,9 @@ module.exports = {
           currentPage: res.page || 1,
           filteredCount: res.total || list.length,
         })
-        // 缓存全量数据用于饼图/导出（最多 500 人）
-        if (reset && (res.total || 0) <= 500) {
-          this.setData({ allPlayers: list })
+        // 缓存全量数据用于导出（无筛选条件时）
+        if (reset && !kw && pos === 'all' && rank === 'all' && (res.total || 0) <= 500) {
+          // 加载全量数据仅用于导出
         }
       } catch (err) {
         console.error('[选手数据] 加载失败', err)
@@ -194,25 +194,24 @@ module.exports = {
     },
 
     computeRankDistribution() {
-      const all = this.data.allPlayers
-      const dist = {}
-      for (let i = 0; i < all.length; i++) {
-        const tier = R.getRankTier(all[i].calibrateRankName) || 'unknown'
-        if (!dist[tier]) dist[tier] = 0
-        dist[tier]++
-      }
-      const result = []
-      for (let j = 0; j < RANK_ORDER.length; j++) {
-        const key = RANK_ORDER[j]
-        if (dist[key]) {
-          const ico = RANK_ICONS[key]
-          result.push({ tier: key, label: RANK_LABELS[key], icon: ico, iconIsImg: R.isRankIconImage(ico), count: dist[key], color: RANK_COLORS[j] })
-        }
-      }
-      if (dist['unknown']) {
-        result.push({ tier: 'unknown', label: '未定段位', icon: '❓', count: dist['unknown'], color: '#666' })
-      }
-      this.setData({ rankDistribution: result })
+      // 从后端统计数据获取段位分布（不受分页影响）
+      api.get('/stats/ranks').then(res => {
+        if (!res.success || !res.data || !res.data.length) return
+        const result = res.data
+          .filter(d => d.name && d.name !== '')
+          .map(d => {
+            const tier = R.getRankTier(d.name)
+            if (!tier) return null
+            const j = RANK_ORDER.indexOf(tier)
+            return { tier, label: RANK_LABELS[tier], icon: RANK_ICONS[tier], iconIsImg: R.isRankIconImage(RANK_ICONS[tier]), count: d.value, color: RANK_COLORS[j >= 0 ? j : 0] }
+          })
+          .filter(Boolean)
+          .sort((a, b) => b.count - a.count)
+        this.setData({ rankDistribution: result }, () => {
+          if (this._pieTimer) clearTimeout(this._pieTimer)
+          this._pieTimer = setTimeout(() => { this.drawPieChart() }, 300)
+        })
+      }).catch(() => {})
     },
 
     drawPieChart() {

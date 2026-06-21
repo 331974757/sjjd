@@ -45,7 +45,7 @@
         <view class="event-meta-left">
           <view class="meta-item">
             <text class="meta-label">比赛时间<text wx:if="{{isAdmin && !isArchived && event.event_status < 4}}" class="meta-edit-icon"> ✎</text></text>
-            <picker wx:if="{{isAdmin && !isArchived && event.event_status < 4}}" mode="multiSelector" range="{{editTimeRange}}" value="{{editTimeIndex}}" bindchange="onEditTimeChange" bindcolumnchange="onEditTimeColumnChange">
+            <picker wx:if="{{isAdmin && !isArchived && event.event_status < 4}}" mode="multiSelector" range="{{editDateTimeRange}}" value="{{editDateTimeIndex}}" bindchange="onEditDateTimeChange" bindcolumnchange="onEditDateTimeColumnChange">
               <view class="meta-value meta-time-editable">{{event._timeLabel}}</view>
             </picker>
             <text wx:else class="meta-value">{{event._timeLabel}}</text>
