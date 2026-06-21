@@ -165,7 +165,12 @@ Page({
             : 0,
         }))
 
-        // 自由选手直接使用，后端已返回规范字段名
+        // 按队名数字排序（队伍1,2,3,4）
+        normalizedTeams.sort((a, b) => {
+          var na = parseInt((a.teamName || '').replace(/[^0-9]/g, '')) || 0
+          var nb = parseInt((b.teamName || '').replace(/[^0-9]/g, '')) || 0
+          return na - nb
+        })
         const normalizedFree = freePlayers || []
 
         this.setData({
