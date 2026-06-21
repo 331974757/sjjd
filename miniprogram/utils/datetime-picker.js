@@ -11,7 +11,7 @@
 
 /**
  * 构建 multiSelector 的列范围数组
- * [年[], 月[], 日[], 时[], [00分, 30分]]
+ * [年[], 月[], 日[], 时[], 分[]]
  * @param {Object} opts
  * @param {number} [opts.refYear]  - 起始年份，默认当前年
  * @param {number} [opts.yearSpan] - 年份跨度，默认 3
@@ -35,7 +35,9 @@ function buildRange({ refYear, yearSpan = 3, selYear, selMonth } = {}) {
   const hours = []
   for (let h = 0; h < 24; h++) hours.push(('0' + h).slice(-2) + '时')
 
-  return [years, months, days, hours, ['00分', '30分']]
+  const minutes = []
+  for (let mi = 0; mi < 60; mi += 5) minutes.push(String(mi).padStart(2, '0') + '分')
+  return [years, months, days, hours, minutes]
 }
 
 /**
@@ -52,7 +54,7 @@ function buildIndex(ts, refYear) {
     d.getMonth(),
     d.getDate() - 1,
     d.getHours(),
-    d.getMinutes() >= 30 ? 1 : 0
+    Math.round(d.getMinutes() / 5)
   ]
 }
 
