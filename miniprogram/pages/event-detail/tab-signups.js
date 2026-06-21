@@ -209,9 +209,13 @@ module.exports = {
     // 单个添加：直接添加一名选手到报名池
     async doSingleAdd(e) {
       const pid = e.currentTarget.dataset.pid
+      console.log('[add] pid:', pid, 'eventId:', this.data.eventId)
       this.setData({ addLoading: true })
       try {
-        const res = await api.post('/events/' + this.data.eventId + '/signups/batch', { playerIds: [pid] })
+        const payload = { playerIds: [pid] }
+        console.log('[add] sending:', JSON.stringify(payload))
+        const res = await api.post('/events/' + this.data.eventId + '/signups/batch', payload)
+        console.log('[add] response:', JSON.stringify(res))
         // 服务器始终返回 success:true，实际添加结果在 res.data 中
         const result = res.data || {}
         const added = result.success || 0
@@ -241,6 +245,7 @@ module.exports = {
           modal.toast(this, { title: '添加失败，请重试', icon: 'none' })
         }
       } catch (e) {
+        console.log('[add] error:', e)
         this.setData({ addLoading: false })
         modal.toast(this, { title: '添加失败，请重试', icon: 'none' })
       }
