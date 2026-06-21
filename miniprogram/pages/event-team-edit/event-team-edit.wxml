@@ -113,7 +113,7 @@
         <!-- 队长标识 -->
         <view class="captain-row" wx:if="{{item.captain}}">
           <text class="captain-icon">👑</text>
-          <text class="captain-name">队长：{{item.captain.wx_nickname || '未知'}}</text>
+          <text class="captain-name">队长：{{item.captainName || '未知'}}</text>
         </view>
         <view class="no-captain-row" wx:elif="{{canEdit && item.players.length > 0}}">
           <text class="no-captain-text">⚠ 未指定队长（长按队员设置）</text>

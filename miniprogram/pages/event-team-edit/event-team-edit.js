@@ -151,6 +151,16 @@ Page({
           teamName: t.team_name || t.teamName || '未命名',
           captain_id: t.captain_id || t.captainId || '',
           captain: t.captain || null,
+          captainName: (function() {
+            var c = t.captain;
+            var name = (c && c.wx_nickname) || t.captainName || '';
+            if (!name && t.captain_id) {
+              var members = t.members || t.players || [];
+              var found = members.find(function(m) { return m.id === t.captain_id; });
+              name = (found && found.wx_nickname) || '';
+            }
+            return name.length > 8 ? name.substring(0,8) + '…' : name;
+          })(),
           players: (t.members || t.players || []).map(m => ({
             id: m.id, wx_nickname: m.wx_nickname || '',
             calibrate_mmr: m.calibrate_mmr || 0,
@@ -509,6 +519,11 @@ Page({
           captain: (t.players || []).length > 0
             ? ((t.players || []).find(p => p.id === t.captainId) || t.players[0])
             : null,
+          captainName: (function() {
+            var cap = ((t.players || []).find(p => p.id === t.captainId) || (t.players || [])[0]);
+            var name = (cap && cap.wx_nickname) || '';
+            return name.length > 8 ? name.substring(0,8) + '…' : name;
+          })(),
           playerIds: t.playerIds,
           players: t.players || [],
           totalMmr: t.totalMmr || 0,
