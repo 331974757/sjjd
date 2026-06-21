@@ -198,10 +198,12 @@ module.exports = {
       api.get('/stats/ranks').then(res => {
         if (!res.success || !res.data || !res.data.length) return
         const result = res.data
-          .filter(d => d.name && d.name !== '')
           .map(d => {
-            const tier = R.getRankTier(d.name)
-            if (!tier) return null
+            const tier = d.name ? R.getRankTier(d.name) : null
+            if (!tier) {
+              // 未定段位归入 unknown 统计
+              return { tier: 'unknown', label: '未定段位', icon: '❓', count: d.value, color: '#666' }
+            }
             const j = RANK_ORDER.indexOf(tier)
             return { tier, label: RANK_LABELS[tier], icon: RANK_ICONS[tier], iconIsImg: R.isRankIconImage(RANK_ICONS[tier]), count: d.value, color: RANK_COLORS[j >= 0 ? j : 0] }
           })
