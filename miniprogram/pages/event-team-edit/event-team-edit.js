@@ -152,10 +152,10 @@ Page({
           captain_id: t.captain_id || t.captainId || '',
           captain: t.captain || null,
           players: (t.members || t.players || []).map(m => ({
-            id: m.id, wx_nickname: m.nickName || m.wx_nickname || '',
-            calibrate_mmr: m.mmr || m.calibrate_mmr || 0,
-            calibrate_rank_name: m.rankName || m.calibrate_rank_name || '',
-            calibrate_rank_star: m.rankStar || m.calibrate_rank_star || 0,
+            id: m.id, wx_nickname: m.wx_nickname || '',
+            calibrate_mmr: m.calibrate_mmr || 0,
+            calibrate_rank_name: m.calibrate_rank_name || '',
+            calibrate_rank_star: m.calibrate_rank_star || 0,
             isCaptain: m.isCaptain || m.id === (t.captain_id || t.captainId)
           })),
           playerIds: (t.members || t.players || []).map(p => p.id),
@@ -165,16 +165,8 @@ Page({
             : 0,
         }))
 
-        // 规范化自由选手数据，对齐 WXML 期望的字段名
-        const normalizedFree = (freePlayers || []).map(p => ({
-          id: p.id,
-          wx_nickname: p.nickName || p.wx_nickname || '',
-          calibrate_mmr: p.mmr || p.calibrate_mmr || 0,
-          calibrate_rank_name: p.rankName || p.calibrate_rank_name || '',
-          calibrate_rank_star: p.rankStar || p.calibrate_rank_star || 0,
-          avatar_url: p.avatarUrl || p.avatar_url || '',
-          game_id: p.gameId || p.game_id || '',
-        }))
+        // 自由选手直接使用，后端已返回规范字段名
+        const normalizedFree = freePlayers || []
 
         this.setData({
           teams: normalizedTeams,

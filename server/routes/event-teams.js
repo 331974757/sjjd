@@ -45,8 +45,8 @@ module.exports = function (app, h) {
         const members = playerIds.map(pid => {
           const p = allPlayersMap[pid];
           return p ? {
-            id: p.id, nickName: p.wx_nickname || '', rankName: p.calibrate_rank_name || '', rankStar: p.calibrate_rank_star || 0,
-            mmr: p.calibrate_mmr || 0, rankSort: p.calibrate_rank_sort || 0, avatarUrl: p.avatar_url || '',
+            id: p.id, wx_nickname: p.wx_nickname || '', calibrate_rank_name: p.calibrate_rank_name || '', calibrate_rank_star: p.calibrate_rank_star || 0,
+            calibrate_mmr: p.calibrate_mmr || 0, calibrate_rank_sort: p.calibrate_rank_sort || 0, avatar_url: p.avatar_url || '',
             isCaptain: p.id === team.captain_id
           } : null;
         }).filter(Boolean);
@@ -55,7 +55,7 @@ module.exports = function (app, h) {
 
         teams.push({
           teamId: team.team_id, teamName: team.team_name, captainId: team.captain_id,
-          captainName: captainPlayer ? captainPlayer.nickName : '', members, memberCount: members.length,
+          captainName: captainPlayer ? captainPlayer.wx_nickname : '', members, memberCount: members.length,
           totalMmr: team.total_mmr || 0, avgMmr, createdAt: team.created_at
         });
       }
@@ -67,9 +67,9 @@ module.exports = function (app, h) {
       const freePlayerIds = signedPlayerIds.filter(pid => !allAssignedPlayerIds.has(pid));
       const freePlayers = freePlayerIds.length ? await h.getPlayersByIds(freePlayerIds) : [];
       const freeList = freePlayers.map(p => ({
-        id: p.id, nickName: p.wx_nickname || '', rankName: p.calibrate_rank_name || '', rankStar: p.calibrate_rank_star || 0,
-        mmr: p.calibrate_mmr || 0, rankSort: p.calibrate_rank_sort || 0, avatarUrl: p.avatar_url || '',
-        gameId: p.game_id || ''
+        id: p.id, wx_nickname: p.wx_nickname || '', calibrate_rank_name: p.calibrate_rank_name || '', calibrate_rank_star: p.calibrate_rank_star || 0,
+        calibrate_mmr: p.calibrate_mmr || 0, calibrate_rank_sort: p.calibrate_rank_sort || 0, avatar_url: p.avatar_url || '',
+        game_id: p.game_id || ''
       }));
 
       res.json({ success: true, data: { teams, freePlayers: freeList } });
