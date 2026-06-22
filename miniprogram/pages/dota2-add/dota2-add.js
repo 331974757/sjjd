@@ -59,20 +59,25 @@ Page({
   async checkAccess() {
     try {
       const isAdmin = await perm.isAdmin()
+      wx.setStorageSync('debug_a', 'isAdmin:' + isAdmin)
       if (isAdmin) {
         this.setData({ accessChecked: true, accessDenied: false, isAdmin: true })
         return
       }
       // 普通用户：检查是否可自建档案
       const res = await api.get('/users/me')
+      wx.setStorageSync('debug_b', JSON.stringify(res).substring(0,200))
       if (!res.success) {
-        this.setData({ accessChecked: true, accessDenied: true, _denyReason: '网络异常，请重试' })
-        setTimeout(() => { wx.navigateBack() }, 2000)
+        wx.setStorageSync('debug_c', 'success=false')
+        this.setData({ accessChecked: true, accessDenied: true, _denyReason: '网络异常，请重试 (A)' })
+        setTimeout(() => { wx.navigateBack() }, 3000)
         return
       }
+      wx.setStorageSync('debug_d', 'hasCreated=' + res.hasCreatedPlayer)
       if (res.hasCreatedPlayer) {
-        this.setData({ accessChecked: true, accessDenied: true, _denyReason: '您已创建过选手档案' })
-        setTimeout(() => { wx.navigateBack() }, 2000)
+        wx.setStorageSync('debug_e', 'hasCreated=1')
+        this.setData({ accessChecked: true, accessDenied: true, _denyReason: '您已创建过选手档案 (B)' })
+        setTimeout(() => { wx.navigateBack() }, 3000)
         return
       }
       this.setData({ accessChecked: true, accessDenied: false, isAdmin: false })
