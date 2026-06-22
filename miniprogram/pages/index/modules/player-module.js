@@ -148,7 +148,7 @@ module.exports = {
 
     // ====== 导航 ======
     async goAdd() {
-      if (!this.data.isAdmin) {
+      if (!this.data.isAdmin && !this.data.userCanCreatePlayer) {
         const names = this.data.allAdminNames.join('、')
         await modal.confirm(this, {
           theme: 'warning',
