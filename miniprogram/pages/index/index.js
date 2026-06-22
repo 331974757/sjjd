@@ -269,6 +269,8 @@ const pageConfig = {
           nickChangeCount: newCount,
           remainingCount: Math.max(0, this.data.nickChangeLimit - newCount)
         })
+        // 刷新用户权限标记（含 hasCreatedPlayer）
+        this.fetchNicknameInfo()
         modal.toast(this, { theme: 'success', content: '昵称已更新' })
       } else {
         if (res.nickChangeCount !== undefined) { this.setData({ nickChangeCount: res.nickChangeCount }) }
