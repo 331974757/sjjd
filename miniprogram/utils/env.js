@@ -10,8 +10,8 @@ const PROD = {
 }
 
 const TEST = {
-  API_BASE: 'https://congqin.online:3001/api',
-  BASE_URL: 'https://congqin.online:3001',
+  API_BASE: 'https://congqin.online/test-api',
+  BASE_URL: 'https://congqin.online',
 }
 
 const CONFIG = USE_TEST ? TEST : PROD
