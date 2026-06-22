@@ -66,15 +66,13 @@ Page({
       // 普通用户：检查是否可自建档案
       const res = await api.get('/users/me')
       if (!res.success) {
-        this.setData({ accessChecked: true, accessDenied: true })
-        modal.toast(this, { title: '网络异常，请重试', icon: 'none' })
-        setTimeout(() => { wx.navigateBack() }, 1500)
+        this.setData({ accessChecked: true, accessDenied: true, _denyReason: '网络异常，请重试' })
+        setTimeout(() => { wx.navigateBack() }, 2000)
         return
       }
       if (res.hasCreatedPlayer) {
-        this.setData({ accessChecked: true, accessDenied: true })
-        modal.toast(this, { title: '您已创建过选手档案', icon: 'none' })
-        setTimeout(() => { wx.navigateBack() }, 1500)
+        this.setData({ accessChecked: true, accessDenied: true, _denyReason: '您已创建过选手档案' })
+        setTimeout(() => { wx.navigateBack() }, 2000)
         return
       }
       this.setData({ accessChecked: true, accessDenied: false, isAdmin: false })
@@ -82,9 +80,8 @@ Page({
       setTimeout(() => { wx.navigateBack() }, 1500)
     } catch (err) {
       console.error('权限检查失败', err)
-      this.setData({ accessChecked: true, accessDenied: true })
-      modal.toast(this, { title: '权限检查失败，请重试', icon: 'none' })
-      setTimeout(() => { wx.navigateBack() }, 1500)
+      this.setData({ accessChecked: true, accessDenied: true, _denyReason: '权限检查失败' })
+      setTimeout(() => { wx.navigateBack() }, 2000)
     }
   },
 

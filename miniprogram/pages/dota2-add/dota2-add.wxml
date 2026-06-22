@@ -13,9 +13,8 @@
 
   <!-- 无权限 -->
   <view class="empty-state" wx:elif="{{accessDenied}}">
-    <text class="empty-text">无法添加选手，请稍后重试</text>
+    <text class="empty-text">{{_denyReason || '无法访问'}}</text>
   </view>
-
   <block wx:else>
   <!-- 头像上传 -->
   <view class="avatar-section">
