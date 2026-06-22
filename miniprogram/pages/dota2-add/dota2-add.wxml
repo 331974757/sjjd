@@ -13,7 +13,7 @@
 
   <!-- 无权限 -->
   <view class="empty-state" wx:elif="{{accessDenied}}">
-    <text class="empty-text">仅管理员可添加选手</text>
+    <text class="empty-text">无法添加选手，请稍后重试</text>
   </view>
 
   <block wx:else>
