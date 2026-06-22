@@ -82,7 +82,6 @@ Page({
       console.log('[checkAccess] OK - allowed')
       this.setData({ accessChecked: true, accessDenied: false, isAdmin: false })
       if (res.nickName) this.setData({ wxNickname: res.nickName })
-      setTimeout(() => { wx.navigateBack() }, 1500)
     } catch (err) {
       console.error('[checkAccess] error:', err)
       this.setData({ accessChecked: true, accessDenied: true, _denyReason: 'E-错误' })
