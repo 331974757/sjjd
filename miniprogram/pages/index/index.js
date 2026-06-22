@@ -184,7 +184,8 @@ const pageConfig = {
           remainingCount: Math.max(0, this.data.nickChangeLimit - count),
           userRole: role,
           isAdmin: isManager,
-          unlimitedNick: isManager
+          unlimitedNick: isManager,
+          userCanCreatePlayer: !isManager && !res.hasCreatedPlayer
         })
       } else {
         this._applyRoleFallback()

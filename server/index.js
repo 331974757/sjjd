@@ -279,25 +279,29 @@ app.post('/api/players', async (req, res) => {
 
     // 普通用户自建档案：限昵称匹配 + 只能建一次
     if (!isAdmin) {
+      // 非管理员自建档案：限昵称匹配 + 只能建一次
       const [userRows] = await pool.query('SELECT nick_name, has_created_player FROM users WHERE openid = ?', [openid]);
       const userNick = (userRows.length && userRows[0].nick_name) ? userRows[0].nick_name.trim() : '';
       if (!userNick) return res.status(400).json({ success: false, error: '请先设置昵称' });
       if (userRows[0].has_created_player) return res.status(400).json({ success: false, error: '您已创建过选手档案' });
       const wxNickname = (req.body.wxNickname || '').trim();
       if (userNick !== wxNickname) return res.status(400).json({ success: false, error: '昵称需与选手名一致' });
-    }
-
-    if (!await assertAdmin(req, res)) {
-      // 非管理员只能建档案（不能设段位/MMR）
-      const { wxNickname, steamId, gameId } = req.body;
+      // 检查是否已存在活跃选手
+      const [dup] = await pool.query("SELECT id FROM dota2_players WHERE wx_nickname = ? AND status = 'active'", [wxNickname]);
+      if (dup.length) return res.status(400).json({ success: false, error: '该昵称已存在' });
+      // 创建基础档案（无段位/MMR）
+      const { steamId, gameId } = req.body;
       const id = genId();
       await pool.query(
         "INSERT INTO dota2_players (id, wx_nickname, steam_id, game_id, status, created_at, updated_at) VALUES (?,?,?,?,'active',NOW(),NOW())",
-        [id, wxNickname || '', steamId || '', gameId || '']
+        [id, wxNickname, steamId || '', gameId || '']
       );
       await pool.query('UPDATE users SET has_created_player = 1 WHERE openid = ?', [openid]);
       return res.json({ success: true, data: { _id: id } });
     }
+
+    // 以下为管理员创建选手
+    if (!await assertAdmin(req, res)) return;
     const { wxNickname, steamId, gameId, calibrateRankName, calibrateRankStar, calibrateMmr, goodAtPositions, signupPosition, avatarUrl } = req.body;
     const mmr = calibrateMmr != null && calibrateMmr > 0 ? Number(calibrateMmr) : null;
     if (!wxNickname) return res.status(400).json({ success: false, error: '微信群昵称不能为空' });
