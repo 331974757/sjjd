@@ -329,7 +329,7 @@
     </view>
 
     <!-- 添加选手按钮 -->
-    <view class="fab-btn" wx:if="{{isAdmin}}" bindtap="goAdd">
+    <view class="fab-btn" wx:if="{{isAdmin || userCanCreatePlayer}}" bindtap="goAdd">
       <text class="fab-text">+</text>
     </view>
 

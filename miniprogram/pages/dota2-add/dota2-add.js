@@ -59,18 +59,22 @@ Page({
   async checkAccess() {
     try {
       const isAdmin = await perm.isAdmin()
-      if (!isAdmin) {
-        this.setData({ accessChecked: true, accessDenied: true })
-        await modal.confirm(this, {
-          theme: 'warning',
-          title: '仅管理员可添加选手',
-          content: '请联系管理员添加选手',
-          showCancel: false
-        })
-        wx.navigateBack()
-      } else {
-        this.setData({ accessChecked: true, accessDenied: false })
+      if (isAdmin) {
+        this.setData({ accessChecked: true, accessDenied: false, isAdmin: true })
+        return
       }
+      // 普通用户：检查是否可自建档案
+      const res = await api.get('/users/me')
+      console.log('[dota2-add] /users/me:', JSON.stringify(res))
+      if (res.success && !res.hasCreatedPlayer) {
+        this.setData({ accessChecked: true, accessDenied: false, isAdmin: false })
+        // 预填昵称
+        if (res.nickName) this.setData({ wxNickname: res.nickName })
+        return
+      }
+      this.setData({ accessChecked: true, accessDenied: true })
+      modal.toast(this, { title: '仅管理员可添加选手', icon: 'none' })
+      setTimeout(() => { wx.navigateBack() }, 1500)
     } catch (err) {
       console.error('权限检查失败', err)
       this.setData({ accessChecked: true, accessDenied: true })
