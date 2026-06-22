@@ -46,7 +46,8 @@
       <input class="form-input" placeholder="请输入 Dota2 游戏昵称" value="{{gameId}}" bindinput="onInput" data-field="gameId" />
     </view>
 
-    <!-- 核准段位（可滑动选择） -->
+    <!-- 核准段位（仅管理员可见） -->
+    <block wx:if="{{isAdmin}}">
     <view class="form-group">
       <text class="form-label">核准段位 <text class="required">*</text></text>
       <scroll-view class="rank-scroll" scroll-x enhanced show-scrollbar="{{false}}">
@@ -105,6 +106,7 @@
       <text class="form-label">实际天梯分 <text class="optional">(可选)</text></text>
       <input class="form-input" placeholder="如填写实际天梯分则分队时优先使用" value="{{calibrateMmr}}" bindinput="onInput" data-field="calibrateMmr" type="number" />
     </view>
+    </block>
 
     <!-- 擅长游戏位置（多选圆形按钮） -->
     <view class="form-group">

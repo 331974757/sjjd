@@ -197,36 +197,45 @@ Page({
       if (this.data.signupPos[j]) signupPosition.push(j)
     }
 
-    // 验证段位必选
-    if (this.data.rankIndex < 0) {
-      modal.toast(this, { title: '请选择核准段位', icon: 'none' })
-      return
+    // 验证段位必选（仅管理员）
+    if (this.data.isAdmin) {
+      if (this.data.rankIndex < 0) {
+        modal.toast(this, { title: '请选择核准段位', icon: 'none' })
+        return
+      }
+      const isEmperor = this.data.rankIndex === RANK_OPTIONS.length - 1
+      if (!isEmperor && this.data.rankStars <= 0) {
+        modal.toast(this, { title: '请选择核准星数', icon: 'none' })
+        return
+      }
     }
-    // 验证非冠绝时必须选星数
-    const isEmperor = this.data.rankIndex === RANK_OPTIONS.length - 1
-    if (!isEmperor && this.data.rankStars <= 0) {
-      modal.toast(this, { title: '请选择核准星数', icon: 'none' })
-      return
-    }
-
-    const rankTitle = RANK_OPTIONS[this.data.rankIndex]
+    const rankTitle = this.data.isAdmin ? RANK_OPTIONS[this.data.rankIndex] : ''
 
     this.setData({ submitting: true })
 
     try {
-      const res = await api.post('/players', {
+      const payload = {
         avatarUrl: this.data.avatarUrl || '',
         wxNickname: wxNickname,
         steamId: this.data.steamId.trim(),
         gameId: gameId,
-        calibrateRankName: rankTitle,
-        calibrateRankStar: this.data.rankStars,
-        calibrateMmr: this.data.calibrateMmr ? parseInt(this.data.calibrateMmr) : null,
-        goodAtPositions: goodAtPositions,
-        signupPosition: signupPosition
-      })
+      }
+      if (this.data.isAdmin) {
+        payload.calibrateRankName = rankTitle
+        payload.calibrateRankStar = this.data.rankStars
+        payload.calibrateMmr = this.data.calibrateMmr ? parseInt(this.data.calibrateMmr) : null
+      }
+      payload.goodAtPositions = goodAtPositions
+      payload.signupPosition = signupPosition
+      const res = await api.post('/players', payload)
 
       if (res.success) {
+        // 普通用户自建后隐藏按钮
+        if (!this.data.isAdmin) {
+          const pages = getCurrentPages()
+          const homePage = pages.find(p => p.route === 'pages/index/index')
+          if (homePage) homePage.setData({ userCanCreatePlayer: false })
+        }
         // 通知首页强制刷新
         this._notifyHomeRefresh()
         const action = res.action
