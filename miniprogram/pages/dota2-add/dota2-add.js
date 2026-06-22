@@ -59,34 +59,31 @@ Page({
   async checkAccess() {
     try {
       const isAdmin = await perm.isAdmin()
-      wx.setStorageSync('debug_a', 'isAdmin:' + isAdmin)
+      console.log('[checkAccess] isAdmin:', isAdmin)
       if (isAdmin) {
         this.setData({ accessChecked: true, accessDenied: false, isAdmin: true })
         return
       }
-      // 普通用户：检查是否可自建档案
       const res = await api.get('/users/me')
-      wx.setStorageSync('debug_b', JSON.stringify(res).substring(0,200))
+      console.log('[checkAccess] /users/me:', JSON.stringify(res))
       if (!res.success) {
-        wx.setStorageSync('debug_c', 'success=false')
-        this.setData({ accessChecked: true, accessDenied: true, _denyReason: '网络异常，请重试 (A)' })
-        setTimeout(() => { wx.navigateBack() }, 3000)
+        console.log('[checkAccess] FAIL: success=false')
+        this.setData({ accessChecked: true, accessDenied: true, _denyReason: 'A-网络异常' })
         return
       }
-      wx.setStorageSync('debug_d', 'hasCreated=' + res.hasCreatedPlayer)
+      console.log('[checkAccess] hasCreatedPlayer:', res.hasCreatedPlayer)
       if (res.hasCreatedPlayer) {
-        wx.setStorageSync('debug_e', 'hasCreated=1')
-        this.setData({ accessChecked: true, accessDenied: true, _denyReason: '您已创建过选手档案 (B)' })
-        setTimeout(() => { wx.navigateBack() }, 3000)
+        console.log('[checkAccess] FAIL: already created')
+        this.setData({ accessChecked: true, accessDenied: true, _denyReason: 'B-已创建过' })
         return
       }
+      console.log('[checkAccess] OK - allowed')
       this.setData({ accessChecked: true, accessDenied: false, isAdmin: false })
       if (res.nickName) this.setData({ wxNickname: res.nickName })
       setTimeout(() => { wx.navigateBack() }, 1500)
     } catch (err) {
-      console.error('权限检查失败', err)
-      this.setData({ accessChecked: true, accessDenied: true, _denyReason: '权限检查失败' })
-      setTimeout(() => { wx.navigateBack() }, 2000)
+      console.error('[checkAccess] error:', err)
+      this.setData({ accessChecked: true, accessDenied: true, _denyReason: 'E-错误' })
     }
   },
 
