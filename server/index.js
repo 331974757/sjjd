@@ -765,7 +765,7 @@ app.get('/api/users/me', async (req, res) => {
     const openid = req._openid || '';
     if (!openid) return res.status(401).json({ success: false, error: '请先登录' });
     const [rows] = await pool.query('SELECT * FROM users WHERE openid = ?', [openid]);
-    if (!rows.length) return res.json({ success: true, nickName: '', nickChangeCount: 0, role: 'user' });
+    if (!rows.length) return res.json({ success: true, nickName: '', nickChangeCount: 0, role: 'user', hasCreatedPlayer: false });
     const u = mapUser(rows[0]);
     res.json({ success: true, ...u });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
