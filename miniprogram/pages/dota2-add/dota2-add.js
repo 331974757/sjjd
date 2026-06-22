@@ -65,15 +65,20 @@ Page({
       }
       // 普通用户：检查是否可自建档案
       const res = await api.get('/users/me')
-      console.log('[dota2-add] /users/me:', JSON.stringify(res))
-      if (res.success && !res.hasCreatedPlayer) {
-        this.setData({ accessChecked: true, accessDenied: false, isAdmin: false })
-        // 预填昵称
-        if (res.nickName) this.setData({ wxNickname: res.nickName })
+      if (!res.success) {
+        this.setData({ accessChecked: true, accessDenied: true })
+        modal.toast(this, { title: '网络异常，请重试', icon: 'none' })
+        setTimeout(() => { wx.navigateBack() }, 1500)
         return
       }
-      this.setData({ accessChecked: true, accessDenied: true })
-      modal.toast(this, { title: '仅管理员可添加选手', icon: 'none' })
+      if (res.hasCreatedPlayer) {
+        this.setData({ accessChecked: true, accessDenied: true })
+        modal.toast(this, { title: '您已创建过选手档案', icon: 'none' })
+        setTimeout(() => { wx.navigateBack() }, 1500)
+        return
+      }
+      this.setData({ accessChecked: true, accessDenied: false, isAdmin: false })
+      if (res.nickName) this.setData({ wxNickname: res.nickName })
       setTimeout(() => { wx.navigateBack() }, 1500)
     } catch (err) {
       console.error('权限检查失败', err)
