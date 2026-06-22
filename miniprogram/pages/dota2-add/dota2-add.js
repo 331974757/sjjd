@@ -25,6 +25,7 @@ Page({
   },
 
   onLoad() {
+    console.log('[dota2-add] onLoad START')
     // 恢复草稿
     try {
       const draft = wx.getStorageSync('dota2_add_draft')
@@ -57,6 +58,7 @@ Page({
   },
 
   async checkAccess() {
+    console.log('[checkAccess] ENTER')
     try {
       const isAdmin = await perm.isAdmin()
       console.log('[checkAccess] isAdmin:', isAdmin)
