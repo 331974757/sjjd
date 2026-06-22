@@ -6,6 +6,8 @@ App({
   onLaunch() {
     // 每次冷启动时清理所有业务缓存，避免旧缓存导致加载问题
     this._clearBusinessCaches()
+    // 版本更新检测
+    this._checkUpdate()
     
     // 先从本地缓存恢复 token 和 openid（快速恢复会话）
     try {
@@ -43,6 +45,37 @@ App({
    */
   onHide() {
     this.globalData._lastHideTime = Date.now()
+  },
+
+  /**
+   * 版本检测：有新版时弹窗提示用户重启
+   */
+  _checkUpdate() {
+    if (!wx.canIUse('getUpdateManager')) return
+    const updateManager = wx.getUpdateManager()
+    updateManager.onCheckForUpdate(function (res) {
+      // 静默检测，不做提示
+    })
+    updateManager.onUpdateReady(function () {
+      wx.showModal({
+        title: '版本更新',
+        content: '检测到新版本，请重启小程序以体验最新功能',
+        showCancel: false,
+        confirmText: '立即重启',
+        success: function (res) {
+          if (res.confirm) {
+            updateManager.applyUpdate()
+          }
+        }
+      })
+    })
+    updateManager.onUpdateFailed(function () {
+      wx.showModal({
+        title: '更新失败',
+        content: '新版本下载失败，请稍后重试',
+        showCancel: false
+      })
+    })
   },
 
   /**
