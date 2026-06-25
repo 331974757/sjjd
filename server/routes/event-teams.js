@@ -388,6 +388,7 @@ module.exports = function (app, h) {
         return {
           teamId: t.team_id, teamName: t.team_name, captainName: captainMap[t.captain_id] || '',
           wins, losses: Math.max(0, totalPlayed - wins), score: wins,
+          memberCount: t.player_ids ? JSON.parse(t.player_ids).length : 0,
           totalMmr: t.total_mmr || 0, avgMmr: t.avg_mmr || 0
         };
       });
