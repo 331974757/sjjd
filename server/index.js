@@ -56,7 +56,7 @@ const { errorHandler } = require('./utils/errors');
 const pool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'dota2',
-  password: process.env.DB_PASSWORD || 'Yang8728135@',
+  password: process.env.DB_PASSWORD || 'your_db_password',
   database: process.env.DB_NAME || 'dota2',
   charset: 'utf8mb4',              // 确保中文正常存储
   dateStrings: true,               // DATETIME 直接返回字符串，无需 JS Date 转换
@@ -67,8 +67,8 @@ const pool = mysql.createPool({
   keepAliveInitialDelay: 0,        // Keep-Alive初始延迟
 });
 
-const WECHAT_APPID = process.env.WECHAT_APPID || 'wxecea6e915b217430';
-const WECHAT_SECRET = process.env.WECHAT_SECRET || 'f2c23d00ebb1e12debc58dc9a6157349';
+const WECHAT_APPID = process.env.WECHAT_APPID || 'your_wechat_appid';
+const WECHAT_SECRET = process.env.WECHAT_SECRET || 'your_wechat_secret';
 // JWT 密钥：优先从环境变量读取；否则从 WECHAT 凭据派生固定值，确保重启后 Token 不失效
 const JWT_SECRET = process.env.JWT_SECRET
   || crypto.createHash('sha256').update(WECHAT_APPID + WECHAT_SECRET).digest('hex');
