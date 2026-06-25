@@ -270,7 +270,7 @@ ssh root@121.41.191.80 "mysql -u root -p'Dota2Migrate@2026' dota2 < /opt/dota2-a
 ### 5.4 前端小程序部署
 
 1. 在微信开发者工具中打开项目
-2. 确认 `project.config.json` 中 appid 为 `wxecea6e915b217430`
+2. 确认 `project.config.json` 中 appid 为 `你的小程序AppID`
 3. 点击「上传」→ 填写版本号和描述
 4. 登录 MP 后台 → 版本管理 → 提交审核
 
@@ -279,7 +279,7 @@ ssh root@121.41.191.80 "mysql -u root -p'Dota2Migrate@2026' dota2 < /opt/dota2-a
 | 问题 | 排查方法 |
 |---|---|
 | 接口返回 500 | `pm2 logs dota2-api --err` 查看错误日志 |
-| 数据库连接失败 | `mysql -u dota2 -p'Yang8728135@' dota2 -e "SELECT 1"` |
+| 数据库连接失败 | `mysql -u dota2 -p'你的MySQL密码' dota2 -e "SELECT 1"` |
 | 接口跨域 | 确认 `server/index.js` 中有 `app.use(cors())` |
 | 权限校验异常 | 调用 `/api/users/me?openid=xxx` 确认角色 |
 | PM2 进程崩溃 | `pm2 restart dota2-api`，检查 `.env` 文件是否存在 |
