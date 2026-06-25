@@ -219,7 +219,7 @@ module.exports = {
           .sort((a, b) => {
             var ia = a.tier === 'unknown' ? -1 : RANK_ORDER.indexOf(a.tier)
             var ib = b.tier === 'unknown' ? -1 : RANK_ORDER.indexOf(b.tier)
-            return ib - ia
+            return ia - ib
           })
         this.setData({ rankDistribution: result }, () => {
           if (this._pieTimer) clearTimeout(this._pieTimer)
