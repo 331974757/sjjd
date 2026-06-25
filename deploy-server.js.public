@@ -1,0 +1,17 @@
+/**
+ * Dota2 API 一键部署脚本（公开版 — 请替换为实际服务器信息）
+ * 用法: node deploy-server.js
+ */
+const { Client } = require('ssh2');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+
+const SERVER = {
+  host: 'your_server_ip',
+  port: 22,
+  username: 'root',
+  privateKey: fs.readFileSync(path.join(os.homedir(), '.ssh', 'your_private_key')),
+};
+
+const REMOTE_DIR = '/opt/dota2-api';
