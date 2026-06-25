@@ -216,7 +216,11 @@ module.exports = {
             return { tier, label: RANK_LABELS[tier], icon: RANK_ICONS[tier], iconIsImg: R.isRankIconImage(RANK_ICONS[tier]), count: d.value, color: RANK_COLORS[j >= 0 ? j : 0] }
           })
           .filter(Boolean)
-          .sort((a, b) => b.count - a.count)
+          .sort((a, b) => {
+            var ia = a.tier === 'unknown' ? -1 : RANK_ORDER.indexOf(a.tier)
+            var ib = b.tier === 'unknown' ? -1 : RANK_ORDER.indexOf(b.tier)
+            return ib - ia
+          })
         this.setData({ rankDistribution: result }, () => {
           if (this._pieTimer) clearTimeout(this._pieTimer)
           this._pieTimer = setTimeout(() => { this.drawPieChart() }, 300)
